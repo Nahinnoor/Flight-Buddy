@@ -1,0 +1,47 @@
+# ---- secrets: commit these patterns BEFORE anything else ----
+.env
+.env.*
+!.env.example
+.mcp.json
+*.local.json
+*.p8
+*.p12
+*.mobileprovision
+google-services.json
+GoogleService-Info.plist
+
+# ---- node ----
+node_modules/
+npm-debug.*
+yarn-error.*
+.pnpm-debug.log*
+
+# ---- expo / react native ----
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+ios/
+android/
+*.jks
+*.keystore
+
+# ---- build output ----
+build/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# ---- supabase ----
+supabase/.branches
+supabase/.temp
+
+# ---- editors / os ----
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ---- logs ----
+logs/
+*.log
