@@ -1,0 +1,12 @@
+{
+  "name": "flightbuddy",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "devDependencies": {
+    "expo-mcp": "~0.2.1"
+  }
+}

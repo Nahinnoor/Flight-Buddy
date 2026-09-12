@@ -1,3 +1,4 @@
+node_modules
 # ---- secrets: commit these patterns BEFORE anything else ----
 .env
 .env.*
