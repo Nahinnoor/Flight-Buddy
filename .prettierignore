@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+package-lock.json
+# apps/mobile keeps the formatting Expo's template ships with.
+apps/mobile
+# Prose and SQL are hand-authored; reflowing tables and migrations helps nobody.
+**/*.md
+docs
+supabase

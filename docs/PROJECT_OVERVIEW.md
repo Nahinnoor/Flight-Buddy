@@ -1,6 +1,6 @@
 # FlightBuddy — Master Project Overview
 
-**Status:** Pre-implementation. Architecture confirmed, no code written.
+**Status:** Phase 1 in progress (schema applied to dev project).
 **Owner:** Solo developer.
 **Target:** iOS private beta (~10 testers) via TestFlight, then public launch.
 **Last updated:** 2026-09-05
@@ -410,6 +410,8 @@ create table provider_credit_log (
 **`manual`-tier flights still get a `flights` row.** No `next_poll_at`, times supplied by the user. This keeps `trip_segments.flight_id` non-nullable and every read path uniform.
 
 **Ownership transfer** on owner account deletion: promote the `group_members` row with the earliest `joined_at`.
+
+**Implementation notes (applied 2026-09-11, migrations 20260912011727–20260912011905).** `citext` is installed in the `extensions` schema, so columns are typed `extensions.citext`. Every FK has an explicit index (performance advisor). A partial unique index on `travelers(user_id) where user_id is not null` enforces one self-traveller per user. RLS helpers live in a `private` schema as `security definer` functions with `search_path = ''`. Policy widenings beyond §10: `notification_prefs` rows are writable by the group owner (owner-set mutes); a pending joiner can read their own `group_members` row; the owner can read/update `groups` directly, not only via an active membership.
 
 **Forward compatibility.** `groups.destination_iata`, `start_date`, and `end_date` are unused in MVP. They exist because expense splitting and itineraries need a bounded trip, and adding them later is a migration on a live table.
 
