@@ -1,0 +1,3189 @@
+{
+  "departures": [
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KORF",
+          "iata": "ORF",
+          "name": "Norfolk",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 02:41Z",
+          "local": "2026-09-11 22:41-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:52Z",
+          "local": "2026-09-11 21:52-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 5326",
+      "callSign": "EDV5326",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N600LR",
+        "modeS": "A7C849",
+        "model": "Canadair CRJ 900"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KCLE",
+          "iata": "CLE",
+          "name": "Cleveland",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:02Z",
+          "local": "2026-09-11 23:02-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:10Z",
+          "local": "2026-09-11 22:10-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 4946",
+      "callSign": "EDV4946",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N582CA",
+        "modeS": "A77D89",
+        "model": "Canadair CRJ 900"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KSFO",
+          "iata": "SFO",
+          "name": "San Francisco",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:34Z",
+          "local": "2026-09-12 00:34-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:26Z",
+          "local": "2026-09-12 00:26-07:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 07:26Z",
+          "local": "2026-09-12 00:26-07:00"
+        },
+        "terminal": "1",
+        "gate": "C9",
+        "baggageBelt": "CL-B8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 1732",
+      "callSign": "DAL1732",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N722TW",
+        "modeS": "A9ACB8",
+        "model": "Boeing 757-200"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:30Z",
+          "local": "2026-09-11 20:30-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "terminal": "7",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "BIKF",
+          "iata": "KEF",
+          "name": "Reykjavik",
+          "countryCode": "is",
+          "timeZone": "Atlantic/Reykjavik"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 06:20+00:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 06:20+00:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "FI 614",
+      "callSign": "ICE614",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "TF-IAC",
+        "modeS": "4CC57C",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "Icelandair",
+        "iata": "FI",
+        "icao": "ICE"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:29Z",
+          "local": "2026-09-11 20:29-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:01Z",
+          "local": "2026-09-11 21:01-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:01Z",
+          "local": "2026-09-11 21:01-04:00"
+        },
+        "terminal": "4",
+        "runway": "31L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KSAN",
+          "iata": "SAN",
+          "name": "San Diego",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 06:34Z",
+          "local": "2026-09-11 23:34-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:16Z",
+          "local": "2026-09-11 23:16-07:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 685",
+      "callSign": "DAL685",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N593DX",
+        "modeS": "A7A8ED",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:40Z",
+          "local": "2026-09-11 20:40-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:02Z",
+          "local": "2026-09-11 21:02-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:02Z",
+          "local": "2026-09-11 21:02-04:00"
+        },
+        "terminal": "5",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KLAX",
+          "iata": "LAX",
+          "name": "Los Angeles",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 06:53Z",
+          "local": "2026-09-11 23:53-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:36Z",
+          "local": "2026-09-11 23:36-07:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 1223",
+      "callSign": "JBU1223",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N942JB",
+        "modeS": "AD1560",
+        "model": "Airbus A321 (Sharklets)"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 23:55Z",
+          "local": "2026-09-11 19:55-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:03Z",
+          "local": "2026-09-11 21:03-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:03Z",
+          "local": "2026-09-11 21:03-04:00"
+        },
+        "terminal": "4",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KFLL",
+          "iata": "FLL",
+          "name": "Fort Lauderdale",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:26Z",
+          "local": "2026-09-11 23:26-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 03:11Z",
+          "local": "2026-09-11 23:11-04:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 1414",
+      "callSign": "DAL1414",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N910DU",
+        "modeS": "AC9709",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 23:40Z",
+          "local": "2026-09-11 19:40-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:04Z",
+          "local": "2026-09-11 21:04-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:04Z",
+          "local": "2026-09-11 21:04-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KSEA",
+          "iata": "SEA",
+          "name": "Seattle",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-11 23:20-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:43Z",
+          "local": "2026-09-11 23:43-07:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 688",
+      "callSign": "DAL688",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N591DT",
+        "modeS": "A7A17B",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:15Z",
+          "local": "2026-09-11 20:15-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:04Z",
+          "local": "2026-09-11 21:04-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:04Z",
+          "local": "2026-09-11 21:04-04:00"
+        },
+        "terminal": "4",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "terminal": "2E",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 266",
+      "callSign": "DAL266",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N805NW",
+        "modeS": "AAF5B1",
+        "model": "Airbus A330"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:05Z",
+          "local": "2026-09-11 21:05-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:05Z",
+          "local": "2026-09-11 21:05-04:00"
+        },
+        "terminal": "7",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EIDW",
+          "iata": "DUB",
+          "name": "Dublin",
+          "countryCode": "ie",
+          "timeZone": "Europe/Dublin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:50Z",
+          "local": "2026-09-12 08:50+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:50Z",
+          "local": "2026-09-12 08:50+01:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "EI 106",
+      "callSign": "EIN106",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "EI-DUZ",
+        "modeS": "4CA5C7",
+        "model": "Airbus A330-300"
+      },
+      "airline": {
+        "name": "Aer Lingus",
+        "iata": "EI",
+        "icao": "EIN"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:05Z",
+          "local": "2026-09-11 21:05-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:05Z",
+          "local": "2026-09-11 21:05-04:00"
+        },
+        "terminal": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KRDU",
+          "iata": "RDU",
+          "name": "Raleigh/Durham",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:07Z",
+          "local": "2026-09-11 23:07-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:12Z",
+          "local": "2026-09-11 22:12-04:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AA 4573",
+      "callSign": "RPA4573",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N112HQ",
+        "modeS": "A0345F",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 23:50Z",
+          "local": "2026-09-11 19:50-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:07Z",
+          "local": "2026-09-11 21:07-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:07Z",
+          "local": "2026-09-11 21:07-04:00"
+        },
+        "terminal": "1",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LTFM",
+          "iata": "IST",
+          "name": "Istanbul",
+          "countryCode": "tr",
+          "timeZone": "Europe/Istanbul"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 10:00Z",
+          "local": "2026-09-12 13:00+03:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 10:00Z",
+          "local": "2026-09-12 13:00+03:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "TK 2",
+      "callSign": "THY2",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "TC-JJV",
+        "modeS": "4BA956",
+        "model": "Boeing 777"
+      },
+      "airline": {
+        "name": "Turkish",
+        "iata": "TK",
+        "icao": "THY"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 21:15Z",
+          "local": "2026-09-11 17:15-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:07Z",
+          "local": "2026-09-11 21:07-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:07Z",
+          "local": "2026-09-11 21:07-04:00"
+        },
+        "terminal": "5",
+        "runway": "31L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KBUR",
+          "iata": "BUR",
+          "name": "Burbank",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:23Z",
+          "local": "2026-09-11 20:23-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:16Z",
+          "local": "2026-09-11 23:16-07:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 358",
+      "callSign": "JBU358",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N3138J",
+        "modeS": "A3556F",
+        "model": "Airbus A220-300"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:35Z",
+          "local": "2026-09-11 20:35-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:08Z",
+          "local": "2026-09-11 21:08-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:08Z",
+          "local": "2026-09-11 21:08-04:00"
+        },
+        "terminal": "4",
+        "runway": "31L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KLAX",
+          "iata": "LAX",
+          "name": "Los Angeles",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 06:43Z",
+          "local": "2026-09-11 23:43-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:17Z",
+          "local": "2026-09-11 23:17-07:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 752",
+      "callSign": "DAL752",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N827MH",
+        "modeS": "AB4BF7",
+        "model": "Boeing 767-400"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:08Z",
+          "local": "2026-09-11 21:08-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:08Z",
+          "local": "2026-09-11 21:08-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KUNV",
+          "iata": "SCE",
+          "name": "State College",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "quality": []
+      },
+      "number": "TTT 685",
+      "callSign": "TTT685",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N685VQ",
+        "modeS": "FAA685",
+        "model": "Airbus A340-200"
+      },
+      "airline": {
+        "name": "TTT"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:45Z",
+          "local": "2026-09-11 20:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:09Z",
+          "local": "2026-09-11 21:09-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:09Z",
+          "local": "2026-09-11 21:09-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LSZH",
+          "iata": "ZRH",
+          "name": "Zurich",
+          "countryCode": "ch",
+          "timeZone": "Europe/Zurich"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:35Z",
+          "local": "2026-09-12 10:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:08Z",
+          "local": "2026-09-12 10:08+02:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 52",
+      "callSign": "DAL52",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N196DN",
+        "modeS": "A17ECD",
+        "model": "Boeing 767-300"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:10Z",
+          "local": "2026-09-11 21:10-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:10Z",
+          "local": "2026-09-11 21:10-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EIDW",
+          "iata": "DUB",
+          "name": "Dublin",
+          "countryCode": "ie",
+          "timeZone": "Europe/Dublin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 09:00+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 09:00+01:00"
+        },
+        "terminal": "2",
+        "baggageBelt": "6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 841",
+      "callSign": "JBU841",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N2205J",
+        "modeS": "A1E411",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:10Z",
+          "local": "2026-09-11 21:10-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:10Z",
+          "local": "2026-09-11 21:10-04:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LIRF",
+          "iata": "FCO",
+          "name": "Rome",
+          "countryCode": "it",
+          "timeZone": "Europe/Rome"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:50Z",
+          "local": "2026-09-12 11:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:50Z",
+          "local": "2026-09-12 11:50+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AZ 611",
+      "callSign": "ITY6KC",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "I-ITYE",
+        "modeS": "300A63",
+        "model": "Airbus A330"
+      },
+      "airline": {
+        "name": "ITA",
+        "iata": "AZ",
+        "icao": "ITY"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:45Z",
+          "local": "2026-09-11 20:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:11Z",
+          "local": "2026-09-11 21:11-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:11Z",
+          "local": "2026-09-11 21:11-04:00"
+        },
+        "terminal": "5",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KMCO",
+          "iata": "MCO",
+          "name": "Orlando",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:55Z",
+          "local": "2026-09-11 23:55-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 03:19Z",
+          "local": "2026-09-11 23:19-04:00"
+        },
+        "terminal": "C",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 283",
+      "callSign": "JBU283",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N974JT",
+        "modeS": "AD935B",
+        "model": "Airbus A321"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 19:26Z",
+          "local": "2026-09-11 15:26-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:12Z",
+          "local": "2026-09-11 21:12-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:12Z",
+          "local": "2026-09-11 21:12-04:00"
+        },
+        "terminal": "4",
+        "runway": "31L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KMIA",
+          "iata": "MIA",
+          "name": "Miami",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-11 23:03Z",
+          "local": "2026-09-11 19:03-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 04:10Z",
+          "local": "2026-09-12 00:10-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 2500",
+      "callSign": "DAL2500",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N3762Y",
+        "modeS": "A44CCA",
+        "model": "Boeing 737-800"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:14Z",
+          "local": "2026-09-11 21:14-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:14Z",
+          "local": "2026-09-11 21:14-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "CYYZ",
+          "iata": "YYZ",
+          "name": "Toronto",
+          "countryCode": "ca",
+          "timeZone": "America/Toronto"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:12Z",
+          "local": "2026-09-11 23:12-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:24Z",
+          "local": "2026-09-11 22:24-04:00"
+        },
+        "terminal": "3",
+        "gate": "A6",
+        "baggageBelt": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 5170",
+      "callSign": "EDV5170",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N904XJ",
+        "modeS": "AC801E",
+        "model": "Canadair CRJ 900"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:30Z",
+          "local": "2026-09-11 20:30-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:15Z",
+          "local": "2026-09-11 21:15-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:15Z",
+          "local": "2026-09-11 21:15-04:00"
+        },
+        "terminal": "1",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LSZH",
+          "iata": "ZRH",
+          "name": "Zurich",
+          "countryCode": "ch",
+          "timeZone": "Europe/Zurich"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:25Z",
+          "local": "2026-09-12 10:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "LX 15",
+      "callSign": "SWR15X",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "HB-JHF",
+        "modeS": "4B187F",
+        "model": "Airbus A330-300"
+      },
+      "airline": {
+        "name": "SWISS",
+        "iata": "LX",
+        "icao": "SWR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:15Z",
+          "local": "2026-09-11 21:15-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:15Z",
+          "local": "2026-09-11 21:15-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EHAM",
+          "iata": "AMS",
+          "name": "Amsterdam",
+          "countryCode": "nl",
+          "timeZone": "Europe/Amsterdam"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:35Z",
+          "local": "2026-09-12 10:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:27Z",
+          "local": "2026-09-12 10:27+02:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 08:27Z",
+          "local": "2026-09-12 10:27+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 644",
+      "callSign": "KLM644",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BKA",
+        "modeS": "485B42",
+        "model": "Boeing 787-10"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 03:00Z",
+          "local": "2026-09-11 23:00-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:16Z",
+          "local": "2026-09-11 21:16-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:16Z",
+          "local": "2026-09-11 21:16-04:00"
+        },
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "SBGR",
+          "iata": "GRU",
+          "name": "São Paulo",
+          "countryCode": "br",
+          "timeZone": "America/Sao_Paulo"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 11:47Z",
+          "local": "2026-09-12 08:47-03:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 10:03Z",
+          "local": "2026-09-12 07:03-03:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "JJ 8181",
+      "callSign": "TAM8181",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "CC-BGP",
+        "modeS": "E80468",
+        "model": "Boeing 787-9"
+      },
+      "airline": {
+        "name": "LATAM Brasil",
+        "iata": "JJ",
+        "icao": "TAM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 23:41Z",
+          "local": "2026-09-11 19:41-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:17Z",
+          "local": "2026-09-11 21:17-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:17Z",
+          "local": "2026-09-11 21:17-04:00"
+        },
+        "terminal": "8",
+        "runway": "31L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KIND",
+          "iata": "IND",
+          "name": "Indianapolis",
+          "countryCode": "us",
+          "timeZone": "America/Indiana/Indianapolis"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 02:08Z",
+          "local": "2026-09-11 22:08-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:51Z",
+          "local": "2026-09-11 22:51-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AA 4423",
+      "callSign": "RPA4423",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N119HQ",
+        "modeS": "A04E60",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:45Z",
+          "local": "2026-09-11 20:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:18Z",
+          "local": "2026-09-11 21:18-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:18Z",
+          "local": "2026-09-11 21:18-04:00"
+        },
+        "terminal": "8",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "VIDP",
+          "iata": "DEL",
+          "name": "New Delhi",
+          "countryCode": "in",
+          "timeZone": "Asia/Kolkata"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 14:11Z",
+          "local": "2026-09-12 19:41+05:30"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 14:11Z",
+          "local": "2026-09-12 19:41+05:30"
+        },
+        "terminal": "3",
+        "baggageBelt": "09",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AA 292",
+      "callSign": "AAL292",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N835AN",
+        "modeS": "AB6AFA",
+        "model": "Boeing 787-9"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:25Z",
+          "local": "2026-09-11 20:25-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:20Z",
+          "local": "2026-09-11 21:20-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LGAV",
+          "iata": "ATH",
+          "name": "Athens",
+          "countryCode": "gr",
+          "timeZone": "Europe/Athens"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 10:20Z",
+          "local": "2026-09-12 13:20+03:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 10:20Z",
+          "local": "2026-09-12 13:20+03:00"
+        },
+        "baggageBelt": "05",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 212",
+      "callSign": "DAL212",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N429DX",
+        "modeS": "A51D6F",
+        "model": "Airbus A330"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 23:25Z",
+          "local": "2026-09-11 19:25-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:20Z",
+          "local": "2026-09-11 21:20-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LIRF",
+          "iata": "FCO",
+          "name": "Rome",
+          "countryCode": "it",
+          "timeZone": "Europe/Rome"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:05Z",
+          "local": "2026-09-12 10:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:34Z",
+          "local": "2026-09-12 11:34+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 230",
+      "callSign": "DAL230",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N801NW",
+        "modeS": "AAE6D5",
+        "model": "Airbus A330"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:20Z",
+          "local": "2026-09-11 21:20-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:20Z",
+          "local": "2026-09-11 21:20-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGPH",
+          "iata": "EDI",
+          "name": "Edinburgh",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 09:20+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 09:20+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 73",
+      "callSign": "JBU73",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N2142J",
+        "modeS": "A1CB05",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:20Z",
+          "local": "2026-09-11 21:20-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:20Z",
+          "local": "2026-09-11 21:20-04:00"
+        },
+        "terminal": "8",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KMIA",
+          "iata": "MIA",
+          "name": "Miami",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 04:15Z",
+          "local": "2026-09-12 00:15-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 03:51Z",
+          "local": "2026-09-11 23:51-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AA 1922",
+      "callSign": "AAL1922",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N327VP",
+        "modeS": "A38A3A",
+        "model": "Boeing 737 MAX 8"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:00Z",
+          "local": "2026-09-11 21:00-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:20Z",
+          "local": "2026-09-11 21:20-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:20Z",
+          "local": "2026-09-11 21:20-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KCMH",
+          "iata": "CMH",
+          "name": "Columbus",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:02Z",
+          "local": "2026-09-11 23:02-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:32Z",
+          "local": "2026-09-11 22:32-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 5658",
+      "callSign": "RPA5658",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N213JQ",
+        "modeS": "A1C57E",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:27Z",
+          "local": "2026-09-11 20:27-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:21Z",
+          "local": "2026-09-11 21:21-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:21Z",
+          "local": "2026-09-11 21:21-04:00"
+        },
+        "terminal": "8",
+        "runway": "04L",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KSEA",
+          "iata": "SEA",
+          "name": "Seattle",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 06:42Z",
+          "local": "2026-09-11 23:42-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:56Z",
+          "local": "2026-09-11 23:56-07:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AS 17",
+      "callSign": "ASA17",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N530AS",
+        "modeS": "A6B07E",
+        "model": "Boeing 737-800"
+      },
+      "airline": {
+        "name": "Alaska",
+        "iata": "AS",
+        "icao": "ASA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:40Z",
+          "local": "2026-09-11 20:40-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:23Z",
+          "local": "2026-09-11 21:23-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:23Z",
+          "local": "2026-09-11 21:23-04:00"
+        },
+        "terminal": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "SBGR",
+          "iata": "GRU",
+          "name": "São Paulo",
+          "countryCode": "br",
+          "timeZone": "America/Sao_Paulo"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 10:15Z",
+          "local": "2026-09-12 07:15-03:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 10:18Z",
+          "local": "2026-09-12 07:18-03:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "AA 951",
+      "callSign": "AAL951",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N833AA",
+        "modeS": "AB6380",
+        "model": "Boeing 787-9"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 22:45Z",
+          "local": "2026-09-11 18:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:25Z",
+          "local": "2026-09-11 21:25-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:25Z",
+          "local": "2026-09-11 21:25-04:00"
+        },
+        "terminal": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KMIA",
+          "iata": "MIA",
+          "name": "Miami",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 02:02Z",
+          "local": "2026-09-11 22:02-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 04:02Z",
+          "local": "2026-09-12 00:02-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AA 1174",
+      "callSign": "AAL1174",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N903AA",
+        "modeS": "AC7A52",
+        "model": "Airbus A321"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:25Z",
+          "local": "2026-09-11 21:25-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:25Z",
+          "local": "2026-09-11 21:25-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGPH",
+          "iata": "EDI",
+          "name": "Edinburgh",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 09:20+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 09:20+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 208",
+      "callSign": "DAL208",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N178DZ",
+        "modeS": "A13748",
+        "model": "Boeing 767-300"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:27Z",
+          "local": "2026-09-11 21:27-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:27Z",
+          "local": "2026-09-11 21:27-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KRIC",
+          "iata": "RIC",
+          "name": "Richmond",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:15Z",
+          "local": "2026-09-11 23:15-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:22Z",
+          "local": "2026-09-11 22:22-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 4659",
+      "callSign": "EDV4659",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N491PX",
+        "modeS": "A6152A",
+        "model": "Canadair CRJ 900"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-11 23:15Z",
+          "local": "2026-09-11 19:15-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:27Z",
+          "local": "2026-09-11 21:27-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:27Z",
+          "local": "2026-09-11 21:27-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "PANC",
+          "iata": "ANC",
+          "name": "Anchorage",
+          "countryCode": "us",
+          "timeZone": "America/Anchorage"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 05:59Z",
+          "local": "2026-09-11 21:59-08:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:11Z",
+          "local": "2026-09-12 00:11-08:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "5Y 8602",
+      "callSign": "GTI8602",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N430GT",
+        "modeS": "A523C6",
+        "model": "Boeing 747-400"
+      },
+      "airline": {
+        "name": "Atlas Air",
+        "iata": "5Y",
+        "icao": "GTI"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:55Z",
+          "local": "2026-09-11 20:55-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:28Z",
+          "local": "2026-09-11 21:28-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:28Z",
+          "local": "2026-09-11 21:28-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "SQ 25",
+      "callSign": "SIA25",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "9V-SWH",
+        "modeS": "76CEE8",
+        "model": "Boeing 777-300"
+      },
+      "airline": {
+        "name": "Singapore",
+        "iata": "SQ",
+        "icao": "SIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:28Z",
+          "local": "2026-09-11 21:28-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:28Z",
+          "local": "2026-09-11 21:28-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KDCA",
+          "iata": "DCA",
+          "name": "Washington",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 02:59Z",
+          "local": "2026-09-11 22:59-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:11Z",
+          "local": "2026-09-11 22:11-04:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 5743",
+      "callSign": "RPA5743",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N220JQ",
+        "modeS": "A1E1D8",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:45Z",
+          "local": "2026-09-11 20:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:29Z",
+          "local": "2026-09-11 21:29-04:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 01:29Z",
+          "local": "2026-09-11 21:29-04:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "GMMN",
+          "iata": "CMN",
+          "name": "Casablanca",
+          "countryCode": "ma",
+          "timeZone": "Africa/Casablanca"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:50Z",
+          "local": "2026-09-12 08:50+01:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "AT 201",
+      "callSign": "RAM201N",
+      "status": "Departed",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "CN-RGC",
+        "modeS": "0200CA",
+        "model": "Boeing 787-8"
+      },
+      "airline": {
+        "name": "Royal Air Maroc",
+        "iata": "AT",
+        "icao": "RAM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KDCA",
+          "iata": "DCA",
+          "name": "Washington",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 02:59Z",
+          "local": "2026-09-11 22:59-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:18Z",
+          "local": "2026-09-11 22:18-04:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 955",
+      "callSign": "JBU955",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N3023J",
+        "modeS": "A3298A",
+        "model": "Airbus A220-300"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "terminal": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KSFO",
+          "iata": "SFO",
+          "name": "San Francisco",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:59Z",
+          "local": "2026-09-12 00:59-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 01:00-07:00"
+        },
+        "runwayTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 01:00-07:00"
+        },
+        "terminal": "1",
+        "baggageBelt": "CL-B4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AA 177",
+      "callSign": "AAL177",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N111ZM",
+        "modeS": "A03235",
+        "model": "Airbus A321 (Sharklets)"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "terminal": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "OTHH",
+          "iata": "DOH",
+          "name": "Doha",
+          "countryCode": "qa",
+          "timeZone": "Asia/Qatar"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 14:20Z",
+          "local": "2026-09-12 17:20+03:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 14:20Z",
+          "local": "2026-09-12 17:20+03:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "QR 702",
+      "callSign": "QTR17E",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "A7-BEF",
+        "modeS": "06A1BC",
+        "model": "Boeing 777"
+      },
+      "airline": {
+        "name": "Qatar",
+        "iata": "QR",
+        "icao": "QTR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:10Z",
+          "local": "2026-09-12 11:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:10Z",
+          "local": "2026-09-12 11:10+02:00"
+        },
+        "terminal": "2E",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AF 7",
+      "callSign": "AFR007",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "F-GZNR",
+        "modeS": "3965B1",
+        "model": "Boeing 777"
+      },
+      "airline": {
+        "name": "Air France",
+        "iata": "AF",
+        "icao": "AFR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:30Z",
+          "local": "2026-09-11 21:30-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Washington"
+        },
+        "quality": []
+      },
+      "number": "AA 4546",
+      "status": "Unknown",
+      "codeshareStatus": "Unknown",
+      "isCargo": false,
+      "aircraft": {
+        "model": "Airbus A220-300"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:35Z",
+          "local": "2026-09-11 21:35-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:35Z",
+          "local": "2026-09-11 21:35-04:00"
+        },
+        "terminal": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KDCA",
+          "iata": "DCA",
+          "name": "Washington",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:10Z",
+          "local": "2026-09-11 23:10-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:18Z",
+          "local": "2026-09-11 22:18-04:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AA 4463",
+      "callSign": "RPA4463",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N420YX",
+        "modeS": "A4FDDB",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:40Z",
+          "local": "2026-09-11 21:40-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:40Z",
+          "local": "2026-09-11 21:40-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:56Z",
+          "local": "2026-09-12 09:56+02:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "KJ 587",
+      "callSign": "AIH587",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "HL7646",
+        "modeS": "71BE46",
+        "model": "Boeing 747-400"
+      },
+      "airline": {
+        "name": "Air Incheon",
+        "iata": "KJ",
+        "icao": "AIH"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:40Z",
+          "local": "2026-09-11 21:40-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:40Z",
+          "local": "2026-09-11 21:40-04:00"
+        },
+        "terminal": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGLL",
+          "iata": "LHR",
+          "name": "London",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:50Z",
+          "local": "2026-09-12 09:50+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:50Z",
+          "local": "2026-09-12 09:50+01:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "BA 114",
+      "callSign": "BAW14K",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "G-STBF",
+        "modeS": "4065DE",
+        "model": "Boeing 777-300"
+      },
+      "airline": {
+        "name": "British",
+        "iata": "BA",
+        "icao": "BAW"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 00:30Z",
+          "local": "2026-09-11 20:30-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:44Z",
+          "local": "2026-09-11 21:44-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KCLE",
+          "iata": "CLE",
+          "name": "Cleveland",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 02:32Z",
+          "local": "2026-09-11 22:32-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:54Z",
+          "local": "2026-09-11 22:54-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 2768",
+      "callSign": "JBU2768",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N3240J",
+        "modeS": "A37F8D",
+        "model": "Airbus A220-300"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:45Z",
+          "local": "2026-09-11 21:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:45Z",
+          "local": "2026-09-11 21:45-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KLAX",
+          "iata": "LAX",
+          "name": "Los Angeles",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:52Z",
+          "local": "2026-09-12 00:52-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:08Z",
+          "local": "2026-09-12 00:08-07:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 923",
+      "callSign": "JBU923",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N976JT",
+        "modeS": "AD9AC9",
+        "model": "Airbus A321"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:45Z",
+          "local": "2026-09-11 21:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:45Z",
+          "local": "2026-09-11 21:45-04:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LOWW",
+          "iata": "VIE",
+          "name": "Vienna",
+          "countryCode": "at",
+          "timeZone": "Europe/Vienna"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 11:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 11:55+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "OS 36",
+      "callSign": "AUA8K",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "OE-LPL",
+        "modeS": "44012F",
+        "model": "Boeing 787-9"
+      },
+      "airline": {
+        "name": "Austrian",
+        "iata": "OS",
+        "icao": "AUA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:45Z",
+          "local": "2026-09-11 21:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:45Z",
+          "local": "2026-09-11 21:45-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KDTW",
+          "iata": "DTW",
+          "name": "Detroit",
+          "countryCode": "us",
+          "timeZone": "America/Detroit"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:56Z",
+          "local": "2026-09-11 23:56-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 03:10Z",
+          "local": "2026-09-11 23:10-04:00"
+        },
+        "terminal": "E",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 820",
+      "callSign": "JBU820",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N712JB",
+        "modeS": "A98445",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:45Z",
+          "local": "2026-09-11 21:45-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:45Z",
+          "local": "2026-09-11 21:45-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KRDU",
+          "iata": "RDU",
+          "name": "Raleigh/Durham",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:41Z",
+          "local": "2026-09-11 23:41-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 03:04Z",
+          "local": "2026-09-11 23:04-04:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 185",
+      "callSign": "JBU185",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N636JB",
+        "modeS": "A854D0",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:50Z",
+          "local": "2026-09-11 21:50-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:50Z",
+          "local": "2026-09-11 21:50-04:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:45Z",
+          "local": "2026-09-12 11:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:45Z",
+          "local": "2026-09-12 11:45+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "LH 405",
+      "callSign": "DLH405",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIGO",
+        "modeS": "3C64EF",
+        "model": "Airbus A340-300"
+      },
+      "airline": {
+        "name": "Lufthansa",
+        "iata": "LH",
+        "icao": "DLH"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:55Z",
+          "local": "2026-09-11 21:55-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:55Z",
+          "local": "2026-09-11 21:55-04:00"
+        },
+        "terminal": "4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LIMC",
+          "iata": "MXP",
+          "name": "Milan",
+          "countryCode": "it",
+          "timeZone": "Europe/Rome"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 10:05Z",
+          "local": "2026-09-12 12:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 10:05Z",
+          "local": "2026-09-12 12:05+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 184",
+      "callSign": "DAL184",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N831MH",
+        "modeS": "AB5D2C",
+        "model": "Boeing 767-400"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:59Z",
+          "local": "2026-09-11 21:59-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:59Z",
+          "local": "2026-09-11 21:59-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KROC",
+          "iata": "ROC",
+          "name": "Rochester",
+          "countryCode": "us",
+          "timeZone": "America/New_York"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 03:31Z",
+          "local": "2026-09-11 23:31-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 02:52Z",
+          "local": "2026-09-11 22:52-04:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 1186",
+      "callSign": "JBU1186",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N639JB",
+        "modeS": "A85FF5",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:59Z",
+          "local": "2026-09-11 21:59-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:59Z",
+          "local": "2026-09-11 21:59-04:00"
+        },
+        "terminal": "5",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KLAS",
+          "iata": "LAS",
+          "name": "Las Vegas",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:38Z",
+          "local": "2026-09-12 00:38-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:57Z",
+          "local": "2026-09-11 23:57-07:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "B6 1411",
+      "callSign": "JBU1411",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N943JT",
+        "modeS": "AD1927",
+        "model": "Airbus A321 (Sharklets)"
+      },
+      "airline": {
+        "name": "JetBlue",
+        "iata": "B6",
+        "icao": "JBU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 01:59Z",
+          "local": "2026-09-11 21:59-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 01:59Z",
+          "local": "2026-09-11 21:59-04:00"
+        },
+        "terminal": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "KLAX",
+          "iata": "LAX",
+          "name": "Los Angeles",
+          "countryCode": "us",
+          "timeZone": "America/Los_Angeles"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:59Z",
+          "local": "2026-09-12 00:59-07:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:24Z",
+          "local": "2026-09-12 00:24-07:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AA 300",
+      "callSign": "AAL300",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N107NN",
+        "modeS": "A01FEE",
+        "model": "Airbus A321 (Sharklets)"
+      },
+      "airline": {
+        "name": "American",
+        "iata": "AA",
+        "icao": "AAL"
+      }
+    }
+  ]
+}

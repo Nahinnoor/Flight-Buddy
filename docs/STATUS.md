@@ -1,6 +1,6 @@
 # FlightBuddy — Status / handoff
 
-**Updated:** 2026-09-11 (session 1) · **Phase:** 1 — Foundation · **Branch:** `main` · **Last commit:** `9afd920`
+**Updated:** 2026-09-12 (session 2, resumed after usage limit) · **Phase:** 1 — Foundation · **Branch:** `main` · **Last commit:** `9afd920`
 
 This file is the handoff point. A human or a fresh agent should be able to read this and `docs/PROJECT_OVERVIEW.md` and continue without the previous conversation.
 
@@ -20,12 +20,13 @@ This file is the handoff point. A human or a fresh agent should be able to read 
 | Skeletons | `packages/flight-provider`, `apps/api`, `services/poller` | package.json + tsconfig only at commit time. |
 | Mobile | `apps/mobile` | Expo SDK 57 template committed as-is; real work in progress (below). |
 
-## In progress (uncommitted, agents running at time of writing)
+## In progress (uncommitted; agents relaunched 2026-09-12 after a usage-limit cut-off)
 
-- **data-pipeline** → `packages/flight-provider/**`, `docs/api-samples/**`, `packages/shared/src/flightQuery.ts`. AeroDataBox client, codeshare resolution, tracking tiers, `ingestFlight`, fixtures (≤20 real calls), free-text query parser.
-- **mobile-client** → `apps/mobile/**`. Supabase auth (Apple + Google via `signInWithIdToken`), API client with `EXPO_PUBLIC_MOCK_API=1` mode, add-flight screen with disambiguation, flight card, dashboard, push-token registration.
+- **data-pipeline — DONE, staged, under review.** `packages/flight-provider/**`, `packages/shared/src/flightQuery.ts`, `docs/api-samples/**` are `git add`-ed. 137 tests green. Reviewer (Sonnet 5) running. Findings from its report: balance endpoint returns empty 200 (see owner items); codeshares resolved server-side by the flight-number endpoint; AS65 = 5 legs.
+- **mobile-client — resumed.** `apps/mobile/**` unstaged. Previous agent got through auth, API client with mock mode, add-flight, flight card, and was wiring the mock store into the dashboard when cut off. Resumed agent finishes + verifies (tsc, expo lint, expo export, simulator screenshots).
+- **api-backend part 2 — resumed.** `apps/api/src/{config,auth,errors}.ts` existed; resumed agent builds app/routes/tests. First job: dedupe zod to a single ^4 copy across workspaces.
 
-If these agents are gone, check `git status`; whatever is in the tree is their partial output. Re-run `npm run typecheck && npm test && npm run lint` before trusting it.
+If these agents are gone again: `git status`; run `npm run typecheck && npm test && npm run lint`; whatever is in the tree is partial output — relaunch with a "resume, read existing files first" brief.
 
 ## Next
 
@@ -44,7 +45,8 @@ If these agents are gone, check `git status`; whatever is in the tree is their p
 ## Owner-only items / open questions
 
 - Confirm Apple Services ID + bundle ID match in Supabase Auth → Apple provider (mobile agent will report what it assumed).
-- `GET /subscriptions/balance` smoke test result (§11) — pending data-pipeline report. If it errored, re-subscribe the RapidAPI plan.
+- `GET /subscriptions/balance` returns HTTP 200 with an EMPTY body (no balance record). Re-subscribe the RapidAPI plan / enable the Flight Alert API before Phase 2. Not blocking Phase 1.
+- Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to root `.env` (API ingest path). Not yet present as of 2026-09-12.
 - Consider rewriting history to purge `.env` from `6102def` before the repo is shared more widely.
 
 ## Process rules in force

@@ -1,0 +1,87 @@
+[
+  {
+    "greatCircleDistance": {
+      "meter": 3617691.31,
+      "km": 3617.69,
+      "mile": 2247.93,
+      "nm": 1953.4,
+      "feet": 11869065.98
+    },
+    "departure": {
+      "airport": {
+        "icao": "KJFK",
+        "iata": "JFK",
+        "name": "New York John F Kennedy",
+        "shortName": "John F Kennedy",
+        "municipalityName": "New York",
+        "location": {
+          "lat": 40.6398,
+          "lon": -73.7789
+        },
+        "countryCode": "US",
+        "timeZone": "America/New_York"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-12 01:59Z",
+        "local": "2026-09-11 21:59-04:00"
+      },
+      "revisedTime": {
+        "utc": "2026-09-12 01:59Z",
+        "local": "2026-09-11 21:59-04:00"
+      },
+      "terminal": "5",
+      "quality": [
+        "Basic",
+        "Live"
+      ]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "KLAS",
+        "iata": "LAS",
+        "name": "Las Vegas McCarran",
+        "shortName": "McCarran",
+        "municipalityName": "Las Vegas",
+        "location": {
+          "lat": 36.0801,
+          "lon": -115.152
+        },
+        "countryCode": "US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-12 07:38Z",
+        "local": "2026-09-12 00:38-07:00"
+      },
+      "revisedTime": {
+        "utc": "2026-09-12 06:57Z",
+        "local": "2026-09-11 23:57-07:00"
+      },
+      "predictedTime": {
+        "utc": "2026-09-12 06:51Z",
+        "local": "2026-09-11 23:51-07:00"
+      },
+      "terminal": "3",
+      "quality": [
+        "Basic",
+        "Live"
+      ]
+    },
+    "lastUpdatedUtc": "2026-09-12 00:32Z",
+    "number": "B6 1411",
+    "callSign": "JBU1411",
+    "status": "Expected",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": {
+      "reg": "N943JT",
+      "modeS": "AD1927",
+      "model": "Airbus A321 (Sharklets)"
+    },
+    "airline": {
+      "name": "JetBlue Airways",
+      "iata": "B6",
+      "icao": "JBU"
+    }
+  }
+]

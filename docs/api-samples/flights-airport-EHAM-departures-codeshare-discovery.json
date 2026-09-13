@@ -1,0 +1,6116 @@
+{
+  "departures": [
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "VS 7077",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXO",
+        "modeS": "4864EE",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Virgin Atlantic",
+        "iata": "VS",
+        "icao": "VIR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "GA 9760",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXO",
+        "modeS": "4864EE",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Garuda Indonesia",
+        "iata": "GA",
+        "icao": "GIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MF 9660",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXO",
+        "modeS": "4864EE",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Xiamen",
+        "iata": "MF",
+        "icao": "CXA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "KE 6423",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXO",
+        "modeS": "4864EE",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Korean Air",
+        "iata": "KE",
+        "icao": "KAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9363",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXO",
+        "modeS": "4864EE",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "6E 3269",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXO",
+        "modeS": "4864EE",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGCC",
+          "iata": "MAN",
+          "name": "Manchester",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:25Z",
+          "local": "2026-09-12 08:25+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:25Z",
+          "local": "2026-09-12 08:25+01:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1029",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXO",
+        "modeS": "4864EE",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "C14",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:10Z",
+          "local": "2026-09-12 09:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:10Z",
+          "local": "2026-09-12 09:10+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "UA 9156",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZQ",
+        "modeS": "3C6751",
+        "model": "Airbus A320 (Sharklets)"
+      },
+      "airline": {
+        "name": "United",
+        "iata": "UA",
+        "icao": "UAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "C14",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:10Z",
+          "local": "2026-09-12 09:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:10Z",
+          "local": "2026-09-12 09:10+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "LH 1003",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZQ",
+        "modeS": "3C6751",
+        "model": "Airbus A320 (Sharklets)"
+      },
+      "airline": {
+        "name": "Lufthansa",
+        "iata": "LH",
+        "icao": "DLH"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "C14",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:10Z",
+          "local": "2026-09-12 09:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:10Z",
+          "local": "2026-09-12 09:10+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AC 9076",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZQ",
+        "modeS": "3C6751",
+        "model": "Airbus A320 (Sharklets)"
+      },
+      "airline": {
+        "name": "Air Canada",
+        "iata": "AC",
+        "icao": "ACA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MU 1621",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXR",
+        "model": "Embraer 195-E2"
+      },
+      "airline": {
+        "name": "China Eastern",
+        "iata": "MU",
+        "icao": "CES"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDS",
+          "iata": "STR",
+          "name": "Stuttgart",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:15Z",
+          "local": "2026-09-12 09:15+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:15Z",
+          "local": "2026-09-12 09:15+02:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1827",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXU",
+        "modeS": "485870",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "SK 6670",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXU",
+        "modeS": "485870",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "SAS",
+        "iata": "SK",
+        "icao": "SAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9406",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXU",
+        "modeS": "485870",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:00Z",
+          "local": "2026-09-12 08:00+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "6E 8012",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXU",
+        "modeS": "485870",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGPH",
+          "iata": "EDI",
+          "name": "Edinburgh",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 08:30+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 08:30+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 923",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXI",
+        "modeS": "486492",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "SK 6710",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXI",
+        "modeS": "486492",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "SAS",
+        "iata": "SK",
+        "icao": "SAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "VS 6975",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXI",
+        "modeS": "486492",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Virgin Atlantic",
+        "iata": "VS",
+        "icao": "VIR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9584",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXI",
+        "modeS": "486492",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "KQ 1277",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXI",
+        "modeS": "486492",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Kenya",
+        "iata": "KQ",
+        "icao": "KQA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MF 9746",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXI",
+        "modeS": "486492",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Xiamen",
+        "iata": "MF",
+        "icao": "CXA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:05Z",
+          "local": "2026-09-12 08:05+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "6E 3236",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXI",
+        "modeS": "486492",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "terminal": "2F",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "MK 7593",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCA",
+        "modeS": "484CB4",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Air Mauritius",
+        "iata": "MK",
+        "icao": "MAU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "terminal": "2F",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "6E 3222",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCA",
+        "modeS": "484CB4",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "terminal": "2F",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "VN 3153",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCA",
+        "modeS": "484CB4",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Vietnam",
+        "iata": "VN",
+        "icao": "HVN"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "terminal": "2F",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KQ 1227",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCA",
+        "modeS": "484CB4",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Kenya",
+        "iata": "KQ",
+        "icao": "KQA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C16",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "terminal": "2F",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1405",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCA",
+        "modeS": "484CB4",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C16",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "terminal": "2F",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "GA 9240",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCA",
+        "modeS": "484CB4",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Garuda Indonesia",
+        "iata": "GA",
+        "icao": "GIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C16",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "terminal": "2F",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AF 3171",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCA",
+        "modeS": "484CB4",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Air France",
+        "iata": "AF",
+        "icao": "AFR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C16",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFPG",
+          "iata": "CDG",
+          "name": "Paris",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:30Z",
+          "local": "2026-09-12 09:30+02:00"
+        },
+        "terminal": "2F",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9659",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCA",
+        "modeS": "484CB4",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C18",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LEBL",
+          "iata": "BCN",
+          "name": "Barcelona",
+          "countryCode": "es",
+          "timeZone": "Europe/Madrid"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1511",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXO",
+        "modeS": "48418A",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C18",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LEBL",
+          "iata": "BCN",
+          "name": "Barcelona",
+          "countryCode": "es",
+          "timeZone": "Europe/Madrid"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9188",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXO",
+        "modeS": "48418A",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C18",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LEBL",
+          "iata": "BCN",
+          "name": "Barcelona",
+          "countryCode": "es",
+          "timeZone": "Europe/Madrid"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KE 6405",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXO",
+        "modeS": "48418A",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Korean Air",
+        "iata": "KE",
+        "icao": "KAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C18",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LEBL",
+          "iata": "BCN",
+          "name": "Barcelona",
+          "countryCode": "es",
+          "timeZone": "Europe/Madrid"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "GA 9248",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXO",
+        "modeS": "48418A",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Garuda Indonesia",
+        "iata": "GA",
+        "icao": "GIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:10Z",
+          "local": "2026-09-12 08:10+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C18",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LEBL",
+          "iata": "BCN",
+          "name": "Barcelona",
+          "countryCode": "es",
+          "timeZone": "Europe/Madrid"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:20Z",
+          "local": "2026-09-12 10:20+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "MU 1839",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXO",
+        "modeS": "48418A",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "China Eastern",
+        "iata": "MU",
+        "icao": "CES"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:15Z",
+          "local": "2026-09-12 08:15+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:15Z",
+          "local": "2026-09-12 08:15+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "C12",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDM",
+          "iata": "MUC",
+          "name": "Munich",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "LH 2311",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIDF",
+        "modeS": "3C6486",
+        "model": "Airbus A321"
+      },
+      "airline": {
+        "name": "Lufthansa",
+        "iata": "LH",
+        "icao": "DLH"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:15Z",
+          "local": "2026-09-12 08:15+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:15Z",
+          "local": "2026-09-12 08:15+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "C12",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "NH 6176",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIDF",
+        "modeS": "3C6486",
+        "model": "Airbus A321"
+      },
+      "airline": {
+        "name": "ANA",
+        "iata": "NH",
+        "icao": "ANA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:15Z",
+          "local": "2026-09-12 08:15+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:15Z",
+          "local": "2026-09-12 08:15+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "C12",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "AC 9192",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIDF",
+        "modeS": "3C6486",
+        "model": "Airbus A321"
+      },
+      "airline": {
+        "name": "Air Canada",
+        "iata": "AC",
+        "icao": "ACA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:15Z",
+          "local": "2026-09-12 08:15+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:15Z",
+          "local": "2026-09-12 08:15+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "C12",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "A3 1409",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIDF",
+        "modeS": "3C6486",
+        "model": "Airbus A321"
+      },
+      "airline": {
+        "name": "Aegean",
+        "iata": "A3",
+        "icao": "AEE"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGPD",
+          "iata": "ABZ",
+          "name": "Aberdeen",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:50Z",
+          "local": "2026-09-12 08:50+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:50Z",
+          "local": "2026-09-12 08:50+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 911",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AMWO",
+        "modeS": "3C76EF",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGBB",
+          "iata": "BHX",
+          "name": "Birmingham",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 08:35+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:21Z",
+          "local": "2026-09-12 08:21+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9210",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXJ",
+        "modeS": "4853F4",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGBB",
+          "iata": "BHX",
+          "name": "Birmingham",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 08:35+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:21Z",
+          "local": "2026-09-12 08:21+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "MU 1645",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXJ",
+        "modeS": "4853F4",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "China Eastern",
+        "iata": "MU",
+        "icao": "CES"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGBB",
+          "iata": "BHX",
+          "name": "Birmingham",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 08:35+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:21Z",
+          "local": "2026-09-12 08:21+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1041",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXJ",
+        "modeS": "4853F4",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGBB",
+          "iata": "BHX",
+          "name": "Birmingham",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 08:35+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:21Z",
+          "local": "2026-09-12 08:21+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "VS 6941",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXJ",
+        "modeS": "4853F4",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Virgin Atlantic",
+        "iata": "VS",
+        "icao": "VIR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "VS 6907",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AMWO",
+        "modeS": "3C76EF",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "Virgin Atlantic",
+        "iata": "VS",
+        "icao": "VIR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9377",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AMWO",
+        "modeS": "3C76EF",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "6E 3188",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXJ",
+        "modeS": "4853F4",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "6E 3203",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AMWO",
+        "modeS": "3C76EF",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C15",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "KQ 1185",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCH",
+        "modeS": "485A33",
+        "model": "Boeing 737-800"
+      },
+      "airline": {
+        "name": "Kenya",
+        "iata": "KQ",
+        "icao": "KQA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C15",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9192",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCH",
+        "modeS": "485A33",
+        "model": "Boeing 737-800"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B32",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MH 5651",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AZFA",
+        "modeS": "3C1AEB",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "Malaysia",
+        "iata": "MH",
+        "icao": "MAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B32",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9411",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AZFA",
+        "modeS": "3C1AEB",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B32",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "ENZV",
+          "iata": "SVG",
+          "name": "Stavanger",
+          "countryCode": "no",
+          "timeZone": "Europe/Oslo"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:45Z",
+          "local": "2026-09-12 09:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:45Z",
+          "local": "2026-09-12 09:45+02:00"
+        },
+        "baggageBelt": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1173",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AZFA",
+        "modeS": "3C1AEB",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:20Z",
+          "local": "2026-09-12 08:20+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C15",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "ENBR",
+          "iata": "BGO",
+          "name": "Bergen",
+          "countryCode": "no",
+          "timeZone": "Europe/Oslo"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1163",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCH",
+        "modeS": "485A33",
+        "model": "Boeing 737-800"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B26",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "VN 3150",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXY",
+        "modeS": "4868A6",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Vietnam",
+        "iata": "VN",
+        "icao": "HVN"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B26",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "MF 9604",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXY",
+        "modeS": "4868A6",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Xiamen",
+        "iata": "MF",
+        "icao": "CXA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B26",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9234",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXY",
+        "modeS": "4868A6",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B26",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "GA 9234",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXY",
+        "modeS": "4868A6",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Garuda Indonesia",
+        "iata": "GA",
+        "icao": "GIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B26",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "SK 6638",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXY",
+        "modeS": "4868A6",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "SAS",
+        "iata": "SK",
+        "icao": "SAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B26",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "terminal": "3",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1815",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXY",
+        "modeS": "4868A6",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9689",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXR",
+        "modeS": "485778",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "VS 7097",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXR",
+        "modeS": "485778",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Virgin Atlantic",
+        "iata": "VS",
+        "icao": "VIR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "6E 8003",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXR",
+        "modeS": "485778",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGNT",
+          "iata": "NCL",
+          "name": "Newcastle upon Tyne",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:45Z",
+          "local": "2026-09-12 08:45+01:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "KL 953",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXR",
+        "modeS": "485778",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:25Z",
+          "local": "2026-09-12 08:25+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B26",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "6E 3380",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXY",
+        "modeS": "4868A6",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B7",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EKBI",
+          "iata": "BLL",
+          "name": "Billund",
+          "countryCode": "dk",
+          "timeZone": "Europe/Copenhagen"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:35Z",
+          "local": "2026-09-12 09:35+02:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "KL 1291",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EZO",
+        "modeS": "484C53",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B20",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LFSB",
+          "iata": "BSL",
+          "name": "Bâle/Mulhouse",
+          "countryCode": "fr",
+          "timeZone": "Europe/Paris"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:45Z",
+          "local": "2026-09-12 09:45+02:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "KL 1943",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXK",
+        "modeS": "48548C",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B7",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9198",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EZO",
+        "modeS": "484C53",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B7",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "SK 6675",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EZO",
+        "modeS": "484C53",
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "SAS",
+        "iata": "SK",
+        "icao": "SAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B20",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "SK 6720",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXK",
+        "modeS": "48548C",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "SAS",
+        "iata": "SK",
+        "icao": "SAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B20",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9355",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXK",
+        "modeS": "48548C",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:30Z",
+          "local": "2026-09-12 08:30+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B20",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "AF 3121",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXK",
+        "modeS": "48548C",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Air France",
+        "iata": "AF",
+        "icao": "AFR"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C9",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LGAV",
+          "iata": "ATH",
+          "name": "Athens",
+          "countryCode": "gr",
+          "timeZone": "Europe/Athens"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:50Z",
+          "local": "2026-09-12 12:50+03:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:50Z",
+          "local": "2026-09-12 12:50+03:00"
+        },
+        "baggageBelt": "10",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1953",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCD",
+        "modeS": "484FDE",
+        "model": "Boeing 737-800"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C9",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LGAV",
+          "iata": "ATH",
+          "name": "Athens",
+          "countryCode": "gr",
+          "timeZone": "Europe/Athens"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:50Z",
+          "local": "2026-09-12 12:50+03:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:50Z",
+          "local": "2026-09-12 12:50+03:00"
+        },
+        "baggageBelt": "10",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9619",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCD",
+        "modeS": "484FDE",
+        "model": "Boeing 737-800"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGHI",
+          "iata": "SOU",
+          "name": "Southampton",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:45Z",
+          "local": "2026-09-12 08:45+01:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "KL 1069",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXO",
+        "modeS": "4855D1",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "terminal": "2",
+        "checkInDesk": "9-16",
+        "gate": "D6",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "WA 1069",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXO",
+        "modeS": "4855D1",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "KLM Cityhopper",
+        "iata": "WA",
+        "icao": "KLC"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:35Z",
+          "local": "2026-09-12 08:35+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C9",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MF 9316",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BCD",
+        "modeS": "484FDE",
+        "model": "Boeing 737-800"
+      },
+      "airline": {
+        "name": "Xiamen",
+        "iata": "MF",
+        "icao": "CXA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B31",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LHBP",
+          "iata": "BUD",
+          "name": "Budapest",
+          "countryCode": "hu",
+          "timeZone": "Europe/Budapest"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "terminal": "2A",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1363",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXT",
+        "modeS": "4841A6",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B31",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LHBP",
+          "iata": "BUD",
+          "name": "Budapest",
+          "countryCode": "hu",
+          "timeZone": "Europe/Budapest"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "terminal": "2A",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "SK 6650",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXT",
+        "modeS": "4841A6",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "SAS",
+        "iata": "SK",
+        "icao": "SAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B31",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LHBP",
+          "iata": "BUD",
+          "name": "Budapest",
+          "countryCode": "hu",
+          "timeZone": "Europe/Budapest"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "terminal": "2A",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9343",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXT",
+        "modeS": "4841A6",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B24",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EKYT",
+          "iata": "AAL",
+          "name": "Aalborg",
+          "countryCode": "dk",
+          "timeZone": "Europe/Copenhagen"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "KL 1283",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXZ",
+        "modeS": "485876",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B31",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "GA 9254",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXT",
+        "modeS": "4841A6",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Garuda Indonesia",
+        "iata": "GA",
+        "icao": "GIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B31",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MU 1855",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXT",
+        "modeS": "4841A6",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "China Eastern",
+        "iata": "MU",
+        "icao": "CES"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B31",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MF 9361",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXT",
+        "modeS": "4841A6",
+        "model": "Boeing 737"
+      },
+      "airline": {
+        "name": "Xiamen",
+        "iata": "MF",
+        "icao": "CXA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B30",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LIRQ",
+          "iata": "FLR",
+          "name": "Firenze",
+          "countryCode": "it",
+          "timeZone": "Europe/Rome"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:40Z",
+          "local": "2026-09-12 10:40+02:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "KL 1651",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXB",
+        "modeS": "486258",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B24",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9179",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXZ",
+        "modeS": "485876",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:40Z",
+          "local": "2026-09-12 08:40+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B30",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9388",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXB",
+        "modeS": "486258",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "3",
+        "checkInDesk": "27",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LIMC",
+          "iata": "MXP",
+          "name": "Milan",
+          "countryCode": "it",
+          "timeZone": "Europe/Rome"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:30Z",
+          "local": "2026-09-12 10:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:30Z",
+          "local": "2026-09-12 10:30+02:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "U2 3854",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "OE-LUG",
+        "modeS": "440224",
+        "model": "Airbus A320 NEO"
+      },
+      "airline": {
+        "name": "easyJet",
+        "iata": "U2",
+        "icao": "EZY"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "3",
+        "checkInDesk": "27",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LIMC",
+          "iata": "MXP",
+          "name": "Milan",
+          "countryCode": "it",
+          "timeZone": "Europe/Rome"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:30Z",
+          "local": "2026-09-12 10:30+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:30Z",
+          "local": "2026-09-12 10:30+02:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "EC 3854",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "OE-LUG",
+        "modeS": "440224",
+        "model": "Airbus A320 NEO"
+      },
+      "airline": {
+        "name": "EasyJet Europe",
+        "iata": "EC",
+        "icao": "EJU"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "3",
+        "checkInDesk": "27",
+        "gate": "H1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EGGW",
+          "iata": "LTN",
+          "name": "London",
+          "countryCode": "gb",
+          "timeZone": "Europe/London"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 09:00+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 09:00+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "U2 2512",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "G-EZPE",
+        "modeS": "406FDB",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "easyJet",
+        "iata": "U2",
+        "icao": "EZY"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B35",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "ESSA",
+          "iata": "ARN",
+          "name": "Stockholm",
+          "countryCode": "se",
+          "timeZone": "Europe/Stockholm"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:45Z",
+          "local": "2026-09-12 10:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:45Z",
+          "local": "2026-09-12 10:45+02:00"
+        },
+        "terminal": "2",
+        "baggageBelt": "2",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1217",
+      "callSign": "KLM59U",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXD",
+        "model": "Boeing 737-800 (winglets)"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B35",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "SK 6653",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXD",
+        "model": "Boeing 737-800 (winglets)"
+      },
+      "airline": {
+        "name": "SAS",
+        "iata": "SK",
+        "icao": "SAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B35",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MH 5635",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXD",
+        "model": "Boeing 737-800 (winglets)"
+      },
+      "airline": {
+        "name": "Malaysia",
+        "iata": "MH",
+        "icao": "MAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B35",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9595",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXD",
+        "model": "Boeing 737-800 (winglets)"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B35",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "GA 9484",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXD",
+        "model": "Boeing 737-800 (winglets)"
+      },
+      "airline": {
+        "name": "Garuda Indonesia",
+        "iata": "GA",
+        "icao": "GIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B35",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "MF 9310",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXD",
+        "model": "Boeing 737-800 (winglets)"
+      },
+      "airline": {
+        "name": "Xiamen",
+        "iata": "MF",
+        "icao": "CXA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B35",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "6E 3179",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-BXD",
+        "model": "Boeing 737-800 (winglets)"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:45Z",
+          "local": "2026-09-12 08:45+02:00"
+        },
+        "quality": [
+          "Basic"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "London"
+        },
+        "quality": []
+      },
+      "number": "KL 981",
+      "status": "Unknown",
+      "codeshareStatus": "Unknown",
+      "isCargo": false,
+      "aircraft": {
+        "model": "Embraer 190"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "B27",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "UA 9195",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZI",
+        "modeS": "3C6749",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "United",
+        "iata": "UA",
+        "icao": "UAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "B27",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AC 9074",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZI",
+        "modeS": "3C6749",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "Air Canada",
+        "iata": "AC",
+        "icao": "ACA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "B27",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "NH 5411",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZI",
+        "modeS": "3C6749",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "ANA",
+        "iata": "NH",
+        "icao": "ANA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "B27",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "AI 8542",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZI",
+        "modeS": "3C6749",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "Air India",
+        "iata": "AI",
+        "icao": "AIC"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "B27",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "LH 987",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZI",
+        "modeS": "3C6749",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "Lufthansa",
+        "iata": "LH",
+        "icao": "DLH"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "2-4",
+        "gate": "B27",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDF",
+          "iata": "FRA",
+          "name": "Frankfurt-am-Main",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:00Z",
+          "local": "2026-09-12 10:00+02:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "A3 1421",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "D-AIZI",
+        "modeS": "3C6749",
+        "model": "Airbus A320"
+      },
+      "airline": {
+        "name": "Aegean",
+        "iata": "A3",
+        "icao": "AEE"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B36",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDB",
+          "iata": "BER",
+          "name": "Berlin",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "terminal": "1",
+        "gate": "A31",
+        "baggageBelt": "A4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1773",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXV",
+        "modeS": "486803",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B36",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDB",
+          "iata": "BER",
+          "name": "Berlin",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "terminal": "1",
+        "gate": "A31",
+        "baggageBelt": "A4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "GA 9766",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXV",
+        "modeS": "486803",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Garuda Indonesia",
+        "iata": "GA",
+        "icao": "GIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B36",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDB",
+          "iata": "BER",
+          "name": "Berlin",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "terminal": "1",
+        "gate": "A31",
+        "baggageBelt": "A4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9176",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXV",
+        "modeS": "486803",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B36",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDB",
+          "iata": "BER",
+          "name": "Berlin",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "terminal": "1",
+        "gate": "A31",
+        "baggageBelt": "A4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "MF 9775",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXV",
+        "modeS": "486803",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "Xiamen",
+        "iata": "MF",
+        "icao": "CXA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B36",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EDDB",
+          "iata": "BER",
+          "name": "Berlin",
+          "countryCode": "de",
+          "timeZone": "Europe/Berlin"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 08:10Z",
+          "local": "2026-09-12 10:10+02:00"
+        },
+        "terminal": "1",
+        "gate": "A31",
+        "baggageBelt": "A4",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "6E 3184",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-NXV",
+        "modeS": "486803",
+        "model": "Embraer 195"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:50Z",
+          "local": "2026-09-12 08:50+02:00"
+        },
+        "terminal": "3",
+        "checkInDesk": "27-28",
+        "gate": "D24",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LTAI",
+          "iata": "AYT",
+          "name": "Antalya",
+          "countryCode": "tr",
+          "timeZone": "Europe/Istanbul"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 10:40Z",
+          "local": "2026-09-12 13:40+03:00"
+        },
+        "terminal": "2",
+        "quality": [
+          "Basic"
+        ]
+      },
+      "number": "CD 5169",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-CDR",
+        "modeS": "48664A",
+        "model": "Boeing 737 MAX 9"
+      },
+      "airline": {
+        "name": "Corendon Dutch",
+        "iata": "CD",
+        "icao": "CND"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C10",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LPPT",
+          "iata": "LIS",
+          "name": "Lisbon",
+          "countryCode": "pt",
+          "timeZone": "Europe/Lisbon"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KE 6439",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "Korean Air",
+        "iata": "KE",
+        "icao": "KAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C10",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LPPT",
+          "iata": "LIS",
+          "name": "Lisbon",
+          "countryCode": "pt",
+          "timeZone": "Europe/Lisbon"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "G3 5541",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "Gol",
+        "iata": "G3",
+        "icao": "GLO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C10",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LPPT",
+          "iata": "LIS",
+          "name": "Lisbon",
+          "countryCode": "pt",
+          "timeZone": "Europe/Lisbon"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9349",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C10",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LPPT",
+          "iata": "LIS",
+          "name": "Lisbon",
+          "countryCode": "pt",
+          "timeZone": "Europe/Lisbon"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "terminal": "1",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1579",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "C10",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LPPT",
+          "iata": "LIS",
+          "name": "Lisbon",
+          "countryCode": "pt",
+          "timeZone": "Europe/Lisbon"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:55Z",
+          "local": "2026-09-12 10:55+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "6E 3395",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321 NEO"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "LPPR",
+          "iata": "OPO",
+          "name": "Porto",
+          "countryCode": "pt",
+          "timeZone": "Europe/Lisbon"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 09:40Z",
+          "local": "2026-09-12 10:40+01:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 09:40Z",
+          "local": "2026-09-12 10:40+01:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1571",
+      "status": "Canceled",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321-200 (Sharklets)"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "MU 1852",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "China Eastern",
+        "iata": "MU",
+        "icao": "CES"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KQ 1723",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Kenya",
+        "iata": "KQ",
+        "icao": "KQA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "DL 9607",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "SV 6614",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Saudi Arabian",
+        "iata": "SV",
+        "icao": "SVA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "MF 9355",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Xiamen",
+        "iata": "MF",
+        "icao": "CXA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "KL 1703",
+      "status": "Expected",
+      "codeshareStatus": "IsOperator",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "KLM",
+        "iata": "KL",
+        "icao": "KLM"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "MH 5683",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Malaysia",
+        "iata": "MH",
+        "icao": "MAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "GA 9220",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "Garuda Indonesia",
+        "iata": "GA",
+        "icao": "GIA"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "6-8",
+        "gate": "B28",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "icao": "EBBR",
+          "iata": "BRU",
+          "name": "Brussels",
+          "countryCode": "be",
+          "timeZone": "Europe/Brussels"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 07:40Z",
+          "local": "2026-09-12 09:40+02:00"
+        },
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "number": "6E 3190",
+      "status": "Expected",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-EXI",
+        "modeS": "4852F6",
+        "model": "Embraer 175"
+      },
+      "airline": {
+        "name": "IndiGo",
+        "iata": "6E",
+        "icao": "IGO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "SK 6752",
+      "status": "Canceled",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321-200 (Sharklets)"
+      },
+      "airline": {
+        "name": "SAS",
+        "iata": "SK",
+        "icao": "SAS"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "G3 5553",
+      "status": "Canceled",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321-200 (Sharklets)"
+      },
+      "airline": {
+        "name": "Gol",
+        "iata": "G3",
+        "icao": "GLO"
+      }
+    },
+    {
+      "departure": {
+        "scheduledTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-12 06:55Z",
+          "local": "2026-09-12 08:55+02:00"
+        },
+        "terminal": "1",
+        "checkInDesk": "8",
+        "quality": [
+          "Basic",
+          "Live"
+        ]
+      },
+      "arrival": {
+        "airport": {
+          "name": "Unknown"
+        },
+        "quality": []
+      },
+      "number": "DL 9398",
+      "status": "Canceled",
+      "codeshareStatus": "IsCodeshared",
+      "isCargo": false,
+      "aircraft": {
+        "reg": "PH-AXI",
+        "modeS": "4867C4",
+        "model": "Airbus A321-200 (Sharklets)"
+      },
+      "airline": {
+        "name": "Delta Air Lines",
+        "iata": "DL",
+        "icao": "DAL"
+      }
+    }
+  ]
+}

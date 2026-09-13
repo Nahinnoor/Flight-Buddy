@@ -1,0 +1,353 @@
+[
+  {
+    "greatCircleDistance": {
+      "meter": 1094377.15,
+      "km": 1094.38,
+      "mile": 680.01,
+      "nm": 590.92,
+      "feet": 3590476.22
+    },
+    "departure": {
+      "airport": {
+        "icao": "KSEA",
+        "iata": "SEA",
+        "name": "Seattle Tacoma",
+        "shortName": "Tacoma",
+        "municipalityName": "Seattle",
+        "location": {
+          "lat": 47.449,
+          "lon": -122.309
+        },
+        "countryCode": "US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 14:02Z",
+        "local": "2026-09-15 07:02-07:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "PAKT",
+        "iata": "KTN",
+        "name": "Ketchikan",
+        "shortName": "Ketchikan",
+        "municipalityName": "Ketchikan",
+        "location": {
+          "lat": 55.3556,
+          "lon": -131.714
+        },
+        "countryCode": "US",
+        "timeZone": "America/Sitka"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 16:20Z",
+        "local": "2026-09-15 08:20-08:00"
+      },
+      "predictedTime": {
+        "utc": "2026-09-15 16:03Z",
+        "local": "2026-09-15 08:03-08:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "lastUpdatedUtc": "2026-05-21 08:26Z",
+    "number": "AS 65",
+    "status": "Expected",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": {
+      "model": "Boeing 737-700"
+    },
+    "airline": {
+      "name": "Alaska Airlines",
+      "iata": "AS",
+      "icao": "ASA"
+    }
+  },
+  {
+    "greatCircleDistance": {
+      "meter": 132191.57,
+      "km": 132.19,
+      "mile": 82.14,
+      "nm": 71.38,
+      "feet": 433699.37
+    },
+    "departure": {
+      "airport": {
+        "icao": "PAKT",
+        "iata": "KTN",
+        "name": "Ketchikan",
+        "shortName": "Ketchikan",
+        "municipalityName": "Ketchikan",
+        "location": {
+          "lat": 55.3556,
+          "lon": -131.714
+        },
+        "countryCode": "US",
+        "timeZone": "America/Sitka"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 17:04Z",
+        "local": "2026-09-15 09:04-08:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "PAWG",
+        "iata": "WRG",
+        "name": "Wrangell",
+        "shortName": "Wrangell",
+        "municipalityName": "Wrangell",
+        "location": {
+          "lat": 56.4843,
+          "lon": -132.37
+        },
+        "countryCode": "US",
+        "timeZone": "America/Sitka"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 17:45Z",
+        "local": "2026-09-15 09:45-08:00"
+      },
+      "predictedTime": {
+        "utc": "2026-09-15 18:02Z",
+        "local": "2026-09-15 10:02-08:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "lastUpdatedUtc": "2026-05-21 19:44Z",
+    "number": "AS 65",
+    "status": "Expected",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": {
+      "model": "Boeing 737-700"
+    },
+    "airline": {
+      "name": "Alaska Airlines",
+      "iata": "AS",
+      "icao": "ASA"
+    }
+  },
+  {
+    "greatCircleDistance": {
+      "meter": 49937.32,
+      "km": 49.94,
+      "mile": 31.03,
+      "nm": 26.96,
+      "feet": 163836.37
+    },
+    "departure": {
+      "airport": {
+        "icao": "PAWG",
+        "iata": "WRG",
+        "name": "Wrangell",
+        "shortName": "Wrangell",
+        "municipalityName": "Wrangell",
+        "location": {
+          "lat": 56.4843,
+          "lon": -132.37
+        },
+        "countryCode": "US",
+        "timeZone": "America/Sitka"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 18:29Z",
+        "local": "2026-09-15 10:29-08:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "PAPG",
+        "iata": "PSG",
+        "name": "Petersburg James A Johnson",
+        "shortName": "James A Johnson",
+        "municipalityName": "Petersburg",
+        "location": {
+          "lat": 56.8017,
+          "lon": -132.945
+        },
+        "countryCode": "US",
+        "timeZone": "America/Juneau"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 18:53Z",
+        "local": "2026-09-15 10:53-08:00"
+      },
+      "predictedTime": {
+        "utc": "2026-09-15 18:47Z",
+        "local": "2026-09-15 10:47-08:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "lastUpdatedUtc": "2026-05-21 19:44Z",
+    "number": "AS 65",
+    "status": "Expected",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": {
+      "model": "Boeing 737-700"
+    },
+    "airline": {
+      "name": "Alaska Airlines",
+      "iata": "AS",
+      "icao": "ASA"
+    }
+  },
+  {
+    "greatCircleDistance": {
+      "meter": 198599.46,
+      "km": 198.6,
+      "mile": 123.4,
+      "nm": 107.24,
+      "feet": 651573.02
+    },
+    "departure": {
+      "airport": {
+        "icao": "PAPG",
+        "iata": "PSG",
+        "name": "Petersburg James A Johnson",
+        "shortName": "James A Johnson",
+        "municipalityName": "Petersburg",
+        "location": {
+          "lat": 56.8017,
+          "lon": -132.945
+        },
+        "countryCode": "US",
+        "timeZone": "America/Juneau"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 19:37Z",
+        "local": "2026-09-15 11:37-08:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "PAJN",
+        "iata": "JNU",
+        "name": "Juneau",
+        "shortName": "Juneau",
+        "municipalityName": "Juneau",
+        "location": {
+          "lat": 58.355,
+          "lon": -134.576
+        },
+        "countryCode": "US",
+        "timeZone": "America/Juneau"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 20:22Z",
+        "local": "2026-09-15 12:22-08:00"
+      },
+      "predictedTime": {
+        "utc": "2026-09-15 20:42Z",
+        "local": "2026-09-15 12:42-08:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "lastUpdatedUtc": "2026-05-21 09:04Z",
+    "number": "AS 65",
+    "status": "Expected",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": {
+      "model": "Boeing 737-700"
+    },
+    "airline": {
+      "name": "Alaska Airlines",
+      "iata": "AS",
+      "icao": "ASA"
+    }
+  },
+  {
+    "greatCircleDistance": {
+      "meter": 919064.9,
+      "km": 919.06,
+      "mile": 571.08,
+      "nm": 496.26,
+      "feet": 3015304.81
+    },
+    "departure": {
+      "airport": {
+        "icao": "PAJN",
+        "iata": "JNU",
+        "name": "Juneau",
+        "shortName": "Juneau",
+        "municipalityName": "Juneau",
+        "location": {
+          "lat": 58.355,
+          "lon": -134.576
+        },
+        "countryCode": "US",
+        "timeZone": "America/Juneau"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 21:13Z",
+        "local": "2026-09-15 13:13-08:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "PANC",
+        "iata": "ANC",
+        "name": "Anchorage Ted Stevens",
+        "shortName": "Ted Stevens",
+        "municipalityName": "Anchorage",
+        "location": {
+          "lat": 61.1744,
+          "lon": -149.996
+        },
+        "countryCode": "US",
+        "timeZone": "America/Anchorage"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 23:01Z",
+        "local": "2026-09-15 15:01-08:00"
+      },
+      "predictedTime": {
+        "utc": "2026-09-15 23:01Z",
+        "local": "2026-09-15 15:01-08:00"
+      },
+      "terminal": "S",
+      "quality": [
+        "Basic"
+      ]
+    },
+    "lastUpdatedUtc": "2026-05-21 11:52Z",
+    "number": "AS 65",
+    "status": "Expected",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": {
+      "model": "Boeing 737-700"
+    },
+    "airline": {
+      "name": "Alaska Airlines",
+      "iata": "AS",
+      "icao": "ASA"
+    }
+  }
+]

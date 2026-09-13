@@ -1,0 +1,73 @@
+[
+  {
+    "greatCircleDistance": {
+      "meter": 3982940.28,
+      "km": 3982.94,
+      "mile": 2474.88,
+      "nm": 2150.62,
+      "feet": 13067389.36
+    },
+    "departure": {
+      "airport": {
+        "icao": "KJFK",
+        "iata": "JFK",
+        "name": "New York John F Kennedy",
+        "shortName": "John F Kennedy",
+        "municipalityName": "New York",
+        "location": {
+          "lat": 40.6398,
+          "lon": -73.7789
+        },
+        "countryCode": "US",
+        "timeZone": "America/New_York"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 12:29Z",
+        "local": "2026-09-15 08:29-04:00"
+      },
+      "terminal": "8",
+      "quality": [
+        "Basic"
+      ]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "KLAX",
+        "iata": "LAX",
+        "name": "Los Angeles",
+        "shortName": "Los Angeles",
+        "municipalityName": "Los Angeles",
+        "location": {
+          "lat": 33.9425,
+          "lon": -118.408
+        },
+        "countryCode": "US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "scheduledTime": {
+        "utc": "2026-09-15 18:24Z",
+        "local": "2026-09-15 11:24-07:00"
+      },
+      "predictedTime": {
+        "utc": "2026-09-15 18:13Z",
+        "local": "2026-09-15 11:13-07:00"
+      },
+      "quality": [
+        "Basic"
+      ]
+    },
+    "lastUpdatedUtc": "2026-08-02 14:08Z",
+    "number": "AA 1",
+    "status": "Expected",
+    "codeshareStatus": "Unknown",
+    "isCargo": false,
+    "aircraft": {
+      "model": "Airbus A321"
+    },
+    "airline": {
+      "name": "American Airlines",
+      "iata": "AA",
+      "icao": "AAL"
+    }
+  }
+]

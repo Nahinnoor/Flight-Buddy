@@ -1,0 +1,91 @@
+[
+  {
+    "greatCircleDistance": {
+      "meter": 3982940.28,
+      "km": 3982.94,
+      "mile": 2474.88,
+      "nm": 2150.62,
+      "feet": 13067389.36
+    },
+    "departure": {
+      "airport": {
+        "icao": "KJFK",
+        "iata": "JFK",
+        "name": "New York John F Kennedy",
+        "shortName": "John F Kennedy",
+        "municipalityName": "New York",
+        "location": {
+          "lat": 40.6398,
+          "lon": -73.7789
+        },
+        "countryCode": "US",
+        "timeZone": "America/New_York"
+      },
+      "scheduledTime": {
+        "utc": "2026-08-15 13:15Z",
+        "local": "2026-08-15 09:15-04:00"
+      },
+      "revisedTime": {
+        "utc": "2026-08-15 14:14Z",
+        "local": "2026-08-15 10:14-04:00"
+      },
+      "runwayTime": {
+        "utc": "2026-08-15 14:14Z",
+        "local": "2026-08-15 10:14-04:00"
+      },
+      "terminal": "8",
+      "quality": [
+        "Basic",
+        "Live"
+      ]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "KLAX",
+        "iata": "LAX",
+        "name": "Los Angeles",
+        "shortName": "Los Angeles",
+        "municipalityName": "Los Angeles",
+        "location": {
+          "lat": 33.9425,
+          "lon": -118.408
+        },
+        "countryCode": "US",
+        "timeZone": "America/Los_Angeles"
+      },
+      "scheduledTime": {
+        "utc": "2026-08-15 19:12Z",
+        "local": "2026-08-15 12:12-07:00"
+      },
+      "revisedTime": {
+        "utc": "2026-08-15 19:20Z",
+        "local": "2026-08-15 12:20-07:00"
+      },
+      "runwayTime": {
+        "utc": "2026-08-15 19:17Z",
+        "local": "2026-08-15 12:17-07:00"
+      },
+      "runway": "25R",
+      "quality": [
+        "Basic",
+        "Live"
+      ]
+    },
+    "lastUpdatedUtc": "2026-08-15 19:34Z",
+    "number": "AA 1",
+    "callSign": "AAL1",
+    "status": "Arrived",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": {
+      "reg": "N109NN",
+      "modeS": "A0275C",
+      "model": "Airbus A321 (Sharklets)"
+    },
+    "airline": {
+      "name": "American Airlines",
+      "iata": "AA",
+      "icao": "AAL"
+    }
+  }
+]
