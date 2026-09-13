@@ -60,9 +60,12 @@ export class FlightIngestError extends Error {
 /**
  * Upsert one candidate leg into `flights` and return its id.
  *
- * Every column written is a value the provider returned, plus `raw_payload` and
- * `updated_at`. Scheduling, lease, webhook and archive columns are absent from
- * the payload, so an update leaves whatever the poller put there untouched.
+ * Every column written is a value the provider returned, plus `raw_payload`,
+ * `updated_at` and `archived_at = null`. Scheduling, lease and webhook columns
+ * are absent from the payload, so an update leaves whatever the poller put
+ * there untouched. `archived_at` is cleared on purpose: a flight is archived
+ * when its last segment goes (§6.3 trigger) or after landing, and an add is
+ * someone asking to see it again.
  *
  * @param candidate One leg, codeshare already resolved (§7.2).
  * @param supabase A service-role client. RLS denies this write to anyone else.
@@ -108,6 +111,7 @@ export async function ingestFlight(
 
     raw_payload: rawPayload,
     updated_at: now.toISOString(),
+    archived_at: null,
   };
 
   const { data, error } = await supabase

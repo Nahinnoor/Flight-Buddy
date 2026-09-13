@@ -134,12 +134,19 @@ describe('ingestFlight', () => {
       'poll_failure_count',
       'alert_subscription_id',
       'alert_subscribed_at',
-      'archived_at',
       'created_at',
       'id',
     ]) {
       expect(columns).not.toContain(forbidden);
     }
+  });
+
+  it('un-archives the flight: an add is a request to see it again', async () => {
+    const { client, upserts } = fakeSupabase();
+
+    await ingestFlight(CANDIDATE, client, { now: NOW });
+
+    expect(upserts[0]?.row).toHaveProperty('archived_at', null);
   });
 
   it('stores the provider fields as raw_payload by default, or whatever is passed', async () => {
