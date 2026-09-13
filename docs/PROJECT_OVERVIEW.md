@@ -252,7 +252,7 @@ create table travelers (
   display_name   text not null,
   invite_email   citext,
   invite_phone   text,
-  created_by     uuid not null references profiles(id),
+  created_by     uuid references profiles(id) on delete set null,  -- NULL only after the creator deleted their account
   claimed_at     timestamptz,
   created_at     timestamptz not null default now()
 );
@@ -412,6 +412,8 @@ create table provider_credit_log (
 **Ownership transfer** on owner account deletion: promote the `group_members` row with the earliest `joined_at`.
 
 **Implementation notes (applied 2026-09-11, migrations 20260912011727–20260912011905).** `citext` is installed in the `extensions` schema, so columns are typed `extensions.citext`. Every FK has an explicit index (performance advisor). A partial unique index on `travelers(user_id) where user_id is not null` enforces one self-traveller per user. RLS helpers live in a `private` schema as `security definer` functions with `search_path = ''`. Policy widenings beyond §10: `notification_prefs` rows are writable by the group owner (owner-set mutes); a pending joiner can read their own `group_members` row; the owner can read/update `groups` directly, not only via an active membership.
+
+**Implementation notes (applied 2026-09-13, migration `travelers_created_by_set_null`).** `travelers.created_by` was `not null` with no `on delete` action, which made every profile delete — and so every account deletion (App Store guideline 5.1.1(v)) — fail, because a user always has a self-traveller pointing at them. It is now nullable with `on delete set null`: travellers the departing user created for other people survive; `cascade` was rejected because it would also delete a traveller that someone else has since claimed. RLS compares `created_by = auth.uid()`, which is false for NULL, so an orphaned unclaimed traveller is read-only until Phase 3 reassigns it to the group owner. Inserts still require `created_by = auth.uid()`. Open question for §3.4: on account deletion the user's own self-traveller is *not* deleted — `user_id` is `on delete set null` per this section — so their trips remain as an unclaimed traveller carrying their display name. Decide whether account deletion should also remove the self-traveller (privacy) or keep it (the group's itinerary stays intact).
 
 **Forward compatibility.** `groups.destination_iata`, `start_date`, and `end_date` are unused in MVP. They exist because expense splitting and itineraries need a bounded trip, and adding them later is a migration on a live table.
 

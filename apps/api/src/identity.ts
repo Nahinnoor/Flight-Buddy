@@ -37,7 +37,8 @@ export interface TravelerView {
   id: string;
   userId: string | null;
   displayName: string;
-  createdBy: string;
+  /** NULL once the creator has deleted their account (§6.2). */
+  createdBy: string | null;
   claimedAt: string | null;
   createdAt: string;
 }
@@ -74,7 +75,7 @@ function toTraveler(row: Row): TravelerView {
     id: row.id as string,
     userId: (row.user_id as string | null) ?? null,
     displayName: row.display_name as string,
-    createdBy: row.created_by as string,
+    createdBy: row.created_by as string | null,
     claimedAt: (row.claimed_at as string | null) ?? null,
     createdAt: row.created_at as string,
   };

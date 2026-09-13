@@ -393,7 +393,7 @@ export type Database = {
         Row: {
           claimed_at: string | null
           created_at: string
-          created_by: string
+          created_by: string | null
           display_name: string
           id: string
           invite_email: string | null
@@ -403,7 +403,7 @@ export type Database = {
         Insert: {
           claimed_at?: string | null
           created_at?: string
-          created_by: string
+          created_by?: string | null
           display_name: string
           id?: string
           invite_email?: string | null
@@ -413,7 +413,7 @@ export type Database = {
         Update: {
           claimed_at?: string | null
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           display_name?: string
           id?: string
           invite_email?: string | null
