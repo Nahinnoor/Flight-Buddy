@@ -17,12 +17,14 @@ This file is the handoff point. A human or a fresh agent should be able to read 
 | Tooling | root `package.json`, `tsconfig.base.json`, `eslint.config.mjs`, prettier, vitest | `npm run typecheck / test / lint` green at commit time. TS ~6.0 (not 7: typescript-eslint peer range). Node 22.12 (eslint 10 wants 22.13+, warning only). |
 | `packages/shared` | `src/{types,schemas,time,database.types}.ts` | `FlightCandidate` contract, zod schemas matching ADR 0001, Intl-only airport-local time helpers (39 tests), generated Supabase types. |
 | Database | `supabase/migrations/` (9 files), applied to dev project `gxfadelutegfuoxkrmno` (us-west-2) | Schema per §6.2, RLS on all 11 tables, security + performance advisors clean. Review fix migration `20260912013345` tightened `group_members` self-writes and `travelers` insert. |
-| Skeletons | `packages/flight-provider`, `apps/api`, `services/poller` | package.json + tsconfig only at commit time. |
+| `packages/flight-provider` | `src/aerodatabox/{client,mapper,schemas}.ts`, `lookup.ts`, `trackingTier.ts`, `ingest.ts` | AeroDataBox client (injectable fetch, timeout, 429→rate-limit error), codeshare resolved by the flight-number endpoint itself, tracking tier + 24h feed-health cache, `ingestFlight` = the only `flights` writer. 82 tests on real fixtures. Review fixes: empty body on 5xx is an error, calendar-valid date check, timeout vs network error split. |
+| Fixtures | `docs/api-samples/` (14 of 20 calls used, ledger in `calls.tsv`) | Multi-leg `AS65` (5 legs), codeshare `DL9659`→`KL1405`, live, past, empty/invalid, feed health KJFK/PAWG, balance. |
+| `parseFlightQuery` | `packages/shared/src/flightQuery.ts` | Free-text `DL1234 Mar 12` / `tomorrow` / `3/12` → `{flightNumber, dateLocal}`, tz-aware. |
+| Skeletons | `apps/api`, `services/poller` | `apps/api` in progress (below). |
 | Mobile | `apps/mobile` | Expo SDK 57 template committed as-is; real work in progress (below). |
 
 ## In progress (uncommitted; agents relaunched 2026-09-12 after a usage-limit cut-off)
 
-- **data-pipeline — DONE, staged, under review.** `packages/flight-provider/**`, `packages/shared/src/flightQuery.ts`, `docs/api-samples/**` are `git add`-ed. 137 tests green. Reviewer (Sonnet 5) running. Findings from its report: balance endpoint returns empty 200 (see owner items); codeshares resolved server-side by the flight-number endpoint; AS65 = 5 legs.
 - **mobile-client — resumed.** `apps/mobile/**` unstaged. Previous agent got through auth, API client with mock mode, add-flight, flight card, and was wiring the mock store into the dashboard when cut off. Resumed agent finishes + verifies (tsc, expo lint, expo export, simulator screenshots).
 - **api-backend part 2 — resumed.** `apps/api/src/{config,auth,errors}.ts` existed; resumed agent builds app/routes/tests. First job: dedupe zod to a single ^4 copy across workspaces.
 

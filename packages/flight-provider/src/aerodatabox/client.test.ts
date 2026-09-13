@@ -243,3 +243,35 @@ describe('alert and credit wrappers', () => {
     await expect(provider.refillCredits(0)).rejects.toBeInstanceOf(ProviderDataError);
   });
 });
+
+describe('empty body on a failed response is a failure, not "no data"', () => {
+  // Review fix: a gateway 502/503/504 often arrives with an empty body. That
+  // must surface as ProviderError, never as "flight not found", "no coverage"
+  // (which the feed cache would keep for 24 h) or "0 credits" (§7.7).
+  for (const status of [502, 503, 504]) {
+    it(`lookupFlight throws on ${status} with an empty body`, async () => {
+      const { provider } = providerWith({ status, body: '' });
+      const error = await provider.lookupFlight('AA1', '2026-09-15').catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(ProviderError);
+      expect((error as ProviderError).status).toBe(status);
+    });
+
+    it(`getAirportFeedHealth throws on ${status} with an empty body`, async () => {
+      const { provider } = providerWith({ status, body: '' });
+      await expect(provider.getAirportFeedHealth('KJFK')).rejects.toBeInstanceOf(ProviderError);
+    });
+
+    it(`getCreditBalance throws on ${status} with an empty body`, async () => {
+      const { provider } = providerWith({ status, body: '' });
+      await expect(provider.getCreditBalance()).rejects.toBeInstanceOf(ProviderError);
+    });
+  }
+
+  it('rejects a calendar-invalid date before spending quota', async () => {
+    const { provider, requests } = providerWith({ body: '[]' });
+    for (const bad of ['2026-02-30', '2026-13-01', '2026-04-31']) {
+      await expect(provider.lookupFlight('AA1', bad)).rejects.toBeInstanceOf(ProviderDataError);
+    }
+    expect(requests).toHaveLength(0);
+  });
+});

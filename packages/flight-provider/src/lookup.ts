@@ -8,6 +8,7 @@
  */
 import { parseFlightDesignator, type FlightCandidate } from '@flightbuddy/shared';
 
+import { isLocalDate } from './aerodatabox/client';
 import { ProviderDataError } from './errors';
 import type { FeedHealth, FlightDataProvider } from './provider';
 import { assignTrackingTier, createFeedHealthCache, type FeedHealthCache } from './trackingTier';
@@ -30,8 +31,6 @@ export interface LookupOptions {
 /** Shared by default so the 24-hour TTL actually spans requests. */
 const sharedFeedHealthCache = createFeedHealthCache();
 
-const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
-
 /**
  * Look up every leg a flight number operates on a date.
  *
@@ -51,7 +50,7 @@ export async function lookupCandidates(
   if (designator === null) {
     throw new ProviderDataError(`"${request.flightNumber}" is not a flight number.`);
   }
-  if (!LOCAL_DATE.test(request.dateLocal)) {
+  if (!isLocalDate(request.dateLocal)) {
     throw new ProviderDataError(`"${request.dateLocal}" is not a YYYY-MM-DD date.`);
   }
 

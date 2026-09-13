@@ -44,6 +44,14 @@ const DEFAULT_HOST = 'aerodatabox.p.rapidapi.com';
 const DEFAULT_TIMEOUT_MS = 10_000;
 const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Shape AND calendar validity — `2026-02-30` must never reach the provider. */
+export function isLocalDate(value: string): boolean {
+  if (!LOCAL_DATE.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number) as [number, number, number];
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
 /** Response bodies are only ever logged, so they are truncated on the way in. */
 const MAX_LOGGED_BODY = 500;
 
@@ -117,7 +125,16 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
         ...(init.json === undefined ? {} : { body: JSON.stringify(init.json) }),
       });
     } catch (cause) {
-      throw new ProviderTimeoutError(`Request to the flight provider failed: ${path}`, { cause });
+      const isTimeout =
+        typeof cause === 'object' &&
+        cause !== null &&
+        (cause as { name?: string }).name === 'TimeoutError';
+      if (isTimeout) {
+        throw new ProviderTimeoutError(`Request to the flight provider timed out: ${path}`, {
+          cause,
+        });
+      }
+      throw new ProviderError(`Request to the flight provider failed: ${path}`, { cause });
     }
 
     const body = await response.text();
@@ -164,7 +181,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       if (designator === null) {
         throw new ProviderDataError(`"${number}" is not a flight number.`);
       }
-      if (!LOCAL_DATE.test(dateLocal)) {
+      if (!isLocalDate(dateLocal)) {
         throw new ProviderDataError(`"${dateLocal}" is not a YYYY-MM-DD date.`);
       }
 
@@ -179,8 +196,11 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       // No such flight on that date: 204 with an empty body, or 404. Both mean
       // "nothing found", which is an empty list and not an error — the API
       // turns that into its own 404 (ADR 0001).
-      if (raw.status === 204 || raw.status === 404 || raw.body.trim() === '') return [];
+      if (raw.status === 204 || raw.status === 404) return [];
       assertOk(path, raw);
+      // Only a 2xx with nothing in it means "nothing found". A 5xx with an
+      // empty body is a failure and must surface as one (ADR 0001 → 502).
+      if (raw.body.trim() === '') return [];
 
       const parsed = flightListSchema.safeParse(parseJson(path, raw));
       if (!parsed.success) {
@@ -215,10 +235,9 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       // An airport the provider does not carry reports no coverage rather than
       // failing: "no provider data at all" is the `manual` tier (§7.3), which
       // is a decision for the caller, not an error.
-      if (raw.status === 204 || raw.status === 404 || raw.body.trim() === '') {
-        return toFeedHealth(code, null);
-      }
+      if (raw.status === 204 || raw.status === 404) return toFeedHealth(code, null);
       assertOk(path, raw);
+      if (raw.body.trim() === '') return toFeedHealth(code, null);
 
       const parsed = airportFeedsSchema.safeParse(parseJson(path, raw));
       if (!parsed.success) {
@@ -271,8 +290,9 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       // has no alert balance record. Zero is the truthful reading, and it is
       // the reading that makes §7.7 fail safe — zero credits means fall back to
       // polling rather than trust alerts that will never be sent.
-      if (raw.status === 204 || raw.body.trim() === '') return 0;
+      if (raw.status === 204) return 0;
       assertOk(path, raw);
+      if (raw.body.trim() === '') return 0;
 
       const parsed = balanceSchema.safeParse(parseJson(path, raw));
       if (!parsed.success) {
