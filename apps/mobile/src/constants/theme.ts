@@ -1,12 +1,20 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ * Colour, type and spacing tokens. Two palettes, resolved per scheme by
+ * `useTheme`; nothing in a screen reaches for a hex value directly.
  */
 
 import '@/global.css';
 
 import { Platform } from 'react-native';
 
+/**
+ * Neutral greys, plus the four status tones a flight card needs.
+ *
+ * Each tone is a pair: a saturated `*Text` colour that carries the meaning, and
+ * a muted `*Surface` behind it. Status is never signalled by colour alone —
+ * every pill also carries its own word ("Delayed", "Cancelled") — so the pair
+ * only has to clear contrast, not do the communicating on its own.
+ */
 export const Colors = {
   light: {
     text: '#000000',
@@ -14,6 +22,16 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    border: '#DDDEE3',
+    accent: '#0B63CE',
+    neutralText: '#3E4149',
+    neutralSurface: '#ECEDF0',
+    positiveText: '#11663D',
+    positiveSurface: '#DFF3E7',
+    warningText: '#8A4B00',
+    warningSurface: '#FDECD6',
+    criticalText: '#9E2117',
+    criticalSurface: '#FCE3E0',
   },
   dark: {
     text: '#ffffff',
@@ -21,6 +39,16 @@ export const Colors = {
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    border: '#33353A',
+    accent: '#67A8FF',
+    neutralText: '#C7CAD1',
+    neutralSurface: '#25262A',
+    positiveText: '#6FD79C',
+    positiveSurface: '#122A1E',
+    warningText: '#F2B25C',
+    warningSurface: '#2E2113',
+    criticalText: '#FF8C80',
+    criticalSurface: '#301715',
   },
 } as const;
 
@@ -61,5 +89,5 @@ export const Spacing = {
   six: 64,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/** Keeps text measure sane if this ever runs on an iPad or the web build. */
 export const MaxContentWidth = 800;

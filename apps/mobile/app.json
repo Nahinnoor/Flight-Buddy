@@ -1,14 +1,17 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "FlightBuddy",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "flightbuddy",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.nahinnoor.flightbuddy",
+      "usesAppleSignIn": true,
+      "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
@@ -35,10 +38,15 @@
       ],
       "expo-build-properties",
       "expo-secure-store",
-        ["@react-native-google-signin/google-signin", {
+      "expo-apple-authentication",
+      "expo-notifications",
+      "@react-native-community/datetimepicker",
+      [
+        "@react-native-google-signin/google-signin",
+        {
           "iosUrlScheme": "com.googleusercontent.apps.761390052695-jur2mg6mb15g09258lm13hfq7vcmap6n"
-          }
-        ]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -53,7 +61,3 @@
     "owner": "nahinnoor"
   }
 }
-
-761390052695-ggu1domjaed1snf33mba7cmohsgvqn4o.apps.googleusercontent.com
-
-761390052695-jur2mg6mb15g09258lm13hfq7vcmap6n.apps.googleusercontent.com

@@ -1,56 +1,65 @@
-# Welcome to your Expo app 👋
+# FlightBuddy — mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo SDK 57 / expo-router app. iOS is the only supported platform in Phase 1
+(§1: Android is deliberately deferred).
 
-## Get started
+Read `docs/PROJECT_OVERVIEW.md` at the repo root before changing anything here,
+and `AGENTS.md` in this directory before touching an Expo API.
 
-1. Install dependencies
+## Layout
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+src/
+  app/
+    _layout.tsx        theme + session + the route guard (the only redirector)
+    (auth)/sign-in.tsx Apple / Google, both via signInWithIdToken
+    (app)/index.tsx    dashboard: next flight pinned, the rest below
+    (app)/add-flight.tsx  free text → lookup → disambiguate → confirm → add
+  components/flight-card.tsx  one renderer for rows and candidates alike
+  lib/
+    env.ts             public config, from app.config.ts `extra` then process.env
+    supabase.ts        client + chunked expo-secure-store adapter + auto-refresh
+    auth.ts            the two sign-in flows and sign-out
+    api.ts             the Fastify API client (ADR 0001), zod-validated
+    flights.ts         the one nested Supabase read the dashboard runs
+    flight-display.ts  labels, tones, durations, countdowns, staleness
+    push.ts            Expo push token → profiles.expo_push_token
+    mock/              fixtures + in-memory store for EXPO_PUBLIC_MOCK_API=1
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Configuration
 
-### Other setup steps
+Environment lives in the **monorepo-root** `.env` (see `.env.example`), not in
+`apps/mobile/.env`. `app.config.ts` loads it and forwards the public keys into
+the app manifest; `src/lib/env.ts` reads them.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+| Key | Purpose |
+|---|---|
+| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | anon/publishable key — RLS is the boundary |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | audience Supabase validates the Google ID token against |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | what the native Google SDK presents |
+| `EXPO_PUBLIC_API_URL` | Fastify API base, default `http://localhost:3001` |
+| `EXPO_PUBLIC_MOCK_API` | `1` answers lookups from fixtures and keeps added flights in memory |
 
-## Learn more
+## Running
 
-To learn more about developing your project with Expo, look at the following resources:
+Both sign-in providers are native modules, so **Expo Go will not run this app**.
+Build a dev client:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npx expo run:ios                          # prebuild + build + install
+EXPO_PUBLIC_MOCK_API=1 npx expo start     # then reload the dev client
+```
 
-## Join the community
+Mock mode knows three designators: `DL1234` (direct), `DL8517` (codeshare,
+operated by AF 3612, 45 minutes late) and `WN1234` (two legs on one date — the
+disambiguation list). Anything else is the "no flight found" branch.
 
-Join our community of developers creating universal apps.
+## Checks
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npx tsc --noEmit        # from this directory
+npx expo lint
+npx expo export --platform ios   # proves Metro resolves @flightbuddy/shared
+```
