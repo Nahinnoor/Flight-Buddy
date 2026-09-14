@@ -66,11 +66,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     configureGoogleSignIn();
     const stopAutoRefresh = startSupabaseAutoRefresh();
 
-    void supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setSession(data.session);
-      setIsLoading(false);
-    });
+    // If the stored session cannot be read (keychain unavailable, corrupt
+    // entry), fall through to signed-out rather than holding the splash
+    // screen forever: the route guard only leaves it once isLoading is false.
+    // Trade-off: a transient read failure also lands on sign-in for a user
+    // who has a valid stored session. `session` is deliberately not reset in
+    // `catch` — it starts null, so resetting could only discard a real
+    // session delivered first by onAuthStateChange.
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+      })
+      .catch((error: unknown) => {
+        console.warn('[auth] could not restore the stored session', error);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
 
     // Fires for SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED and USER_UPDATED. The
     // callback only sets state: calling back into supabase from inside it can

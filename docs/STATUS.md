@@ -1,6 +1,6 @@
 # FlightBuddy — Status / handoff
 
-**Updated:** 2026-09-13 (session 3) · **Phase:** 1 — Foundation · **Branch:** `main` · **Last commit:** wave 2b = `HEAD` (parent `6bc2179`)
+**Updated:** 2026-09-13 (session 3) · **Phase:** 1 — Foundation, **verified 2026-09-13**; next is Phase 2 · **Branch:** `main` · **Last commit:** Phase 1 close-out (see `git log -1`)
 
 This file is the handoff point. A human or a fresh agent should be able to read this and `docs/PROJECT_OVERVIEW.md` and continue without the previous conversation.
 
@@ -40,11 +40,17 @@ Nothing uncommitted. Both wave 2b agents (mobile-client, api-backend part 2) fin
 
 ## Next
 
-1. **Run the app in the iOS Simulator end-to-end** against the real API (Phase 1 "done when": one person adds a flight and sees accurate live status). `apps/mobile/ios` was deleted to free disk; `npx expo run:ios` regenerates it. Needs the owner-only auth items below confirmed first (Apple/Google sign-in cannot be faked from a script).
+1. ~~Run the app in the iOS Simulator end-to-end~~ **Done 2026-09-13 — Phase 1 "done when" met.** Xcode 26.6, iOS 26.5 SDK, iPhone 17 Pro simulator (iOS 26.3), real API + dev Supabase, mock mode off. Owner signed in with Google; searched `DL1748 Sep 18` → one leg BOS→DTW 9:10 AM EDT → 11:18 AM EDT, Terminal A, 2h 8m, Scheduled, "Not live-tracked" (5 days out; live tracking is Phase 2). Added it; the dashboard read it back from Supabase under RLS as NEXT FLIGHT with the countdown. A fresh provider lookup matched the stored `flights` row on every field (status, scheduled/estimated/actual dep+arr, gate, terminal). Run recipe below stays valid for future runs:
+   - `apps/mobile/ios` is already generated and Pods are installed (the iOS 26.3.1 simulator platform was downloaded via `xcodebuild -downloadPlatform iOS`). Re-run `pod install` with `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8` after any Xcode change (CocoaPods aborts under a non-UTF-8 locale).
+   - `npx expo run:ios --device <simulator>` misclassifies the simulator as a physical device on this setup; build directly instead: `cd apps/mobile/ios && xcodebuild -workspace FlightBuddy.xcworkspace -scheme FlightBuddy -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,id=<udid>' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build`, then `xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/FlightBuddy.app`, with `npx expo start` (Metro, port 8081) and `npm start -w @flightbuddy/api` running.
+   - **Code signing:** build with `CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=` (ad-hoc simulator signing). With `CODE_SIGNING_ALLOWED=NO` the app has no keychain entitlement, SecureStore throws, and supabase-js's `getSession()` never settles — the app sits on the splash screen forever.
+   - **Changing any `EXPO_PUBLIC_*` value needs a native rebuild**, not just a Metro restart: expo-constants embeds `app.config` (including `extra.env`) into the `.app` at build time, and `src/lib/env.ts` reads that before Metro's inlined values.
+   - Sign-in is the owner's tap (Apple or Google; credentials cannot be entered by an agent). Then add a flight, compare the card with a fresh `POST /v1/flights/lookup`.
 2. Phase 3 will need: the account-deletion endpoint (service-role `auth.admin.deleteUser`; the database now does the rest), leave-group (`group_members.status = 'removed'`), owner-chosen ownership transfer, and the hourly reconcile job un-archiving any archived flight that still has a segment (race noted in §6.3).
-3. **Fast-follow:** `apps/api/src/auth.test.ts` (review item above) before any further auth-dependent work.
-4. `services/poller` (Phase 1 live status refresh) — brief from the overview §5/§9 + `docs/subagents/data-pipeline.md`.
-5. Update `docs/PROJECT_OVERVIEW.md` §13 status line.
+3. **Next phase: Phase 2 — the engine** (overview §13): Render Blueprint, worker, `next_poll_at` scheduler with leasing, polling ladder, webhooks, subscription lifecycle, credit monitoring, change detection, pg-boss, Expo Push. `services/poller` is the starting point.
+4. **Follow-ups found in the Phase 1 run** (small, non-blocking): (a) supabase-js `getSession()` hangs instead of rejecting when SecureStore throws, so a keychain failure holds the splash forever — the added `.catch` in `session-provider.tsx` (reviewed: APPROVE; it deliberately does not reset `session`) does not cover a hang. Add a timeout fallback: `Promise.race` with a timer that clears `isLoading` but keeps the original `getSession()` alive behind a `settled` flag so a slow-but-valid read still restores the session; pick the duration from real device latency. Also add a session-provider test (rejecting `getSession`, and unmount-before-settle). (b) Require cycle `src/lib/mock/store.ts` ↔ `src/lib/flights.ts` (move `sortByScheduledDeparture` to its own module). (c) The add-flight input drops fast keystrokes (uppercasing in `onChangeText` races the simulator's typing; check on device). 
+5. **Fast-follow:** `apps/api/src/auth.test.ts` (review item above) before any further auth-dependent work.
+6. `docs/PROJECT_OVERVIEW.md` §13 records Phase 1 as done.
 
 ## Decisions made this session (not in the overview)
 
@@ -60,7 +66,7 @@ Nothing uncommitted. Both wave 2b agents (mobile-client, api-backend part 2) fin
 
 - **Done (2026-09-13):** account-deletion semantics decided and applied to dev — `created_by` set-null (`20260913035610`), `user_id` cascade + group hand-over trigger + orphaned-flight archive trigger (`20260913040940`). Rules in overview §3.7; verified on dev with a three-member group (owner delete → earliest member owns; last member delete → group deleted; last segment delete under RLS → flight archived).
 - Mobile review's list to confirm before the simulator run: iOS bundle id `com.nahinnoor.flightbuddy` matches the Apple App ID and the Supabase Apple provider; Sign in with Apple capability enabled for it; `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` is the one entered in Supabase's Google provider (it validates the token `aud` against it); `iosUrlScheme` in `app.json` matches the iOS client; `EXPO_PUBLIC_API_URL`/`EXPO_PUBLIC_MOCK_API` set in any EAS build profile.
-- Disk: `~/Library/Containers/com.docker.docker` (35 GB) is an orphan of an uninstalled Docker Desktop; the agent sandbox refused to delete it — run `rm -rf ~/Library/Containers/com.docker.docker` yourself.
+- Disk: Docker leftovers removed 2026-09-13 (37 GB free before the iOS platform download; ~26 GB after).
 
 - `GET /subscriptions/balance` returns HTTP 200 with an EMPTY body, but flight lookups succeed (smoke test 2026-09-12). Re-check the plan / enable the Flight Alert API before Phase 2.
 - Consider rewriting history to purge `.env` from `6102def` before the repo is shared more widely.

@@ -1,6 +1,6 @@
 # FlightBuddy — Master Project Overview
 
-**Status:** Phase 1 in progress (schema applied to dev project).
+**Status:** Phase 1 complete — verified end to end 2026-09-13 (sign-in, add-flight, card matches the provider). Phase 2 next.
 **Owner:** Solo developer.
 **Target:** iOS private beta (~10 testers) via TestFlight, then public launch.
 **Last updated:** 2026-09-05
