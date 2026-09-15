@@ -26,6 +26,7 @@ This file is the handoff point. A human or a fresh agent should be able to read 
 
 ## In progress (2026-09-15, Phase 2 — waves 0–2 done)
 
+- **Engine live on Render since 2026-09-15 12:43 UTC (`f18ef44`).** Found and fixed a gap the tests could not see: nothing set `next_poll_at` for a new flight, so the claim query never picked one up. Migration `20260915124352_seed_next_poll_at` (trigger on insert and on un-archive, not manual-tier, not subscribed; plus a backfill of future flights) — proved on dev in an aborted transaction for all five cases. First real poll 12:44:06 UTC: DL1748 claimed, polled at 72.4 h to departure, next poll 23.3 h later (daily band ±10 %), lease released, 0 failures, 0 events. Plan criterion 2 now proven live, not only in tests.
 - **Next: wave 3** — webhook receiver on the API (Render web service, $7 Starter, needed now), T-24 h subscribe / landed+30 unsubscribe, `webhook-ingest` job with the verification poll, hourly reconcile. Owner action before wave 3 can be proven: create the always-on API web service on Render.
 - One-off cleanup for the owner (the worker role cannot DELETE): 18 archived synthetic `ZZ`-carrier rows from wave 2's integration runs — `delete from public.flights where operating_carrier_iata = 'ZZ';` as `postgres` in the SQL editor.
 

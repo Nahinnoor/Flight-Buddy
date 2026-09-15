@@ -426,6 +426,8 @@ create table provider_credit_log (
 
 **Implementation notes (applied 2026-09-13, migration `account_deletion_semantics`).** Implements §3.7. `travelers.user_id` is `on delete cascade` (a claimed row is the user's self-traveller; the cascade continues to trips, segments and memberships). Trigger `travelers_handover_groups_before_delete` (`security definer`, `private` schema) reassigns every group the traveller owns to the earliest-joined active member and marks that member `owner`, or deletes the group when nobody is left — without it `groups.owner_traveler_id`, which has no on-delete action, would refuse the delete. Trigger `trip_segments_archive_orphaned_flight_after_delete` sets `flights.archived_at` when the last segment referencing a flight is deleted; it is the one writer of `flights` outside ingest and the poller (rule 7 exception), touches `archived_at` only, and `ingestFlight` clears `archived_at` on every upsert so a re-add is visible again. Known race: a delete of the last segment concurrent with a new add can archive a flight the new segment references; the hourly reconcile job should un-archive any archived flight that still has a segment.
 
+**Implementation notes (applied 2026-09-15, migration `seed_next_poll_at`).** The worker claims only rows whose `next_poll_at` is set (§7.5), and `ingestFlight` never writes scheduling columns, so a new flight was never polled. Trigger `flights_seed_next_poll_at` sets `next_poll_at = now()` on INSERT, and on UPDATE when a row goes from archived to active (a re-add), unless the flight is `manual`-tier or already holds a webhook subscription. The worker's first poll then places it on the §7.4 ladder. It writes no other column. On `insert … on conflict do update` the BEFORE INSERT trigger only modifies the proposed row; the conflict path applies the SET list, which never includes `next_poll_at`, so an existing row's schedule is untouched. "Due immediately" is deliberately unjittered, a bounded exception to §7.4's jitter rule: the claim batch (`limit 25`) and the 1 req/s token bucket already bound the burst, and the first poll's ladder step is jittered. The one-time backfill skips a non-`manual` row with no departure or arrival time at all; the archive backstop retires such a row 30 days after `created_at`.
+
 **Forward compatibility.** `groups.destination_iata`, `start_date`, and `end_date` are unused in MVP. They exist because expense splitting and itineraries need a bounded trip, and adding them later is a migration on a live table.
 
 ---
@@ -681,7 +683,7 @@ These are binding on every agent and subagent.
 6. Add `.mcp.json`, `.env`, and `*.local.json` to `.gitignore` before the first commit.
 
 **Data integrity**
-7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Phase 1 exceptions, both documented in §6.3: `ingestFlight` on the service-role client, and the database trigger that sets `archived_at` when a flight's last segment is deleted.)
+7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Documented exceptions, all in §6.3: `ingestFlight` — service-role client in the API, the `flightbuddy_worker` role in the worker; the database trigger that sets `archived_at` when a flight's last segment is deleted; and the trigger that sets `next_poll_at` when a flight is created or re-added.)
 8. All timestamps stored UTC. All display airport-local with a zone label.
 9. Resolve codeshares before insert, never after.
 10. Never auto-merge an unclaimed traveller. Always confirm.
