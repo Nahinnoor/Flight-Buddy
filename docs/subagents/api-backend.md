@@ -2,7 +2,11 @@
 
 > Derived verbatim from `docs/PROJECT_OVERVIEW.md`. If this contradicts the master, the master wins — regenerate this file.
 
-## Phase 1 task for this agent
+## Phase 2 task for this agent
+
+Phase 2 (see `docs/PHASE2_PLAN.md` and ADR 0003): Wave 0 — `apps/api/src/auth.test.ts` for the real JWT verifier. Wave 3 — the webhook receiver route `POST /webhooks/aerodatabox/<WEBHOOK_TOKEN>`: constant-time token check (wrong token → 404, nothing queued, no payload logged), strict zod schema, body-size cap, per-IP rate limit, then enqueue to pg-boss and answer 200 immediately. Never write `flights` from the route (rule 7); the worker's job does the ingest.
+
+## Phase 1 task for this agent (done)
 
 Build the Phase 1 backend: Supabase migrations in `supabase/migrations/` (schema §6.2, one migration per logical change), RLS on every table (§10), generated types committed to `packages/shared`, and `apps/api` (Fastify) with the add-flight endpoints: lookup candidates, and confirm/ingest one candidate into flights/trips/trip_segments via the shared `ingestFlight` in `packages/flight-provider`. Auth: verify the Supabase JWT on every request.
 
@@ -68,7 +72,7 @@ flightbuddy/
 │   └── flight-provider/           # FlightDataProvider interface + AeroDataBox impl
 ├── supabase/
 │   └── migrations/
-├── render.yaml                    # Blueprint — worker and cron live here
+├── render.yaml                    # Blueprint — web service and worker live here
 └── package.json                   # workspaces
 ```
 
@@ -119,11 +123,11 @@ create table profiles (
 
 create table travelers (
   id             uuid primary key default gen_random_uuid(),
-  user_id        uuid references profiles(id) on delete set null,  -- NULL = unclaimed
+  user_id        uuid references profiles(id) on delete cascade,   -- NULL = unclaimed; a claimed row is that user's self-traveller and goes with the account (§3.7)
   display_name   text not null,
   invite_email   citext,
   invite_phone   text,
-  created_by     uuid not null references profiles(id),
+  created_by     uuid references profiles(id) on delete set null,  -- NULL only after the creator deleted their account
   claimed_at     timestamptz,
   created_at     timestamptz not null default now()
 );
@@ -280,7 +284,13 @@ create table provider_credit_log (
 
 **`manual`-tier flights still get a `flights` row.** No `next_poll_at`, times supplied by the user. This keeps `trip_segments.flight_id` non-nullable and every read path uniform.
 
-**Ownership transfer** on owner account deletion: promote the `group_members` row with the earliest `joined_at`.
+**Ownership transfer** on owner account deletion: promote the `group_members` row with the earliest `joined_at` (trigger `travelers_handover_groups_before_delete`, §3.7); the owner-chosen transfer is an application action in Phase 3.
+
+**Implementation notes (applied 2026-09-11, migrations 20260912011727–20260912011905).** `citext` is installed in the `extensions` schema, so columns are typed `extensions.citext`. Every FK has an explicit index (performance advisor). A partial unique index on `travelers(user_id) where user_id is not null` enforces one self-traveller per user. RLS helpers live in a `private` schema as `security definer` functions with `search_path = ''`. Policy widenings beyond §10: `notification_prefs` rows are writable by the group owner (owner-set mutes); a pending joiner can read their own `group_members` row; the owner can read/update `groups` directly, not only via an active membership.
+
+**Implementation notes (applied 2026-09-13, migration `travelers_created_by_set_null`).** `travelers.created_by` was `not null` with no `on delete` action, which made every profile delete — and so every account deletion (App Store guideline 5.1.1(v)) — fail, because a user always has a self-traveller pointing at them. It is now nullable with `on delete set null`: travellers the departing user created for other people survive; `cascade` was rejected because it would also delete a traveller that someone else has since claimed. RLS compares `created_by = auth.uid()`, which is false for NULL, so an orphaned unclaimed traveller is read-only until Phase 3 reassigns it to the group owner. Inserts still require `created_by = auth.uid()`. Superseded the same day by the note below for `user_id`.
+
+**Implementation notes (applied 2026-09-13, migration `account_deletion_semantics`).** Implements §3.7. `travelers.user_id` is `on delete cascade` (a claimed row is the user's self-traveller; the cascade continues to trips, segments and memberships). Trigger `travelers_handover_groups_before_delete` (`security definer`, `private` schema) reassigns every group the traveller owns to the earliest-joined active member and marks that member `owner`, or deletes the group when nobody is left — without it `groups.owner_traveler_id`, which has no on-delete action, would refuse the delete. Trigger `trip_segments_archive_orphaned_flight_after_delete` sets `flights.archived_at` when the last segment referencing a flight is deleted; it is the one writer of `flights` outside ingest and the poller (rule 7 exception), touches `archived_at` only, and `ingestFlight` clears `archived_at` on every upsert so a re-add is visible again. Known race: a delete of the last segment concurrent with a new add can archive a flight the new segment references; the hourly reconcile job should un-archive any archived flight that still has a segment.
 
 **Forward compatibility.** `groups.destination_iata`, `start_date`, and `end_date` are unused in MVP. They exist because expense splitting and itineraries need a bounded trip, and adding them later is a migration on a live table.
 
@@ -298,6 +308,8 @@ Policy shape:
 - `trips` / `trip_segments`: own, plus read access for active co-members.
 
 **Join codes.** 6 characters from Crockford base32 (no I, O, 0, 1 — people read these aloud). Rate-limit join attempts per IP and per account. Expire after the trip. Owner approval is required in all cases.
+
+**Webhook receiver (Phase 2, ADR 0003).** AeroDataBox does not sign deliveries. The receiver lives at a path containing a 32+ byte random token known only to Render env, compared in constant time; a wrong token is a 404 that queues nothing and logs no payload. Bodies are schema-validated, size-capped and rate-limited, and are data only — never interpolated into SQL, shell or a prompt. A gate change or cancellation arriving by webhook is confirmed with one provider poll before it notifies anyone. The worker connects to Postgres as `flightbuddy_worker`, a role with table- and column-level grants only (no names, emails or contacts, no DELETE), never with the service-role key.
 
 **Prompt injection.** The database will contain user-supplied strings — traveller display names and group names typed by one person about another. Supabase's own documentation describes this attack directly. Agents get `read_only=true` and `project_ref` scoping against production. Write access only against a dev project or branch.
 
@@ -318,7 +330,7 @@ These are binding on every agent and subagent.
 6. Add `.mcp.json`, `.env`, and `*.local.json` to `.gitignore` before the first commit.
 
 **Data integrity**
-7. **Never write to `flights` from a request handler.** Poller and webhook processor only.
+7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Phase 1 exceptions, both documented in §6.3: `ingestFlight` on the service-role client, and the database trigger that sets `archived_at` when a flight's last segment is deleted.)
 8. All timestamps stored UTC. All display airport-local with a zone label.
 9. Resolve codeshares before insert, never after.
 10. Never auto-merge an unclaimed traveller. Always confirm.
@@ -328,6 +340,3 @@ These are binding on every agent and subagent.
 12. Run `get_advisors` after every migration; resolve RLS findings before merging.
 13. One migration per logical change, in `supabase/migrations/`, never edited after being applied.
 14. Update `docs/PROJECT_OVERVIEW.md` in the same commit as any change that contradicts it.
-
----
-

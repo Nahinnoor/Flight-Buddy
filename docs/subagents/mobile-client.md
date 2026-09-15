@@ -2,7 +2,11 @@
 
 > Derived verbatim from `docs/PROJECT_OVERVIEW.md`. If this contradicts the master, the master wins — regenerate this file.
 
-## Phase 1 task for this agent
+## Phase 2 task for this agent
+
+Phase 2 (see `docs/PHASE2_PLAN.md`): Wave 5 — foreground notification handling and deep link: tapping a push opens the dashboard on that flight; `registerPushToken` already stores the Expo token. Phase 1 follow-ups when touching these files: `getSession()` timeout fallback in `session-provider.tsx`, break the `mock/store.ts` ↔ `flights.ts` import cycle.
+
+## Phase 1 task for this agent (done)
 
 Build the Phase 1 mobile client in `apps/mobile` (Expo SDK 57, expo-router): Sign in with Apple + Google via Supabase Auth, an add-flight screen (flight number + date, free-text parsing, disambiguation list when the API returns multiple legs), and a personal flight card (status, gate, terminal, scheduled/estimated times in airport-local with zone label, duration, delay, countdown, 'Not live-tracked' badge, codeshare display per §7.2). Talk to the Fastify API in `apps/api` and read flight data from Supabase with the anon key under RLS.
 
@@ -81,8 +85,6 @@ The owner can add a friend's flight without that friend having an account. That 
 - **Never auto-merge.** Always confirm. Two strangers on the same flight must not have itineraries crossed.
 - On claim: the traveller gains edit rights and notifications; the owner loses edit but keeps removal rights.
 
-**The manual path is primary, not a fallback.** Apple's Hide My Email issues relay addresses like `x7k2@privaterelay.appleid.com`, so contact matching will fail for a meaningful share of iOS users. Build the "is this you?" prompt as the main flow and treat contact matching as an accelerator.
-
 ### 3.5 Dashboard
 
 Countdown to the user's own next flight. If a user belongs to multiple groups, **the soonest departure takes priority**; other groups are reachable from a list.
@@ -90,6 +92,17 @@ Countdown to the user's own next flight. If a user belongs to multiple groups, *
 ### 3.6 Group page
 
 Own flight pinned to the top. Other members as collapsible rows showing name, route, status, and a per-flight badge. Expanding shows gate, terminal, times, and layovers.
+
+### 3.7 Leaving, deleting and what survives
+
+Decided 2026-09-13. A `flights` row is a shared fact about one aircraft movement; a person is *subscribed* to it through a `trip_segments` row on their own trip, and is *in a group* through a `group_members` row.
+
+- **Leaving a group** flips the membership to `removed`. The person's traveller, trips and segments are untouched — they still see their own flights on their own dashboard. The group stops showing them.
+- **Deleting an account** deletes the person: their self-traveller and, by cascade, their trips, segments and memberships. Travellers they added for other people survive with `created_by = NULL`. Nothing with their name on it remains.
+- **A flight nobody references any more is archived** (`archived_at`), not deleted — the row still carries the provider alert subscription the poller must cancel, and the 90-day purge removes it afterwards. Adding it again (`ingestFlight`) un-archives it.
+- **Owner leaving or deleting:** ownership goes to a member the owner chose (an explicit transfer action, Phase 3), otherwise to the earliest-joined active member; with nobody left, the group is deleted.
+
+**The manual path is primary, not a fallback.** Apple's Hide My Email issues relay addresses like `x7k2@privaterelay.appleid.com`, so contact matching will fail for a meaningful share of iOS users. Build the "is this you?" prompt as the main flow and treat contact matching as an accelerator.
 
 ---
 
@@ -113,7 +126,7 @@ flightbuddy/
 │   └── flight-provider/           # FlightDataProvider interface + AeroDataBox impl
 ├── supabase/
 │   └── migrations/
-├── render.yaml                    # Blueprint — worker and cron live here
+├── render.yaml                    # Blueprint — web service and worker live here
 └── package.json                   # workspaces
 ```
 
@@ -164,11 +177,11 @@ create table profiles (
 
 create table travelers (
   id             uuid primary key default gen_random_uuid(),
-  user_id        uuid references profiles(id) on delete set null,  -- NULL = unclaimed
+  user_id        uuid references profiles(id) on delete cascade,   -- NULL = unclaimed; a claimed row is that user's self-traveller and goes with the account (§3.7)
   display_name   text not null,
   invite_email   citext,
   invite_phone   text,
-  created_by     uuid not null references profiles(id),
+  created_by     uuid references profiles(id) on delete set null,  -- NULL only after the creator deleted their account
   claimed_at     timestamptz,
   created_at     timestamptz not null default now()
 );
@@ -325,7 +338,13 @@ create table provider_credit_log (
 
 **`manual`-tier flights still get a `flights` row.** No `next_poll_at`, times supplied by the user. This keeps `trip_segments.flight_id` non-nullable and every read path uniform.
 
-**Ownership transfer** on owner account deletion: promote the `group_members` row with the earliest `joined_at`.
+**Ownership transfer** on owner account deletion: promote the `group_members` row with the earliest `joined_at` (trigger `travelers_handover_groups_before_delete`, §3.7); the owner-chosen transfer is an application action in Phase 3.
+
+**Implementation notes (applied 2026-09-11, migrations 20260912011727–20260912011905).** `citext` is installed in the `extensions` schema, so columns are typed `extensions.citext`. Every FK has an explicit index (performance advisor). A partial unique index on `travelers(user_id) where user_id is not null` enforces one self-traveller per user. RLS helpers live in a `private` schema as `security definer` functions with `search_path = ''`. Policy widenings beyond §10: `notification_prefs` rows are writable by the group owner (owner-set mutes); a pending joiner can read their own `group_members` row; the owner can read/update `groups` directly, not only via an active membership.
+
+**Implementation notes (applied 2026-09-13, migration `travelers_created_by_set_null`).** `travelers.created_by` was `not null` with no `on delete` action, which made every profile delete — and so every account deletion (App Store guideline 5.1.1(v)) — fail, because a user always has a self-traveller pointing at them. It is now nullable with `on delete set null`: travellers the departing user created for other people survive; `cascade` was rejected because it would also delete a traveller that someone else has since claimed. RLS compares `created_by = auth.uid()`, which is false for NULL, so an orphaned unclaimed traveller is read-only until Phase 3 reassigns it to the group owner. Inserts still require `created_by = auth.uid()`. Superseded the same day by the note below for `user_id`.
+
+**Implementation notes (applied 2026-09-13, migration `account_deletion_semantics`).** Implements §3.7. `travelers.user_id` is `on delete cascade` (a claimed row is the user's self-traveller; the cascade continues to trips, segments and memberships). Trigger `travelers_handover_groups_before_delete` (`security definer`, `private` schema) reassigns every group the traveller owns to the earliest-joined active member and marks that member `owner`, or deletes the group when nobody is left — without it `groups.owner_traveler_id`, which has no on-delete action, would refuse the delete. Trigger `trip_segments_archive_orphaned_flight_after_delete` sets `flights.archived_at` when the last segment referencing a flight is deleted; it is the one writer of `flights` outside ingest and the poller (rule 7 exception), touches `archived_at` only, and `ingestFlight` clears `archived_at` on every upsert so a re-add is visible again. Known race: a delete of the last segment concurrent with a new add can archive a flight the new segment references; the hourly reconcile job should un-archive any archived flight that still has a segment.
 
 **Forward compatibility.** `groups.destination_iata`, `start_date`, and `end_date` are unused in MVP. They exist because expense splitting and itineraries need a bounded trip, and adding them later is a migration on a live table.
 
@@ -360,7 +379,7 @@ These are binding on every agent and subagent.
 6. Add `.mcp.json`, `.env`, and `*.local.json` to `.gitignore` before the first commit.
 
 **Data integrity**
-7. **Never write to `flights` from a request handler.** Poller and webhook processor only.
+7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Phase 1 exceptions, both documented in §6.3: `ingestFlight` on the service-role client, and the database trigger that sets `archived_at` when a flight's last segment is deleted.)
 8. All timestamps stored UTC. All display airport-local with a zone label.
 9. Resolve codeshares before insert, never after.
 10. Never auto-merge an unclaimed traveller. Always confirm.
@@ -370,6 +389,3 @@ These are binding on every agent and subagent.
 12. Run `get_advisors` after every migration; resolve RLS findings before merging.
 13. One migration per logical change, in `supabase/migrations/`, never edited after being applied.
 14. Update `docs/PROJECT_OVERVIEW.md` in the same commit as any change that contradicts it.
-
----
-

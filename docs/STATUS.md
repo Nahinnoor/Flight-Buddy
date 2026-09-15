@@ -24,9 +24,13 @@ This file is the handoff point. A human or a fresh agent should be able to read 
 | `apps/mobile` | `src/app/(auth)/sign-in.tsx`, `src/app/(app)/{index,add-flight}.tsx`, `src/lib/{api,auth,flights,env,push,supabase}.ts`, `src/components/flight-card.tsx`, `src/providers/session-provider.tsx` | Expo SDK 57, expo-router. Apple/Google via `signInWithIdToken`; dashboard reads `trip_segments → trips → travelers` + `flights` under RLS in one query; add-flight goes through the API only, multi-candidate results are always disambiguated in the UI. Mock mode `EXPO_PUBLIC_MOCK_API=1` for offline dev. `expo lint`, `tsc`, 26 tests green. Not yet run in the simulator against the real API. |
 | Skeleton | `services/poller` | Untouched. |
 
-## In progress
+## In progress (2026-09-14, Phase 2 started)
 
-Nothing uncommitted. Both wave 2b agents (mobile-client, api-backend part 2) finished; their output was reviewed (Sonnet 5), fixed and committed as the wave 2b commit (`HEAD`, parent `6bc2179`).
+- **Wave 0 — api-backend (Opus 5):** `apps/api/src/auth.test.ts` for the real JWT verifier (foreign key, `alg: none`, HS256 without secret, algorithm confusion, expiry + tolerance, iss/aud, JWKS failure → 401). Project head wrote ADR 0003 + overview §4/§7.6/§7.7/§7.8/§10/§11 updates (uncommitted until review).
+- **Wave 1 — infra (Opus 5):** `services/poller` boots (config, pg pool over the worker login, pg-boss in schema `pgboss`, scheduled no-op jobs `credit-check`/`reconcile-subscriptions`/`archive-backstop`, heartbeat, graceful shutdown), `render.yaml`, `.node-version`. Only agent allowed to `npm install` this wave.
+- Next after these land: review (Sonnet 5) → fix → security check → commit → owner deploys the worker → Wave 2 (polling engine, data-pipeline).
+
+Previously: nothing uncommitted. Both wave 2b agents (mobile-client, api-backend part 2) finished; their output was reviewed (Sonnet 5), fixed and committed as the wave 2b commit (`HEAD`, parent `6bc2179`).
 
 ### Wave 2b review outcome
 

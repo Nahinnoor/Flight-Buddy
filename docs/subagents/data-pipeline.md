@@ -2,7 +2,11 @@
 
 > Derived verbatim from `docs/PROJECT_OVERVIEW.md`. If this contradicts the master, the master wins — regenerate this file.
 
-## Phase 1 task for this agent
+## Phase 2 task for this agent
+
+Phase 2 (see `docs/PHASE2_PLAN.md` and ADR 0003): Wave 2 — polling ladder (`nextPollAt` with ±10% jitter), lease-claim (`for update skip locked`), 1 req/s token bucket, `pollAndUpdate` reusing `lookupCandidates` + `ingestFlight`, change detection → `flight_events`, failure back-off, archive backstop. Wave 3 — T-24h subscribe with `useCredits=true` and `maxDeliveryRetries: 1`, landed+30 unsubscribe, `webhook-ingest` job (payload is data only; gate/cancellation changes confirmed with one poll before notifying), hourly reconcile of orphaned subscriptions. Wave 4 — hourly credit check → `provider_credit_log`, owner alert at 300/100/0, zero-balance failover to polling; no automatic refill. Wave 5 — event → recipients (own flights only) → `notification_deliveries` → Expo Push with receipts and dead-token clearing.
+
+## Phase 1 task for this agent (done)
 
 Build `packages/flight-provider`: the `FlightDataProvider` interface (§7.1), the AeroDataBox implementation via RapidAPI, codeshare resolution to the operating flight (§7.2), tracking-tier assignment (§7.3), and a shared `ingestFlight` function (service-role, writes only provider-returned values to `flights` via upsert on the canonical key) reused later by the poller. Capture real responses to `docs/api-samples/` (max 20 calls) and unit-test against those fixtures. Polling/webhooks are Phase 2 — do NOT build them.
 
@@ -91,11 +95,11 @@ create table profiles (
 
 create table travelers (
   id             uuid primary key default gen_random_uuid(),
-  user_id        uuid references profiles(id) on delete set null,  -- NULL = unclaimed
+  user_id        uuid references profiles(id) on delete cascade,   -- NULL = unclaimed; a claimed row is that user's self-traveller and goes with the account (§3.7)
   display_name   text not null,
   invite_email   citext,
   invite_phone   text,
-  created_by     uuid not null references profiles(id),
+  created_by     uuid references profiles(id) on delete set null,  -- NULL only after the creator deleted their account
   claimed_at     timestamptz,
   created_at     timestamptz not null default now()
 );
@@ -252,7 +256,13 @@ create table provider_credit_log (
 
 **`manual`-tier flights still get a `flights` row.** No `next_poll_at`, times supplied by the user. This keeps `trip_segments.flight_id` non-nullable and every read path uniform.
 
-**Ownership transfer** on owner account deletion: promote the `group_members` row with the earliest `joined_at`.
+**Ownership transfer** on owner account deletion: promote the `group_members` row with the earliest `joined_at` (trigger `travelers_handover_groups_before_delete`, §3.7); the owner-chosen transfer is an application action in Phase 3.
+
+**Implementation notes (applied 2026-09-11, migrations 20260912011727–20260912011905).** `citext` is installed in the `extensions` schema, so columns are typed `extensions.citext`. Every FK has an explicit index (performance advisor). A partial unique index on `travelers(user_id) where user_id is not null` enforces one self-traveller per user. RLS helpers live in a `private` schema as `security definer` functions with `search_path = ''`. Policy widenings beyond §10: `notification_prefs` rows are writable by the group owner (owner-set mutes); a pending joiner can read their own `group_members` row; the owner can read/update `groups` directly, not only via an active membership.
+
+**Implementation notes (applied 2026-09-13, migration `travelers_created_by_set_null`).** `travelers.created_by` was `not null` with no `on delete` action, which made every profile delete — and so every account deletion (App Store guideline 5.1.1(v)) — fail, because a user always has a self-traveller pointing at them. It is now nullable with `on delete set null`: travellers the departing user created for other people survive; `cascade` was rejected because it would also delete a traveller that someone else has since claimed. RLS compares `created_by = auth.uid()`, which is false for NULL, so an orphaned unclaimed traveller is read-only until Phase 3 reassigns it to the group owner. Inserts still require `created_by = auth.uid()`. Superseded the same day by the note below for `user_id`.
+
+**Implementation notes (applied 2026-09-13, migration `account_deletion_semantics`).** Implements §3.7. `travelers.user_id` is `on delete cascade` (a claimed row is the user's self-traveller; the cascade continues to trips, segments and memberships). Trigger `travelers_handover_groups_before_delete` (`security definer`, `private` schema) reassigns every group the traveller owns to the earliest-joined active member and marks that member `owner`, or deletes the group when nobody is left — without it `groups.owner_traveler_id`, which has no on-delete action, would refuse the delete. Trigger `trip_segments_archive_orphaned_flight_after_delete` sets `flights.archived_at` when the last segment referencing a flight is deleted; it is the one writer of `flights` outside ingest and the poller (rule 7 exception), touches `archived_at` only, and `ingestFlight` clears `archived_at` on every upsert so a re-add is visible again. Known race: a delete of the last segment concurrent with a new add can archive a flight the new segment references; the hourly reconcile job should un-archive any archived flight that still has a segment.
 
 **Forward compatibility.** `groups.destination_iata`, `start_date`, and `end_date` are unused in MVP. They exist because expense splitting and itineraries need a bounded trip, and adding them later is a migration on a live table.
 
@@ -364,13 +374,13 @@ returning *;
 
 ### 7.6 Webhook lifecycle
 
-Subscriptions are **keyed by flight number with no date parameter**. A subscription to `KL1600` fires for every occurrence of that number, every day it operates. Billing is credit-based: 1 credit per flight item per delivery attempt, deducted when **sent**, not delivered.
+Subscriptions are **keyed by flight number with no date parameter**. A subscription to `KL1600` fires for every occurrence of that number, every day it operates, and **never expires** until we delete it (2026 alert API, ADR 0003). Billing is credit-based: 1 credit per flight item per delivery attempt, deducted when **sent**, not delivered. Deliveries are **not signed** by the provider; the receiver is protected by a secret URL token, and a gate change or cancellation that arrives by webhook is confirmed with one poll before it notifies anyone (§10).
 
 This is why subscriptions open at T-24h and not at add time. Subscribing three weeks out bleeds credits daily on a flight nobody is watching.
 
 | Phase | Action |
 |---|---|
-| T-24 h | `POST /subscriptions/webhook/FlightByNumber/{number}` with `maxDeliveryRetries: 2`. Store `alert_subscription_id`. Set `next_poll_at = NULL`. |
+| T-24 h | `POST /subscriptions/webhook/FlightByNumber/{number}?useCredits=true` with `maxDeliveryRetries: 1` (ADR 0003). Store `alert_subscription_id`. Set `next_poll_at = NULL`. |
 | Window active | Receive alerts, write to `flights`, emit `flight_events` |
 | Arrival + 30 min | `DELETE /subscriptions/webhook/{id}`, archive |
 
@@ -386,16 +396,16 @@ Alert payloads include the remaining credit balance — log it to `provider_cred
 
 Required behaviour:
 
-1. Hourly cron calls `GET /subscriptions/balance` (free).
-2. Below the low-water mark, refill via `POST /subscriptions/balance/refill`. On PRO, max 600 credits per refill call, max 6,000 total balance. Refills consume API units 1:1.
-3. **On zero balance or refill failure, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken.
-4. Alert the operator (Sentry + email). If refill fails because the monthly unit quota is exhausted, you need to know in minutes.
+1. An hourly scheduled job in the worker calls `GET /subscriptions/balance` (free).
+2. **No automatic refill (ADR 0003).** Credits are not drawn from the plan automatically; the balance only grows through `POST /subscriptions/balance/refill` (1 credit = 1 API unit), which the owner calls by hand. Below the low-water mark (300, then 100, then 0 credits) the job alerts the owner.
+3. **On zero balance, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken.
+4. Alert the operator: a push notification to the owner's own phone through the Expo pipeline (`OPERATOR_USER_ID`). No Sentry or email for now (ADR 0003).
 
-Write an integration test that drains a dev balance to zero and asserts the poller takes over.
+Write an integration test that drains a dev balance to zero and asserts the poller takes over. Note the unit quota is per calendar month on RapidAPI; the owner is the only one who refills.
 
 ### 7.8 Budget
 
-PRO plan: 6,000 API units/month, 1 req/s. Tier 1 = 1 unit, Tier 2 = 2 units, Tier 3 = 6 units. Flight status is Tier 2. Credits convert 1:1 from units.
+RapidAPI Pro plan (checked 2026-09-14): 5,000 API units/month, 2 req/s, $8/month. Tier 1 = 1 unit, Tier 2 = 2 units, Tier 3 = 6 units. Flight status is Tier 2. Credits convert 1:1 from units. The worker limits itself to 1 req/s, leaving the rest for interactive lookups.
 
 Approximate per-flight cost: ~14 polls (28 units) plus alert credits during the 24-hour window. At beta scale this is comfortably within budget. Track actual consumption from week one — the alert volume estimate is the least certain number in this document.
 
@@ -446,7 +456,7 @@ These are binding on every agent and subagent.
 6. Add `.mcp.json`, `.env`, and `*.local.json` to `.gitignore` before the first commit.
 
 **Data integrity**
-7. **Never write to `flights` from a request handler.** Poller and webhook processor only.
+7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Phase 1 exceptions, both documented in §6.3: `ingestFlight` on the service-role client, and the database trigger that sets `archived_at` when a flight's last segment is deleted.)
 8. All timestamps stored UTC. All display airport-local with a zone label.
 9. Resolve codeshares before insert, never after.
 10. Never auto-merge an unclaimed traveller. Always confirm.
@@ -456,6 +466,3 @@ These are binding on every agent and subagent.
 12. Run `get_advisors` after every migration; resolve RLS findings before merging.
 13. One migration per logical change, in `supabase/migrations/`, never edited after being applied.
 14. Update `docs/PROJECT_OVERVIEW.md` in the same commit as any change that contradicts it.
-
----
-

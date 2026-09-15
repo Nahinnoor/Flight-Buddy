@@ -2,7 +2,11 @@
 
 > Derived verbatim from `docs/PROJECT_OVERVIEW.md`. If this contradicts the master, the master wins — regenerate this file.
 
-## Phase 1 task for this agent
+## Phase 2 task for this agent
+
+Phase 2 (see `docs/PHASE2_PLAN.md` and ADR 0003): Wave 1 — `services/poller` boots on Render and locally: zod config (names only in errors), `pg` pool over `DATABASE_URL` (the `flightbuddy_worker` role via the session pooler, TLS on), pg-boss in schema `pgboss` with scheduled jobs `credit-check` (hourly), `reconcile-subscriptions` (hourly), `archive-backstop` (daily), pino logger with redaction, heartbeat loop with a `tick()` seam, graceful shutdown; `render.yaml` with one web service and one worker (no cron services); `.node-version` 22.
+
+## Phase 1 task for this agent (done)
 
 Set up the monorepo: npm workspaces, root `tsconfig.base.json`, per-package tsconfig, `packages/shared` (domain types, zod schemas, airport-local time helpers), lint/format config, `.env.example`, scripts. Render/worker deployment is Phase 2 — only scaffold `services/poller` as an empty workspace.
 
@@ -18,7 +22,7 @@ Set up the monorepo: npm workspaces, root `tsconfig.base.json`, per-package tsco
 | DB + Auth | Supabase | Genuinely relational data. RLS and Realtime included. One vendor for auth and data. |
 | Scheduler | Render Background Worker | Long-running process, no HTTP port, doesn't spin down. |
 | Queue | pg-boss | Runs on the Postgres you already have. Retries and dead-lettering for notification sends. |
-| Housekeeping | Render Cron Jobs | Genuinely wall-clock scheduled, idempotent work. |
+| Housekeeping | pg-boss scheduled jobs inside the worker | Wall-clock scheduled, idempotent work, without duplicating secrets into extra Render services (ADR 0003). |
 | Push | Expo Push | One API over APNs. |
 | Errors | Sentry | You will have provider outages and parsing failures. |
 
@@ -26,17 +30,17 @@ Set up the monorepo: npm workspaces, root `tsconfig.base.json`, per-package tsco
 
 A **background worker** is a Render service that runs continuously with no inbound port. Render starts `node dist/poller.js` and restarts it if it crashes. It is not an AI agent — no AI runs in production. Agents write the code; the worker executes it forever afterwards.
 
-A **cron job** wakes on a schedule, runs once, exits.
+A **scheduled job** wakes on a schedule inside the worker process (pg-boss's scheduler), runs once, and is retried by the queue if it fails. Render cron services are not used (ADR 0003).
 
 | Job | Service type | Schedule |
 |---|---|---|
 | Flight poller | Background worker | Continuous loop |
 | Notification sends | pg-boss queue | On demand, with retries |
 | Webhook payload processing | pg-boss queue | On demand |
-| Archive completed trips | Cron | Daily |
-| Purge past 90-day retention | Cron | Daily |
-| Reconcile orphaned subscriptions | Cron | Hourly |
-| Credit balance check + refill | Cron | Hourly |
+| Archive backstop (completed trips) | pg-boss scheduled job in the worker | Daily |
+| Purge past 90-day retention | pg-boss scheduled job in the worker (Phase 4) | Daily |
+| Reconcile orphaned subscriptions | pg-boss scheduled job in the worker | Hourly |
+| Credit balance check + low-credit alert | pg-boss scheduled job in the worker | Hourly |
 
 ---
 
@@ -60,7 +64,7 @@ flightbuddy/
 │   └── flight-provider/           # FlightDataProvider interface + AeroDataBox impl
 ├── supabase/
 │   └── migrations/
-├── render.yaml                    # Blueprint — worker and cron live here
+├── render.yaml                    # Blueprint — web service and worker live here
 └── package.json                   # workspaces
 ```
 
@@ -72,12 +76,12 @@ flightbuddy/
 
 | Service | Plan | Notes |
 |---|---|---|
-| AeroDataBox | PRO, $5.35/mo via RapidAPI | 6,000 units, 1 req/s. Separate dev and prod apps/keys. |
+| AeroDataBox | Pro, $8/mo via RapidAPI | 5,000 units, 2 req/s (ADR 0003). Separate dev and prod apps/keys. |
 | Supabase | US region | Region fixed at creation. |
-| Render | Web service + background worker + cron | Worker is paid-only. `render.yaml` Blueprint. |
+| Render | Web service + background worker | Worker is paid-only; scheduled jobs run inside it (ADR 0003). `render.yaml` Blueprint. |
 | Expo / EAS | — | Push + TestFlight builds |
 | Apple Developer | $99/yr | Already held |
-| Sentry | Free tier | Errors from all three services |
+| Sentry | Deferred | Not used in Phase 2 (ADR 0003); Render logs and failure emails instead. |
 
 **First smoke test:** call `GET /subscriptions/balance`. If it errors, the RapidAPI plan version is too old and needs re-subscribing.
 
@@ -113,7 +117,7 @@ These are binding on every agent and subagent.
 6. Add `.mcp.json`, `.env`, and `*.local.json` to `.gitignore` before the first commit.
 
 **Data integrity**
-7. **Never write to `flights` from a request handler.** Poller and webhook processor only.
+7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Phase 1 exceptions, both documented in §6.3: `ingestFlight` on the service-role client, and the database trigger that sets `archived_at` when a flight's last segment is deleted.)
 8. All timestamps stored UTC. All display airport-local with a zone label.
 9. Resolve codeshares before insert, never after.
 10. Never auto-merge an unclaimed traveller. Always confirm.
@@ -123,6 +127,3 @@ These are binding on every agent and subagent.
 12. Run `get_advisors` after every migration; resolve RLS findings before merging.
 13. One migration per logical change, in `supabase/migrations/`, never edited after being applied.
 14. Update `docs/PROJECT_OVERVIEW.md` in the same commit as any change that contradicts it.
-
----
-

@@ -16,7 +16,14 @@
  * `authenticated`, and expiry (`jose` checks `exp`/`nbf` itself).
  */
 import type { FastifyRequest } from 'fastify';
-import { createRemoteJWKSet, decodeProtectedHeader, errors as joseErrors, jwtVerify } from 'jose';
+import {
+  createRemoteJWKSet,
+  customFetch,
+  decodeProtectedHeader,
+  errors as joseErrors,
+  jwtVerify,
+  type FetchImplementation,
+} from 'jose';
 
 import { UnauthorizedError } from './errors';
 import type { Client, UserClientFactory } from './supabase';
@@ -24,12 +31,13 @@ import type { Client, UserClientFactory } from './supabase';
 /** Supabase stamps this on every access token issued to a signed-in user. */
 const AUDIENCE = 'authenticated';
 /** Leeway on `exp`/`nbf`: host and Supabase clocks drift by seconds, not minutes. */
-const CLOCK_TOLERANCE_SECONDS = 5;
+export const CLOCK_TOLERANCE_SECONDS = 5;
 
 /** Long enough that a burst of adds costs one fetch; short enough to rotate. */
 const JWKS_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
 const JWKS_COOLDOWN_MS = 30 * 1000;
-const JWKS_TIMEOUT_MS = 5_000;
+/** A dead JWKS endpoint must fail the request, not hold the connection open. */
+export const JWKS_TIMEOUT_MS = 5_000;
 
 /** The caller, as the rest of the API sees them. */
 export interface AuthUser {
@@ -45,6 +53,13 @@ export interface TokenVerifierOptions {
   supabaseUrl: string;
   /** Legacy HS256 secret. Only consulted for tokens whose `alg` is `HS*`. */
   jwtSecret?: string | undefined;
+  /**
+   * Test seam. The JWKS fetch, so `auth.test.ts` can serve a locally generated
+   * key set — and a failing one — without a socket. Production leaves this
+   * undefined and `jose` uses the global `fetch`; nothing else about the key
+   * set, its cache or its timeout changes.
+   */
+  fetchJwks?: FetchImplementation | undefined;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -73,6 +88,7 @@ export function createTokenVerifier(options: TokenVerifierOptions): TokenVerifie
     cacheMaxAge: JWKS_CACHE_MAX_AGE_MS,
     cooldownDuration: JWKS_COOLDOWN_MS,
     timeoutDuration: JWKS_TIMEOUT_MS,
+    ...(options.fetchJwks === undefined ? {} : { [customFetch]: options.fetchJwks }),
   });
   const secret =
     options.jwtSecret === undefined ? null : new TextEncoder().encode(options.jwtSecret);

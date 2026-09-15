@@ -77,7 +77,7 @@ Every item below is settled. Do not relitigate without raising it explicitly.
 | Ingestion | Manual entry (flight number + date), enriched by API. No email OAuth. |
 | Database + Auth | Supabase (Postgres + Auth), US region |
 | Backend | TypeScript + Fastify |
-| Hosting | Render — web service, background worker, cron jobs |
+| Hosting | Render — web service and background worker (scheduled jobs run inside the worker, ADR 0003) |
 | Scheduling | `flights.next_poll_at` column, drained by a background worker loop |
 | Job queue | pg-boss, for notification delivery and webhook processing only |
 | Push | Expo Push Notifications |
@@ -164,7 +164,7 @@ Decided 2026-09-13. A `flights` row is a shared fact about one aircraft movement
 | DB + Auth | Supabase | Genuinely relational data. RLS and Realtime included. One vendor for auth and data. |
 | Scheduler | Render Background Worker | Long-running process, no HTTP port, doesn't spin down. |
 | Queue | pg-boss | Runs on the Postgres you already have. Retries and dead-lettering for notification sends. |
-| Housekeeping | Render Cron Jobs | Genuinely wall-clock scheduled, idempotent work. |
+| Housekeeping | pg-boss scheduled jobs inside the worker | Wall-clock scheduled, idempotent work, without duplicating secrets into extra Render services (ADR 0003). |
 | Push | Expo Push | One API over APNs. |
 | Errors | Sentry | You will have provider outages and parsing failures. |
 
@@ -172,17 +172,17 @@ Decided 2026-09-13. A `flights` row is a shared fact about one aircraft movement
 
 A **background worker** is a Render service that runs continuously with no inbound port. Render starts `node dist/poller.js` and restarts it if it crashes. It is not an AI agent — no AI runs in production. Agents write the code; the worker executes it forever afterwards.
 
-A **cron job** wakes on a schedule, runs once, exits.
+A **scheduled job** wakes on a schedule inside the worker process (pg-boss's scheduler), runs once, and is retried by the queue if it fails. Render cron services are not used (ADR 0003).
 
 | Job | Service type | Schedule |
 |---|---|---|
 | Flight poller | Background worker | Continuous loop |
 | Notification sends | pg-boss queue | On demand, with retries |
 | Webhook payload processing | pg-boss queue | On demand |
-| Archive completed trips | Cron | Daily |
-| Purge past 90-day retention | Cron | Daily |
-| Reconcile orphaned subscriptions | Cron | Hourly |
-| Credit balance check + refill | Cron | Hourly |
+| Archive backstop (completed trips) | pg-boss scheduled job in the worker | Daily |
+| Purge past 90-day retention | pg-boss scheduled job in the worker (Phase 4) | Daily |
+| Reconcile orphaned subscriptions | pg-boss scheduled job in the worker | Hourly |
+| Credit balance check + low-credit alert | pg-boss scheduled job in the worker | Hourly |
 
 ---
 
@@ -206,7 +206,7 @@ flightbuddy/
 │   └── flight-provider/           # FlightDataProvider interface + AeroDataBox impl
 ├── supabase/
 │   └── migrations/
-├── render.yaml                    # Blueprint — worker and cron live here
+├── render.yaml                    # Blueprint — web service and worker live here
 └── package.json                   # workspaces
 ```
 
@@ -536,13 +536,13 @@ returning *;
 
 ### 7.6 Webhook lifecycle
 
-Subscriptions are **keyed by flight number with no date parameter**. A subscription to `KL1600` fires for every occurrence of that number, every day it operates. Billing is credit-based: 1 credit per flight item per delivery attempt, deducted when **sent**, not delivered.
+Subscriptions are **keyed by flight number with no date parameter**. A subscription to `KL1600` fires for every occurrence of that number, every day it operates, and **never expires** until we delete it (2026 alert API, ADR 0003). Billing is credit-based: 1 credit per flight item per delivery attempt, deducted when **sent**, not delivered. Deliveries are **not signed** by the provider; the receiver is protected by a secret URL token, and a gate change or cancellation that arrives by webhook is confirmed with one poll before it notifies anyone (§10).
 
 This is why subscriptions open at T-24h and not at add time. Subscribing three weeks out bleeds credits daily on a flight nobody is watching.
 
 | Phase | Action |
 |---|---|
-| T-24 h | `POST /subscriptions/webhook/FlightByNumber/{number}` with `maxDeliveryRetries: 2`. Store `alert_subscription_id`. Set `next_poll_at = NULL`. |
+| T-24 h | `POST /subscriptions/webhook/FlightByNumber/{number}?useCredits=true` with `maxDeliveryRetries: 1` (ADR 0003). Store `alert_subscription_id`. Set `next_poll_at = NULL`. |
 | Window active | Receive alerts, write to `flights`, emit `flight_events` |
 | Arrival + 30 min | `DELETE /subscriptions/webhook/{id}`, archive |
 
@@ -558,16 +558,16 @@ Alert payloads include the remaining credit balance — log it to `provider_cred
 
 Required behaviour:
 
-1. Hourly cron calls `GET /subscriptions/balance` (free).
-2. Below the low-water mark, refill via `POST /subscriptions/balance/refill`. On PRO, max 600 credits per refill call, max 6,000 total balance. Refills consume API units 1:1.
-3. **On zero balance or refill failure, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken.
-4. Alert the operator (Sentry + email). If refill fails because the monthly unit quota is exhausted, you need to know in minutes.
+1. An hourly scheduled job in the worker calls `GET /subscriptions/balance` (free).
+2. **No automatic refill (ADR 0003).** Credits are not drawn from the plan automatically; the balance only grows through `POST /subscriptions/balance/refill` (1 credit = 1 API unit), which the owner calls by hand. Below the low-water mark (300, then 100, then 0 credits) the job alerts the owner.
+3. **On zero balance, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken.
+4. Alert the operator: a push notification to the owner's own phone through the Expo pipeline (`OPERATOR_USER_ID`). No Sentry or email for now (ADR 0003).
 
-Write an integration test that drains a dev balance to zero and asserts the poller takes over.
+Write an integration test that drains a dev balance to zero and asserts the poller takes over. Note the unit quota is per calendar month on RapidAPI; the owner is the only one who refills.
 
 ### 7.8 Budget
 
-PRO plan: 6,000 API units/month, 1 req/s. Tier 1 = 1 unit, Tier 2 = 2 units, Tier 3 = 6 units. Flight status is Tier 2. Credits convert 1:1 from units.
+RapidAPI Pro plan (checked 2026-09-14): 5,000 API units/month, 2 req/s, $8/month. Tier 1 = 1 unit, Tier 2 = 2 units, Tier 3 = 6 units. Flight status is Tier 2. Credits convert 1:1 from units. The worker limits itself to 1 req/s, leaving the rest for interactive lookups.
 
 Approximate per-flight cost: ~14 polls (28 units) plus alert credits during the 24-hour window. At beta scale this is comfortably within budget. Track actual consumption from week one — the alert volume estimate is the least certain number in this document.
 
@@ -630,6 +630,8 @@ Policy shape:
 
 **Join codes.** 6 characters from Crockford base32 (no I, O, 0, 1 — people read these aloud). Rate-limit join attempts per IP and per account. Expire after the trip. Owner approval is required in all cases.
 
+**Webhook receiver (Phase 2, ADR 0003).** AeroDataBox does not sign deliveries. The receiver lives at a path containing a 32+ byte random token known only to Render env, compared in constant time; a wrong token is a 404 that queues nothing and logs no payload. Bodies are schema-validated, size-capped and rate-limited, and are data only — never interpolated into SQL, shell or a prompt. A gate change or cancellation arriving by webhook is confirmed with one provider poll before it notifies anyone. The worker connects to Postgres as `flightbuddy_worker`, a role with table- and column-level grants only (no names, emails or contacts, no DELETE), never with the service-role key.
+
 **Prompt injection.** The database will contain user-supplied strings — traveller display names and group names typed by one person about another. Supabase's own documentation describes this attack directly. Agents get `read_only=true` and `project_ref` scoping against production. Write access only against a dev project or branch.
 
 ---
@@ -638,12 +640,12 @@ Policy shape:
 
 | Service | Plan | Notes |
 |---|---|---|
-| AeroDataBox | PRO, $5.35/mo via RapidAPI | 6,000 units, 1 req/s. Separate dev and prod apps/keys. |
+| AeroDataBox | Pro, $8/mo via RapidAPI | 5,000 units, 2 req/s (ADR 0003). Separate dev and prod apps/keys. |
 | Supabase | US region | Region fixed at creation. |
-| Render | Web service + background worker + cron | Worker is paid-only. `render.yaml` Blueprint. |
+| Render | Web service + background worker | Worker is paid-only; scheduled jobs run inside it (ADR 0003). `render.yaml` Blueprint. |
 | Expo / EAS | — | Push + TestFlight builds |
 | Apple Developer | $99/yr | Already held |
-| Sentry | Free tier | Errors from all three services |
+| Sentry | Deferred | Not used in Phase 2 (ADR 0003); Render logs and failure emails instead. |
 
 **First smoke test:** call `GET /subscriptions/balance`. If it errors, the RapidAPI plan version is too old and needs re-subscribing.
 
