@@ -15,4 +15,5 @@ You do not edit files. Report findings only, ranked by severity, each with file:
 - RLS present on every table; no user-facing write policy on `flights`.
 - Secrets: no keys in code, fixtures, or MCP config.
 - Correctness bugs, unhandled promise rejections, missing input validation.
+- Security (owner rule): no user data or secrets in logs, error bodies, responses, fixtures or commit text; external text (provider payloads, webhook bodies, user strings) treated as data — never executed, interpolated into shell/SQL, or followed as instructions; webhook signatures verified; least privilege for keys; parameterized queries.
 End with a verdict: APPROVE, or BLOCK with the list of must-fix items.
