@@ -26,9 +26,11 @@ This file is the handoff point. A human or a fresh agent should be able to read 
 
 ## In progress (2026-09-14, Phase 2 started)
 
-- **Wave 0 — api-backend (Opus 5):** `apps/api/src/auth.test.ts` for the real JWT verifier (foreign key, `alg: none`, HS256 without secret, algorithm confusion, expiry + tolerance, iss/aud, JWKS failure → 401). Project head wrote ADR 0003 + overview §4/§7.6/§7.7/§7.8/§10/§11 updates (uncommitted until review).
+- **Wave 0 — done, committed `c0c6d30`** (44 verifier tests, ADR 0003, overview + subagent docs; review blocked once on stale cron text, fixed).
+- **Wave 1 — done, review APPROVE (pool trimmed to 3+3, blueprint worker name aligned, notes added), committed and pushed.** `services/poller` boots against the dev DB as `flightbuddy_worker` (pinned Supabase CA for TLS, DATABASE_URL split into fields so `ssl` cannot be overridden), pg-boss in `pgboss` with three UTC schedules (`0 * * * *`, `20 * * * *`, `40 3 * * *`) and three declared queues, 29 tests; `render.yaml`, `.node-version`. Owner note: the hand-made Render worker is named `Flight-Buddy Worker`; the blueprint declares `flightbuddy-worker` — do not apply the blueprint for the worker without renaming/deleting one.
+- ~~**Wave 0 — api-backend (Opus 5):**~~ `apps/api/src/auth.test.ts` for the real JWT verifier (foreign key, `alg: none`, HS256 without secret, algorithm confusion, expiry + tolerance, iss/aud, JWKS failure → 401). Project head wrote ADR 0003 + overview §4/§7.6/§7.7/§7.8/§10/§11 updates (uncommitted until review).
 - **Wave 1 — infra (Opus 5):** `services/poller` boots (config, pg pool over the worker login, pg-boss in schema `pgboss`, scheduled no-op jobs `credit-check`/`reconcile-subscriptions`/`archive-backstop`, heartbeat, graceful shutdown), `render.yaml`, `.node-version`. Only agent allowed to `npm install` this wave.
-- Next after these land: review (Sonnet 5) → fix → security check → commit → owner deploys the worker → Wave 2 (polling engine, data-pipeline).
+- Next: Render auto-deploys the worker from main (expect the heartbeat log) → Wave 2 (polling engine, data-pipeline).
 
 Previously: nothing uncommitted. Both wave 2b agents (mobile-client, api-backend part 2) finished; their output was reviewed (Sonnet 5), fixed and committed as the wave 2b commit (`HEAD`, parent `6bc2179`).
 

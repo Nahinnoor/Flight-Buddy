@@ -72,6 +72,10 @@ and the live account:
 - `provider_credit_log.source` gains no new values; `'post_refill'` is simply unused.
 - The verification poll makes a webhook-driven gate change cost 2 units on top of the credit; at
   beta scale this is negligible against 5,000 units/month.
+- The worker verifies the pooler's TLS chain against Supabase's published root CA, committed at
+  `services/poller/certs/` (a public certificate, not a secret); verification is never disabled.
+  Supabase's `function_search_path_mutable` warnings on pg-boss's own `pgboss.*` functions are
+  accepted: SECURITY INVOKER, owned by the worker role, unreachable from `anon`/`authenticated`.
 - Two Render services instead of five: one web service (API + webhook receiver) and one worker.
 - If AeroDataBox later adds delivery signing, decision 1's token stays and the verification poll can
   be dropped by a one-line change; the ADR should be amended then.

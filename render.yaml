@@ -1,0 +1,89 @@
+# Render Blueprint — PROJECT_OVERVIEW §5, PHASE2_PLAN §6 wave 1.
+#
+# Two services and no cron jobs. The hourly credit check, hourly subscription
+# reconcile and daily archive backstop run as pg-boss schedules inside the worker
+# (owner decision, PHASE2_PLAN §8.8): one process holds the database and RapidAPI
+# secrets instead of four, and it costs nothing extra.
+#
+# Every secret is declared as a KEY ONLY with `sync: false`. Render prompts for the
+# value once, in its own UI, and it is never stored in this repo. `NODE_VERSION` is
+# the only plain value here because it is not a secret and both services must agree
+# on it. See PHASE2_PLAN "Render environment variables (least privilege)" for which
+# variable belongs to which service, and why the worker deliberately has no Supabase
+# key of any kind.
+#
+# Applying this blueprint creates services named below. A service created by hand in
+# the dashboard under a different name is NOT adopted — rename or delete it first,
+# or Render will run two. Two workers would double-poll flights and exceed the
+# worker role's connection limit.
+
+services:
+  # ---------------------------------------------------------------------------
+  # Fastify API (ADR 0001). Public: the mobile client and, from wave 3, the
+  # AeroDataBox webhook receiver.
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: flightbuddy-api
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start -w @flightbuddy/api
+    # Deliberately not a dependency check: a liveness probe that fails when
+    # Supabase is down turns an upstream blip into a crash loop (apps/api/README).
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      # Not a secret; the mobile app ships it. Declared for completeness.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      # Bypasses RLS. Handed to ingestFlight and nothing else (§12.7).
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Development RapidAPI key only in a development context (§12.3).
+      - key: RAPIDAPI_KEY
+        sync: false
+      # Wave 3: the secret path segment the receiver compares in constant time
+      # (PHASE2_PLAN §5). The worker holds the same secret as part of WEBHOOK_URL.
+      - key: WEBHOOK_TOKEN
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+      - key: CORS_ORIGIN
+        value: '*'
+
+  # ---------------------------------------------------------------------------
+  # Background worker: the polling ladder, the queue consumers and the scheduled
+  # jobs. No inbound port; Render restarts it if it exits (PROJECT_OVERVIEW §4).
+  # ---------------------------------------------------------------------------
+  - type: worker
+    # Matches the service the owner created by hand (2026-09-14), so a blueprint
+    # apply conflicts on the name instead of silently running a second worker.
+    name: Flight-Buddy Worker
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start -w @flightbuddy/poller
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      # SESSION pooler string for the flightbuddy_worker role (PHASE2_PLAN §8.7).
+      # Not the direct host: it is IPv6-only and Render connects over IPv4. Not the
+      # transaction pooler: pg-boss needs session-level features (§8.6).
+      - key: DATABASE_URL
+        sync: false
+      - key: RAPIDAPI_KEY
+        sync: false
+      # Wave 3. Full public receiver URL including its secret path segment.
+      - key: WEBHOOK_URL
+        sync: false
+      # Wave 4. The owner's profile id, so low-credit and failover alerts reach a
+      # phone (PHASE2_PLAN §8.4). Not a secret, but it is an id, so it is prompted.
+      - key: OPERATOR_USER_ID
+        sync: false
+      - key: LOG_LEVEL
+        value: info
