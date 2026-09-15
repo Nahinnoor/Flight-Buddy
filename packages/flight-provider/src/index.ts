@@ -24,12 +24,18 @@ export {
 } from './trackingTier';
 
 export {
+  FLIGHTS_CONFLICT_COLUMNS,
   FLIGHTS_CONFLICT_TARGET,
+  FLIGHT_UPSERT_COLUMNS,
   FlightIngestError,
+  createSupabaseFlightsWriter,
   ingestFlight,
+  type FlightUpsertRow,
+  type FlightsWriter,
   type IngestOptions,
   type IngestResult,
 } from './ingest';
+export { FLIGHTS_UPSERT_SQL, createPgFlightsWriter, type QueryFn } from './pgWriter';
 
 export {
   ProviderDataError,

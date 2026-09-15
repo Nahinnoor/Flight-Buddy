@@ -5,13 +5,24 @@
  * before the loop kills the process with a non-zero exit so Render restarts it
  * rather than keeping a worker alive that cannot do anything.
  *
- * Wave 1 is the skeleton: `tick()` is a named seam and does nothing yet. Wave 2
- * puts `claimDueFlights(POLL_BATCH_SIZE)` and `pollAndUpdate` behind it, with the
- * lease taken and committed *before* the HTTP call (§7.5, §8.7).
+ * Wave 2 filled `tick()` in: the pass itself lives in `engine/tick.ts` so it can
+ * be tested without importing the module that starts a worker on import.
  */
+import {
+  createAeroDataBoxProvider,
+  createFeedHealthCache,
+  createPgFlightsWriter,
+  type FeedHealthCache,
+  type FlightDataProvider,
+  type FlightsWriter,
+} from '@flightbuddy/flight-provider';
+
 import { ConfigError, loadConfig, type Config } from './config';
 import { createPool, ping, type Pool } from './db';
+import { createRateLimiter, type RateLimiter } from './engine/rateLimiter';
+import { runPollPass } from './engine/tick';
 import { createLogger, type Logger } from './logger';
+import { createArchiveBackstopHandler } from './engine/archiveBackstop';
 import { createBoss, startQueue, stopQueue, type PgBoss } from './queue';
 
 /** Everything a pass needs. Passed explicitly so `tick` stays testable. */
@@ -20,31 +31,32 @@ export interface WorkerContext {
   readonly logger: Logger;
   readonly pool: Pool;
   readonly boss: PgBoss;
+  readonly provider: FlightDataProvider;
+  /** The `pg`-backed `FlightsWriter`; rule 7 still routes every write through `ingestFlight`. */
+  readonly writer: FlightsWriter;
+  /** Process-wide, so the 1 req/s ceiling holds across passes, not just within one. */
+  readonly rateLimiter: RateLimiter;
+  readonly feedHealthCache: FeedHealthCache;
 }
 
 /**
- * One pass of the worker loop.
+ * One pass of the worker loop: claim a batch, poll each flight, log the counts.
  *
- * Wave 2 replaces the body with:
- *
- * ```ts
- * const due = await claimDueFlights(pool, config.POLL_BATCH_SIZE); // lease, commit
- * for (const flight of due) {
- *   await rateLimiter.acquire();   // 1 req/s
- *   await pollAndUpdate(flight);
- * }
- * ```
- *
- * Until then it exists so the loop, the error handling around it and the shutdown
- * path are the ones that ship, not ones written later under time pressure.
+ * `webhooksEnabled: false` is wave 3's seam — until subscriptions exist, a
+ * `live`-tier flight inside T-24 h stays on the failover ladder rather than
+ * falling into a 24-hour blind spot (see `engine/ladder.ts`).
  */
 export async function tick(context: WorkerContext): Promise<void> {
-  const { logger, config } = context;
-  logger.info(
-    { batchSize: config.POLL_BATCH_SIZE, intervalMs: config.POLL_INTERVAL_MS },
-    'heartbeat: no poller engine yet (wave 2)',
-  );
-  await Promise.resolve();
+  await runPollPass({
+    pool: context.pool,
+    provider: context.provider,
+    writer: context.writer,
+    rateLimiter: context.rateLimiter,
+    logger: context.logger,
+    feedHealthCache: context.feedHealthCache,
+    webhooksEnabled: false,
+    batchSize: context.config.POLL_BATCH_SIZE,
+  });
 }
 
 /** `setTimeout` that resolves early when `signal` aborts, and never rejects. */
@@ -100,10 +112,36 @@ async function main(): Promise<void> {
   await ping(pool);
   logger.info('database reachable');
 
-  const boss = createBoss(config);
-  await startQueue({ boss, logger });
+  const provider = createAeroDataBoxProvider({
+    apiKey: config.RAPIDAPI_KEY,
+    host: config.AERODATABOX_HOST,
+  });
+  // Rule 7 (§12.7): the worker writes flight data only through `ingestFlight`,
+  // which now takes a transport. This is the `pg` one — the worker holds no
+  // Supabase key at all (ADR 0003 §6).
+  const writer = createPgFlightsWriter((text, values) => pool.query(text, [...values]));
+  const rateLimiter = createRateLimiter({ rps: config.PROVIDER_RPS });
+  const feedHealthCache = createFeedHealthCache();
 
-  const context: WorkerContext = { config, logger, pool, boss };
+  const boss = createBoss(config);
+  await startQueue({
+    boss,
+    logger,
+    // Wave 2's one scheduled body (§8.9). `credit-check` is wave 4 and
+    // `reconcile-subscriptions` is wave 3; both stay no-ops.
+    handlers: { 'archive-backstop': createArchiveBackstopHandler({ pool, logger }) },
+  });
+
+  const context: WorkerContext = {
+    config,
+    logger,
+    pool,
+    boss,
+    provider,
+    writer,
+    rateLimiter,
+    feedHealthCache,
+  };
   const shutdown = new AbortController();
 
   // Render sends SIGTERM on every deploy. An interrupted pass costs nothing: the

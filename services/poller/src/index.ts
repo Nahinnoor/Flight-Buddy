@@ -35,5 +35,75 @@ export {
   stopQueue,
   type JobBatch,
   type PgBoss,
+  type ScheduledHandler,
   type ScheduledJob,
 } from './queue';
+
+// --- the polling engine (§7.4, §7.5, §8.2, §8.8, §8.9) ----------------------
+
+export {
+  ARCHIVE_AFTER_LANDING_MS,
+  JITTER_FRACTION,
+  LADDER_BOUNDARIES,
+  LADDER_INTERVALS,
+  applyJitter,
+  arrivalAnchor,
+  departureAnchor,
+  ladderIntervalMs,
+  nextPollAt,
+  type LadderFlight,
+  type LadderOptions,
+} from './engine/ladder';
+export {
+  CLAIM_DUE_FLIGHTS_SQL,
+  DEFAULT_LEASE_MS,
+  RELEASE_LEASE_SQL,
+  claimDueFlights,
+  releaseLease,
+} from './engine/lease';
+export {
+  DEFAULT_PROVIDER_RPS,
+  createRateLimiter,
+  systemClock,
+  type Clock,
+  type RateLimiter,
+  type RateLimiterOptions,
+} from './engine/rateLimiter';
+export {
+  DEFAULT_DELAY_THRESHOLD_MINUTES,
+  FLIGHT_EVENT_TYPES,
+  detectChanges,
+  type DetectChangesOptions,
+  type DetectedEvent,
+  type FlightEventSource,
+  type FlightEventType,
+  type PreviousFlight,
+} from './engine/changeDetector';
+export {
+  MAX_BACKOFF_MS,
+  MAX_CONSECUTIVE_FAILURES,
+  backoffPollAt,
+  operatingDesignator,
+  pollAndUpdate,
+  type PollDependencies,
+  type PollFailure,
+  type PollFailureReason,
+  type PollOutcome,
+  type PollSuccess,
+} from './engine/poll';
+export {
+  ARCHIVE_AFTER_ARRIVAL_HOURS,
+  ARCHIVE_BACKSTOP_SQL,
+  ARRIVAL_FALLBACK_HOURS,
+  archiveStaleFlights,
+  createArchiveBackstopHandler,
+  type ArchiveBackstopResult,
+} from './engine/archiveBackstop';
+export {
+  buildInsertEventsSql,
+  insertFlightEvents,
+  recordPollFailure,
+  recordPollSuccess,
+} from './engine/repository';
+export { runPollPass, type PollPassOptions, type PollPassSummary } from './engine/tick';
+export { ENGINE_TYPES, type FlightRow } from './engine/types';

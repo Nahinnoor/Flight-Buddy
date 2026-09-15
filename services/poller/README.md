@@ -4,10 +4,21 @@ The Render **background worker** from PROJECT_OVERVIEW §4 and §7.5. It runs fo
 port: it claims due flights by lease, polls AeroDataBox, writes `flights` and `flight_events`, and
 hosts the queue consumers and the scheduled jobs.
 
-**Wave 1 (this) is the boot skeleton.** The process starts, connects, brings the queue up, ticks on
-a heartbeat and shuts down cleanly. `tick()` in [`src/main.ts`](src/main.ts) is the named seam where
-wave 2's `claimDueFlights` + `pollAndUpdate` land; the three scheduled jobs are registered with
-handlers that log and return.
+**Wave 1** was the boot skeleton: start, connect, bring the queue up, tick, shut down cleanly.
+
+**Wave 2 (this) is the polling engine**, in [`src/engine/`](src/engine). `tick()` now claims a batch
+by lease and polls it: ladder → lease → token bucket → lookup → `ingestFlight` → change detection →
+`flight_events` → `next_poll_at`. `archive-backstop` has a real body. `credit-check` (wave 4) and
+`reconcile-subscriptions` (wave 3) are still no-ops.
+
+Two seams wave 3 will use, both already named:
+
+- **`webhooksEnabled`** in [`src/engine/ladder.ts`](src/engine/ladder.ts), default `false`. Until
+  subscriptions exist, a `live`-tier flight inside T-24 h **keeps polling** on the failover ladder
+  rather than falling into a 24-hour blind spot. With the flag on, a flight holding an
+  `alert_subscription_id` returns `null` — the "set `next_poll_at = NULL`" of §7.6.
+- **`startQueue({ handlers })`**, which replaces a scheduled job's no-op with a real body without
+  `queue.ts` needing to know about pools or providers.
 
 ## Run
 
@@ -41,13 +52,14 @@ process before it connects and reports variable **names** and zod's issue code, 
 | Variable | Required | Default | Notes |
 |---|---|---|---|
 | `DATABASE_URL` | **yes** | — | **Session pooler** string for the `flightbuddy_worker` role. Must be a `postgres://` / `postgresql://` URL. |
-| `RAPIDAPI_KEY` | **yes** | — | Development key only in a development context (§12.3). Used from wave 2. |
+| `RAPIDAPI_KEY` | **yes** | — | Development key only in a development context (§12.3). |
 | `AERODATABOX_HOST` | no | `aerodatabox.p.rapidapi.com` | |
 | `WEBHOOK_URL` | no | — | Wave 3. Full public receiver URL including its secret path segment; the worker registers it with AeroDataBox. |
 | `OPERATOR_USER_ID` | no | — | Wave 4. The owner's profile id, so low-credit and failover alerts reach a phone. A uuid. |
 | `LOG_LEVEL` | no | `info` | A pino level. |
 | `POLL_INTERVAL_MS` | no | `30000` | Sleep between passes (§7.5). 1 000–600 000. |
 | `POLL_BATCH_SIZE` | no | `25` | Flights claimed per pass (§7.5). 1–100. |
+| `PROVIDER_RPS` | no | `1` | Token-bucket rate for provider calls (§7.8). Capped at 2, the whole plan limit; the worker takes 1 and leaves the other for the API's interactive lookups. |
 
 A variable set to the empty string counts as unset, so a blank line in `.env` does not turn into an
 "invalid URL" at boot.
@@ -133,7 +145,7 @@ instead of being silently repaired at runtime.
 |---|---|---|---|
 | `credit-check` | `0 * * * *` | 4 | Balance → `provider_credit_log`; alert and fail over to polling at zero (§7.7). |
 | `reconcile-subscriptions` | `20 * * * *` | 3 | Delete provider subscriptions that map to no active flight. |
-| `archive-backstop` | `40 3 * * *` | 2 | Archive flights past scheduled arrival + 6 h that never reported landing (§8.9). |
+| `archive-backstop` | `40 3 * * *` | **2, done** | Archive flights past their latest known arrival + 6 h that never reported landing (§8.9). |
 
 The plan fixes the cadence and leaves the minute to us; they are spread across the hour so two jobs
 that both call RapidAPI do not land on the same minute as each other or as a poll pass.
@@ -150,6 +162,26 @@ that both call RapidAPI do not land on the same minute as each other or as a pol
 | `src/index.ts` | The workspace's importable surface — importing it does not start a worker. |
 | `certs/` | Supabase's public root CA, the only TLS trust anchor. |
 
+### `src/engine/` — the polling engine (wave 2)
+
+| File | |
+|---|---|
+| `ladder.ts` | Pure `nextPollAt(flight, now, rng)` for §7.4, ±10 % jitter, and the `webhooksEnabled` seam. UTC arithmetic only — no zone, no local clock. |
+| `lease.ts` | `claimDueFlights` (§7.5's `for update skip locked`, committed before any HTTP call) and `releaseLease`. |
+| `rateLimiter.ts` | 1 req/s token bucket with an injectable clock. Reserves its slot synchronously, so a crowd of concurrent callers cannot share a second. |
+| `changeDetector.ts` | Pure `detectChanges(previousRow, freshCandidate)` → typed events (§9), compared against the **last known value** so an unchanged flight yields nothing (§8.2). |
+| `poll.ts` | `pollAndUpdate`: one flight, end to end, plus the failure back-off (§8.8). |
+| `repository.ts` | The scheduling and `flight_events` statements. No provider data passes through it — that is `ingestFlight`'s job (rule 7). |
+| `archiveBackstop.ts` | The `archive-backstop` body: archive anything past its latest known arrival + 6 h (§8.9). |
+| `tick.ts` | One pass: claim → poll each, sequentially, the limiter pacing it. |
+| `types.ts` | `FlightRow`, and the per-query `pg` type parsers that keep a `date` a date and a `timestamptz` a UTC ISO string. |
+
+**Why `ingestFlight` grew a `FlightsWriter`.** The worker has a `pg` pool and, by design, no Supabase
+key at all. Rule 7 still says `ingestFlight` is the only writer of `flights`, so the *transport* moved
+behind a one-method interface in `@flightbuddy/flight-provider`: `createSupabaseFlightsWriter` for the
+API, `createPgFlightsWriter` for the worker. The row — which columns are written, which are left for
+the poller — is decided in one place and shared by both.
+
 ## Logging
 
 JSON on stdout, which is what Render collects. `src/logger.ts` redacts anything that could carry a
@@ -165,11 +197,23 @@ Two limits worth knowing, both covered by a test:
 
 ## Tests
 
-`npm test` is offline and deterministic: config parsing (defaults, coercion, blank-as-unset, every
+`npm test` is offline and deterministic. Config parsing (defaults, coercion, blank-as-unset, every
 rejection, and that no value reaches the error message), connection-string splitting and the TLS
-settings, and log redaction.
+settings, log redaction — and the whole engine: every ladder boundary including a DST transition in
+the origin zone and a date-line crossing, the jitter bounds, 200 simultaneously due flights against a
+fake clock, every change-detector event and its no-op, the poll paths and the back-off, and the shape
+of every statement. Provider responses come from `docs/api-samples/` through a real provider instance
+with an injected `fetch`; **nothing in this workspace calls AeroDataBox** (§12.2).
 
-`src/queue.integration.test.ts` skips unless **both** `INTEGRATION=1` and a `DATABASE_URL` are set.
+Two files skip unless **both** `INTEGRATION=1` and a `DATABASE_URL` are set:
+
+- `src/engine/lease.integration.test.ts` inserts synthetic `ZZ`-carrier flights due in the past, then
+  claims from **two pools at once** and asserts each row went to exactly one claimer — which is the
+  only way to test `for update skip locked` at all. It also asserts the type parsers against real
+  wire values, and that archived and `next_poll_at is null` rows are never claimed. Cleanup
+  **archives** the synthetic rows rather than deleting them, because the role has no DELETE grant;
+  they stay in the table, invisible to every later claim.
+- `src/queue.integration.test.ts` skips unless **both** `INTEGRATION=1` and a `DATABASE_URL` are set.
 It opens a real pool and starts pg-boss, then asserts the connection is the `flightbuddy_worker`
 role, that pg-boss's tables are in `pgboss` and not `public`, and that the three schedules and three
 queues are registered. Its side effects are intended and idempotent — pg-boss creates its own tables

@@ -80,16 +80,21 @@ export const SCHEDULE_TIMEZONE = 'UTC';
 /** pg-boss hands a batch to every handler, even when the batch is one job. */
 export type JobBatch = Job<object>[];
 
+/** What pg-boss calls for a scheduled job. */
+export type ScheduledHandler = (jobs: JobBatch) => Promise<void>;
+
 /**
  * The no-op bodies wave 1 ships. Each logs that it ran and returns, which is enough
  * to prove the scheduler fires on the deployed worker before any of it does work.
  *
+ * Wave 2 supplies a real `archive-backstop` through `startQueue`'s `handlers`
+ * override; `credit-check` (wave 4) and `reconcile-subscriptions` (wave 3) are
+ * still the no-ops below.
+ *
  * Handlers must stay idempotent when they grow bodies (§5, "Engineering basics"):
  * a `missed: 'once'` catch-up or a redelivery can run the same occurrence twice.
  */
-export function createScheduledHandlers(
-  logger: Logger,
-): Record<string, (jobs: JobBatch) => Promise<void>> {
+export function createScheduledHandlers(logger: Logger): Record<string, ScheduledHandler> {
   async function handleCreditCheck(jobs: JobBatch): Promise<void> {
     logger.info({ job: 'credit-check', count: jobs.length }, 'scheduled job ran (no-op, wave 4)');
   }
@@ -104,7 +109,7 @@ export function createScheduledHandlers(
   async function handleArchiveBackstop(jobs: JobBatch): Promise<void> {
     logger.info(
       { job: 'archive-backstop', count: jobs.length },
-      'scheduled job ran (no-op, wave 2)',
+      'scheduled job ran (no-op; the real body is injected by main.ts)',
     );
   }
 
@@ -138,6 +143,14 @@ export function createBoss(config: Config): PgBoss {
 export interface StartQueueOptions {
   boss: PgBoss;
   logger: Logger;
+  /**
+   * Real bodies for scheduled jobs, by name, replacing the no-op of the same name.
+   *
+   * The bodies need a database pool and a provider, which this module deliberately
+   * does not know about — `main.ts` owns those. An unknown name is a wiring
+   * mistake and throws rather than being silently ignored.
+   */
+  handlers?: Record<string, ScheduledHandler>;
 }
 
 /**
@@ -146,7 +159,18 @@ export interface StartQueueOptions {
  * Every step is idempotent: `createQueue` and `schedule` upsert, so a redeploy or a
  * second worker re-asserts the same rows rather than duplicating them.
  */
-export async function startQueue({ boss, logger }: StartQueueOptions): Promise<void> {
+export async function startQueue({
+  boss,
+  logger,
+  handlers: overrides = {},
+}: StartQueueOptions): Promise<void> {
+  const scheduledNames = new Set(SCHEDULED_JOBS.map((job) => job.name));
+  for (const name of Object.keys(overrides)) {
+    if (!scheduledNames.has(name)) {
+      throw new Error(`handler override for unknown scheduled job ${name}`);
+    }
+  }
+
   // pg-boss emits these instead of throwing once it is running; unhandled, an
   // 'error' event on an EventEmitter takes the process down.
   boss.on('error', (error) => logger.error({ err: error }, 'pg-boss error'));
@@ -159,7 +183,7 @@ export async function startQueue({ boss, logger }: StartQueueOptions): Promise<v
   }
   logger.info({ queues: DECLARED_QUEUES, schema: PGBOSS_SCHEMA }, 'queues declared');
 
-  const handlers = createScheduledHandlers(logger);
+  const handlers = { ...createScheduledHandlers(logger), ...overrides };
   for (const job of SCHEDULED_JOBS) {
     const handler = handlers[job.name];
     if (!handler) throw new Error(`no handler registered for scheduled job ${job.name}`);

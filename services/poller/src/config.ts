@@ -73,6 +73,15 @@ export const configSchema = z.object({
   POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).max(600_000).default(30_000),
   /** `claimDueFlights` batch size (§7.5 uses 25; §8.3 relies on it to bound bursts). */
   POLL_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(25),
+
+  /**
+   * Provider requests per second for the token bucket (§7.5, §7.8).
+   *
+   * The plan allows 2; the worker takes 1 and leaves the other for the API's
+   * interactive lookups (ADR 0003 §7). Capped at 2 here so a typo cannot put the
+   * account over its limit — 429s count as failed polls.
+   */
+  PROVIDER_RPS: z.coerce.number().positive().max(2).default(1),
 });
 
 export type Config = z.infer<typeof configSchema>;
