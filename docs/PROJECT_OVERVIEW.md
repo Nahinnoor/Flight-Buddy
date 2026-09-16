@@ -602,6 +602,19 @@ The pipeline is the engine. These are the things that will go wrong.
 
 **11. Group page N+1 queries.** Naive implementation issues one query per member. Fetch the whole group in a single join.
 
+**12b. Silent tier degradation.** Feed health decides the tracking tier (§7.3), and an airport whose
+health cannot be read degrades that flight to `scheduled`. Found live on 2026-09-16: the lookup asked
+about both airports at once, right after the flight call, which is a three-request burst against a
+1–2 req/s account, and the resulting 429 was swallowed — so **every** flight came back `scheduled`,
+nothing ever subscribed to alerts, and no log said why. Health is now fetched one airport at a time,
+retried once (honouring `Retry-After`), and a persistent failure is logged with the ICAO code. The
+lesson generalises: a conservative fallback must be loud, or it becomes the only path.
+
+**12c. A tier that flips back.** A `live` flight that later degrades to `scheduled` still holds its
+`alert_subscription_id`. Subscriptions never expire and bill per delivery (§7.6, §7.7), and the
+hourly reconcile cannot see this case — the row still claims the id and the provider still delivers.
+The poller closes the subscription whenever a flight stops being subscribable.
+
 **12. Multi-leg flight numbers.** Some numbers operate two legs on one date. The lookup returns an array. Never take `[0]` without disambiguating (§3.1).
 
 ---

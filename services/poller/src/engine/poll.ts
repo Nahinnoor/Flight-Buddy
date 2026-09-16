@@ -56,6 +56,7 @@ import {
 } from './ladder';
 import { insertFlightEvents, recordPollFailure, recordPollSuccess } from './repository';
 import {
+  isSubscribable,
   clampToWindowOpening,
   closeSubscription,
   openSubscription,
@@ -247,7 +248,17 @@ export async function pollAndUpdate(
         // on (§6.3). Kept as the `YYYY-MM-DD` text Postgres stored.
         dateLocal: flight.departure_date_local,
       },
-      deps.feedHealthCache === undefined ? {} : { feedHealthCache: deps.feedHealthCache },
+      {
+        ...(deps.feedHealthCache === undefined ? {} : { feedHealthCache: deps.feedHealthCache }),
+        // A silent degrade here is how every flight stayed `scheduled` and
+        // nothing ever subscribed (§7.3). ICAO and error class only.
+        onFeedHealthError: (icao, error) => {
+          deps.logger.warn(
+            { flightId: flight.id, icao, errorName: nameOf(error) },
+            'feed health unavailable: flight stays on the scheduled tier',
+          );
+        },
+      },
     );
   } catch (error) {
     return fail(flight, deps, now, rng, 'provider_error', nameOf(error));
@@ -300,6 +311,22 @@ export async function pollAndUpdate(
     } else {
       let subscriptionId = flight.alert_subscription_id;
       const webhookUrl = webhooksEnabled ? deps.webhookUrl : undefined;
+
+      // The mirror of subscribing: a row that still holds a subscription but is
+      // no longer subscribable — tier dropped back to `scheduled` because an
+      // airport's feed health could not be read, or the flight was cancelled —
+      // must let it go. Subscriptions never expire (§7.6) and bill per delivery
+      // (§7.7), and the hourly reconcile cannot catch this one: the row still
+      // claims the id and the provider still delivers it. Without this the
+      // flight would be polled *and* billed for alerts nobody acts on.
+      if (subscriptionId !== null && !isSubscribable(fresh)) {
+        deps.logger.info(
+          { flightId: flight.id, trackingTier: fresh.trackingTier, status: fresh.status },
+          'flight is no longer subscribable: closing its alert subscription',
+        );
+        await closeSubscription(deps, flight.id, subscriptionId);
+        subscriptionId = null;
+      }
 
       // T-24 h (§7.6): a `live` flight with no subscription gets one. On failure
       // the id stays null, the ladder keeps it on the failover cadence, and the

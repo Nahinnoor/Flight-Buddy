@@ -81,3 +81,14 @@ and §7.7 calls the credit balance the most critical reliability requirement in 
 
 `getCreditBalance()` reads an empty body as `0` credits, which is both the truthful reading and the
 fail-safe one: zero means fall back to polling rather than trust alerts that will never arrive.
+
+## Ledger names
+
+Every row in `calls.tsv` is one real provider call and the quota it spent (§12.1).
+
+- A plain name is a **captured fixture**: the response body is the `<name>.json` file beside this
+  README, and tests build against it (§12.2).
+- A **`liveops-`** prefix is an operational call against the running system — checking the credit
+  balance, tracking the owner's own flight — whose body is deliberately **not** captured: it is one
+  person's itinerary, not a fixture, and §10 keeps user data out of the repo. Nothing builds against
+  these; they are here so the quota is accounted for.

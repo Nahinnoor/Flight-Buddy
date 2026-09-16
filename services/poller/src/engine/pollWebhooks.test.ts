@@ -27,7 +27,8 @@ const DEPARTURE = Date.parse('2026-09-12T01:59:00.000Z');
 const NOW = new Date(DEPARTURE - 6 * HOUR);
 const LANDED = Date.parse('2026-09-12T06:57:00.000Z');
 
-const landed = (legs: Record<string, unknown>[]) => legs.map((leg) => ({ ...leg, status: 'Arrived' }));
+const landed = (legs: Record<string, unknown>[]) =>
+  legs.map((leg) => ({ ...leg, status: 'Arrived' }));
 
 interface Options {
   now?: Date;
@@ -148,6 +149,39 @@ describe('T-24 h: subscribe (§7.6)', () => {
     expect(on.posts()).toHaveLength(0);
     expect(withWebhooks.nextPollAt).toEqual(new Date(DEPARTURE - 24 * HOUR));
     expect(without.nextPollAt).toEqual(new Date(now.getTime() + LADDER_INTERVALS.EVERY_4H));
+  });
+});
+
+describe('a flight that stops being subscribable lets its subscription go', () => {
+  // The mirror of subscribing, and the one case the hourly reconcile cannot see:
+  // the row still claims the id and the provider still delivers it. Tier can drop
+  // back to `scheduled` whenever an airport's feed health cannot be read, and
+  // subscriptions never expire and bill per delivery (§7.6, §7.7).
+  it('unsubscribes and clears the id when the tier falls back to scheduled', async () => {
+    const h = harness({ allLive: false });
+    const row = h.db.addFlight(b6FlightRow({ alert_subscription_id: SUB }));
+
+    const outcome = await h.poll(row);
+
+    expect(h.deletes().map((r) => r.url)).toEqual([
+      `https://aerodatabox.p.rapidapi.com/subscriptions/webhook/${SUB}`,
+    ]);
+    expect(h.db.flight(row.id).alert_subscription_id).toBeNull();
+    // Back on the failover ladder rather than waiting for alerts that now cost
+    // credits and reach nobody.
+    expect(outcome.kind).toBe('updated');
+    expect(outcome.nextPollAt).not.toBeNull();
+    expect(h.log.text()).not.toContain(FAKE_WEBHOOK_TOKEN);
+  });
+
+  it('keeps the subscription while the flight is still live-tracked', async () => {
+    const h = harness();
+    const row = h.db.addFlight(b6FlightRow({ alert_subscription_id: SUB }));
+
+    await h.poll(row);
+
+    expect(h.deletes()).toHaveLength(0);
+    expect(h.db.flight(row.id).alert_subscription_id).toBe(SUB);
   });
 });
 

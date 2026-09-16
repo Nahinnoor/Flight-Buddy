@@ -29,7 +29,7 @@ import {
   type FlightCandidate,
   type FlightLookupResponse,
 } from '@flightbuddy/shared';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify';
 
 import { requireUser, requireUserClient } from '../auth';
 import type { AppDeps } from '../deps';
@@ -58,8 +58,7 @@ function resolveLookup(body: unknown, now: () => Date): ResolvedLookup {
   if (isRecord(body) && 'query' in body) {
     const input = flightQueryInputSchema.parse(body);
     // Uppercase-insensitive already; the parser normalises internally.
-    const reference =
-      input.today === undefined ? now() : new Date(`${input.today}T12:00:00.000Z`);
+    const reference = input.today === undefined ? now() : new Date(`${input.today}T12:00:00.000Z`);
     const zone = input.today === undefined ? (input.timeZone ?? 'UTC') : 'UTC';
     const parsed = parseFlightQuery(input.query, reference, zone);
     if ('error' in parsed) {
@@ -72,9 +71,13 @@ function resolveLookup(body: unknown, now: () => Date): ResolvedLookup {
   // Lenient on case and surrounding space, strict on shape: the shared schema
   // is the contract, but "dl 1234" is a thing people type.
   const normalised = isRecord(body)
-    ? { ...body, flightNumber: typeof body.flightNumber === 'string'
-        ? body.flightNumber.trim().toUpperCase()
-        : body.flightNumber }
+    ? {
+        ...body,
+        flightNumber:
+          typeof body.flightNumber === 'string'
+            ? body.flightNumber.trim().toUpperCase()
+            : body.flightNumber,
+      }
     : body;
   return flightLookupByNumberSchema.parse(normalised);
 }
@@ -88,15 +91,30 @@ function resolveLookup(body: unknown, now: () => Date): ResolvedLookup {
  * the legs of a multi-leg number on a given date, and it is part of the
  * canonical key in §6.2. Everything else on the returned candidate is fresh.
  */
+/**
+ * An airport whose feed health cannot be read degrades that flight to the
+ * `scheduled` tier (§7.3). Logged, never silent: an invisible degrade is how
+ * every flight came back `scheduled` while both airports had live coverage.
+ * ICAO code and error class only — no payload, no user data.
+ */
+function logFeedHealthError(log: FastifyBaseLogger, icao: string, error: unknown): void {
+  log.warn(
+    { icao, errorName: error instanceof Error ? error.name : 'unknown' },
+    'feed health unavailable: flight stays on the scheduled tier',
+  );
+}
+
 async function reverifyCandidate(
   deps: AppDeps,
   posted: FlightCandidate,
+  log: FastifyBaseLogger,
 ): Promise<FlightCandidate> {
   const designator = `${posted.operatingCarrierIata}${posted.operatingFlightNumber}`;
-  const fresh = await lookupCandidates(deps.provider, {
-    flightNumber: designator,
-    dateLocal: posted.departureDateLocal,
-  });
+  const fresh = await lookupCandidates(
+    deps.provider,
+    { flightNumber: designator, dateLocal: posted.departureDateLocal },
+    { onFeedHealthError: (icao, error) => logFeedHealthError(log, icao, error) },
+  );
 
   const match = fresh.find((leg) => leg.originIata === posted.originIata);
   if (match === undefined) {
@@ -127,7 +145,11 @@ async function resolveTrip(
     // Read as the user: RLS already hides other people's trips, and the
     // explicit traveler check additionally rejects a co-member's trip, which
     // is readable but not one this user may append a segment to.
-    const found = await supabase.from('trips').select('id, traveler_id').eq('id', tripId).maybeSingle();
+    const found = await supabase
+      .from('trips')
+      .select('id, traveler_id')
+      .eq('id', tripId)
+      .maybeSingle();
     if (found.error !== null) {
       throw new DatabaseError('Could not read that trip.', { detail: found.error.message });
     }
@@ -247,7 +269,9 @@ export function registerFlightRoutes(app: FastifyInstance, deps: AppDeps): void 
     requireUser(request);
     const lookup = resolveLookup(request.body, deps.now);
 
-    const candidates = await lookupCandidates(deps.provider, lookup);
+    const candidates = await lookupCandidates(deps.provider, lookup, {
+      onFeedHealthError: (icao, error) => logFeedHealthError(request.log, icao, error),
+    });
     if (candidates.length === 0) {
       throw new NotFoundError(
         `No flight ${lookup.flightNumber} on ${lookup.dateLocal}. Check the number and the date.`,
@@ -268,7 +292,7 @@ export function registerFlightRoutes(app: FastifyInstance, deps: AppDeps): void 
     const supabase = requireUserClient(request);
 
     const { traveler } = await ensureIdentity(supabase, user.id, user.email);
-    const fresh = await reverifyCandidate(deps, candidate);
+    const fresh = await reverifyCandidate(deps, candidate, request.log);
 
     // The only `flights` write in the whole API, and it is not this file's.
     const { flightId } = await ingestFlight(fresh, deps.serviceClient);

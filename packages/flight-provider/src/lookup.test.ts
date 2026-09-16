@@ -175,3 +175,81 @@ describe('lookupCandidates', () => {
     expect(candidate?.trackingTier).toBe('scheduled');
   });
 });
+
+describe('feed health under a rate limit', () => {
+  // The bug this covers: two health calls fired together right after the flight
+  // call is a three-request burst; the 429 was swallowed, so every flight came
+  // back `scheduled` and nothing ever subscribed to alerts — silently.
+  const LIVE_REQUEST = { flightNumber: 'B6 1411', dateLocal: '2026-09-11' };
+
+  /** Serves the live-coverage fixture for every airport, failing the first `failures` calls. */
+  function healthProvider(failures: number) {
+    let inFlight = 0;
+    let concurrent = 0;
+    let remaining = failures;
+    const asked: string[] = [];
+    const fetchImpl: typeof globalThis.fetch = async (input) => {
+      const url = String(input);
+      const feeds = /\/health\/services\/airports\/([A-Z0-9]{4})\/feeds/.exec(url);
+      if (feeds === null)
+        return new Response(fixtureBody('flights-number-live-today'), { status: 200 });
+
+      inFlight += 1;
+      concurrent = Math.max(concurrent, inFlight);
+      asked.push(feeds[1] as string);
+      try {
+        if (remaining > 0) {
+          remaining -= 1;
+          return new Response('{"message":"Too many requests"}', { status: 429 });
+        }
+        // KJFK's fixture is the one with live coverage on every feed.
+        return new Response(fixtureBody('health-feeds-KJFK'), { status: 200 });
+      } finally {
+        inFlight -= 1;
+      }
+    };
+    return {
+      provider: createAeroDataBoxProvider({ apiKey: 'test-key', fetch: fetchImpl }),
+      concurrent: () => concurrent,
+      asked,
+    };
+  }
+
+  it('asks one airport at a time, so the lookup cannot rate-limit itself', async () => {
+    const h = healthProvider(0);
+
+    await lookupCandidates(h.provider, LIVE_REQUEST, { ...freshCache(), retryDelayMs: 1 });
+
+    expect(h.concurrent()).toBe(1);
+  });
+
+  it('retries once, so a busy limiter does not cost the live tier', async () => {
+    const h = healthProvider(1);
+    const degraded: string[] = [];
+
+    const candidates = await lookupCandidates(h.provider, LIVE_REQUEST, {
+      ...freshCache(),
+      retryDelayMs: 1,
+      onFeedHealthError: (icao) => degraded.push(icao),
+    });
+
+    expect(candidates[0]?.trackingTier).toBe('live');
+    expect(degraded).toEqual([]);
+  });
+
+  it('names the airport when health stays unavailable, and degrades to scheduled', async () => {
+    const h = healthProvider(99);
+    const degraded: string[] = [];
+
+    const candidates = await lookupCandidates(h.provider, LIVE_REQUEST, {
+      ...freshCache(),
+      retryDelayMs: 1,
+      onFeedHealthError: (icao) => degraded.push(icao),
+    });
+
+    expect(candidates[0]?.trackingTier).toBe('scheduled');
+    // The airports actually asked about, not just "something failed".
+    expect(new Set(degraded)).toEqual(new Set(h.asked));
+    expect(degraded.length).toBeGreaterThan(0);
+  });
+});
