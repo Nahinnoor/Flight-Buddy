@@ -7,9 +7,11 @@
  * may touch, not a hand-written `where` clause a future edit could drop. It is
  * built per request because the token is per request.
  *
- * **Service-role (bypasses RLS).** Exactly one caller: `ingestFlight`, the only
- * writer of `flights` (ADR 0001, §12.7). It is a process singleton because
- * creating a client per request would leak sockets for no benefit.
+ * **Service-role (bypasses RLS).** Exactly two callers: `ingestFlight`, the
+ * only writer of `flights` (ADR 0001, §12.7), and the webhook receiver's single
+ * insert into `webhook_inbox` (`routes/webhooks.ts`; that table has RLS on and
+ * no policies, so no other key can write it). It is a process singleton
+ * because creating a client per request would leak sockets for no benefit.
  *
  * Neither key is ever logged. `createClient` keeps them inside the returned
  * client and nothing here stringifies it.
@@ -49,8 +51,8 @@ export function createUserClientFactory(config: Config): UserClientFactory {
 }
 
 /**
- * A client that bypasses RLS. Hand it only to `ingestFlight`; anything else
- * that needs it should be questioned first (§12.7).
+ * A client that bypasses RLS. Hand it only to `ingestFlight` and the webhook
+ * inbox insert; anything else that needs it should be questioned first (§12.7).
  */
 export function createServiceClient(config: Config): Client {
   return createClient<Database>(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {

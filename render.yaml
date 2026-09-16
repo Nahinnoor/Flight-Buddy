@@ -26,7 +26,10 @@ services:
     name: flightbuddy-api
     runtime: node
     region: oregon
-    plan: starter
+    # Free plan while Phase 2 is dev-only (owner, 2026-09-15). The worker pings
+    # /healthz every 10 minutes to keep it from sleeping; switch to starter before
+    # beta, when a cold start could cost a real user an alert (PHASE2_PLAN §8).
+    plan: free
     buildCommand: npm ci
     startCommand: npm start -w @flightbuddy/api
     # Deliberately not a dependency check: a liveness probe that fails when
@@ -84,6 +87,10 @@ services:
       # Wave 4. The owner's profile id, so low-credit and failover alerts reach a
       # phone (PHASE2_PLAN §8.4). Not a secret, but it is an id, so it is prompted.
       - key: OPERATOR_USER_ID
+        sync: false
+      # Not a secret: the API's /healthz. Keeps a free web service awake
+      # (ADR 0004). Set it once the API service has an address.
+      - key: KEEPALIVE_URL
         sync: false
       - key: LOG_LEVEL
         value: info

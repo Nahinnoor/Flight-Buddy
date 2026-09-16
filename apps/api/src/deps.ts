@@ -17,11 +17,11 @@ export interface AppDeps {
   config: Config;
   /** AeroDataBox in production; a fixture-backed fake in tests. */
   provider: FlightDataProvider;
-  /** Service-role. Handed to `ingestFlight` and to nothing else (§12.7). */
+  /** Service-role. Handed to `ingestFlight` and the webhook inbox insert, nothing else (§12.7). */
   serviceClient: Client;
   /** Builds the per-request, RLS-scoped client from the caller's token. */
   createUserClient: UserClientFactory;
   verifyToken: TokenVerifier;
-  /** Injected so "tomorrow" in a free-text query is deterministic in tests. */
+  /** Injected so "tomorrow" in a free-text query, and the webhook rate-limit window, are deterministic in tests. */
   now: () => Date;
 }

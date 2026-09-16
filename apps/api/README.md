@@ -43,10 +43,13 @@ variable **names** only — no value from `.env` is ever logged or returned in a
 | `HOST` | no | `0.0.0.0` | |
 | `LOG_LEVEL` | no | `info` | A pino level. |
 | `CORS_ORIGIN` | no | `*` | Comma-separated origins, or `*`. The mobile client is not a browser. |
+| `WEBHOOK_TOKEN` | no | — | Secret path segment of the AeroDataBox receiver (ADR 0003). 32–100 URL-safe characters (`A-Z a-z 0-9 _ -`); generate with `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`. **Unset or empty → the route is not registered.** The worker's `WEBHOOK_URL` carries the same value. Render: `sync: false`. |
 
 ## Auth
 
-Every route except `GET /healthz` requires `Authorization: Bearer <supabase access token>`.
+Every route except `GET /healthz` and the webhook receiver requires
+`Authorization: Bearer <supabase access token>`. The receiver authenticates by its secret path
+segment instead (below).
 
 Tokens are verified against the project's JWKS
 (`$SUPABASE_URL/auth/v1/.well-known/jwks.json`, ES256) with `jose`, which caches the key set, so a
@@ -72,8 +75,10 @@ All errors share one envelope:
 | 400 | Body failed validation (`VALIDATION_ERROR`), free text was not a flight and a date (`INVALID_QUERY`), or the posted candidate no longer matches the provider (`CANDIDATE_MISMATCH`). |
 | 401 | Missing, malformed, unverifiable or expired token (`UNAUTHORIZED`). |
 | 404 | No such flight (`NOT_FOUND`), or a `tripId` that is not yours (`TRIP_NOT_FOUND`). |
-| 429 | The provider rate-limited us (`PROVIDER_RATE_LIMITED`). Carries `Retry-After` when the provider supplied one. |
+| 413 / 415 | Webhook receiver only: body over 256 KB (`PAYLOAD_TOO_LARGE`), or not `application/json` (`UNSUPPORTED_MEDIA_TYPE`). |
+| 429 | The provider rate-limited us (`PROVIDER_RATE_LIMITED`), or the webhook receiver's per-IP limit (`RATE_LIMITED`). Carries `Retry-After` when known. |
 | 502 | Provider failure or timeout (`PROVIDER_ERROR`, `PROVIDER_TIMEOUT`). |
+| 503 | Webhook receiver only: the inbox insert failed (`SERVICE_UNAVAILABLE`), so the provider retries. |
 | 500 | Anything else. Logged in full with the request id; the body says nothing. |
 
 Every response carries `x-request-id` — echoed from the request if it had one. That id is the only
@@ -155,6 +160,31 @@ If the segment write fails after a trip was created *by this request*, that trip
 failed add leaves nothing on the dashboard. The ingest is an upsert of a shared real-world fact and
 is left alone.
 
+### `POST /webhooks/aerodatabox/:token`
+
+The AeroDataBox alert receiver ([ADR 0003](../../docs/adr/0003-phase2-alert-api-and-worker-topology.md)).
+Registered only when `WEBHOOK_TOKEN` is set; no JWT, no CORS. AeroDataBox does not sign
+deliveries, so the secret path segment is the credential.
+
+| Step | Outcome |
+|---|---|
+| Token ≠ `WEBHOOK_TOKEN` (SHA-256 both, `timingSafeEqual` the digests) | 404, byte-identical to an unknown route; nothing written; one counter log line. |
+| Right token, over 60 requests/min from this IP (in-memory fixed window, bounded map) | 429 `RATE_LIMITED` with `Retry-After`; nothing written. Wrong-token guesses do not count. |
+| Not `application/json` | 415; nothing written. |
+| Body over 256 KB | 413; nothing written. |
+| Not JSON, or not the documented envelope (`flights` ≤ 50 items each with `number`, `status`, `departure`, `arrival`, `lastUpdatedUtc`; `subscription.id` a uuid; optional `balance`; no other top-level key) | 400 `VALIDATION_ERROR`, generic message; nothing written. |
+| Valid | One `webhook_inbox` row (service-role client) → 200 `{"status":"accepted"}` at once. The worker drains the inbox and does the `flights` write (§12.7). |
+| Inbox insert fails | 503 `SERVICE_UNAVAILABLE`, so the provider retries once (`maxDeliveryRetries: 1`). |
+
+Never logged: the token, the URL (Fastify's request lines show `[redacted webhook path]` for any URL
+mentioning "webhook", registered or not), headers, or any part of the body. Rejections log a fixed
+message with a count or a Fastify/Postgres error code.
+
+The app trusts exactly one proxy hop (`trustProxy` in `src/app.ts`), which is what Render puts in
+front of the service, so `request.ip` is the caller's own address and the limit is per caller. A
+forged `X-Forwarded-For` cannot change that key: only the entry Render itself appended is used.
+The limit counts right-token requests only, so wrong-token guesses cannot exhaust it.
+
 ## Layout
 
 | File | |
@@ -166,8 +196,10 @@ is left alone.
 | `src/auth.ts` | JWT verification and the `preHandler` that guards `/v1`. |
 | `src/supabase.ts` | The user-scoped and service-role clients, and the line between them. |
 | `src/errors.ts` | The error envelope and the one place a failure becomes a status. |
+| `src/logging.ts` | The request log serializer; redacts webhook URLs. |
+| `src/rateLimit.ts` | In-memory, bounded fixed-window limiter for the webhook receiver. |
 | `src/identity.ts` | Ensure `profiles` and the self `travelers` row, idempotently. |
-| `src/routes/` | `healthz`, `/v1/me`, `/v1/flights*`. |
+| `src/routes/` | `healthz`, `/v1/me`, `/v1/flights*`, `/webhooks/aerodatabox/:token`. |
 | `src/testing/` | Fixture-backed provider and an in-memory Supabase. Test-only. |
 
 ## Testing

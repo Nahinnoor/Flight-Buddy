@@ -41,6 +41,15 @@ function isPostgresUrl(value: string): boolean {
   }
 }
 
+/** True for a parseable `https://` URL. A predicate for the same reason as above. */
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export const configSchema = z.object({
   /**
    * Session-pooler connection string for the `flightbuddy_worker` role. Contains a
@@ -57,9 +66,14 @@ export const configSchema = z.object({
 
   /**
    * Public receiver URL including its secret path segment, registered with
-   * AeroDataBox when a subscription opens. Wave 3; absent until then.
+   * AeroDataBox when a subscription opens (wave 3). **Absent = webhooks off**:
+   * nothing subscribes and every flight stays on the polling ladder.
+   *
+   * https only — the path segment is the receiver's only credential (ADR 0003
+   * decision 1), so it never travels in clear. Never logged: config errors name
+   * the variable only, and the logger redacts `WEBHOOK_URL` / `webhookUrl` keys.
    */
-  WEBHOOK_URL: z.url().optional(),
+  WEBHOOK_URL: z.string().refine(isHttpsUrl, 'must be an absolute https:// URL').optional(),
 
   /**
    * The owner's profile id, so low-credit and failover alerts reach a phone
@@ -73,6 +87,34 @@ export const configSchema = z.object({
   POLL_INTERVAL_MS: z.coerce.number().int().min(1_000).max(600_000).default(30_000),
   /** `claimDueFlights` batch size (§7.5 uses 25; §8.3 relies on it to bound bursts). */
   POLL_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(25),
+  /**
+   * Backup poll cadence for a subscribed flight inside the alert window
+   * (ADR 0004). The receiver runs on a Render free web service that can take
+   * ~1 minute to wake, while AeroDataBox gives up after 10 s, so a delivery can
+   * be lost with nothing else watching. 0 disables the backup poll.
+   */
+  WEBHOOK_BACKUP_POLL_MS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(2 * 60 * 60 * 1000),
+  /**
+   * The API's health URL, pinged on an interval so a free Render web service
+   * does not sleep (it spins down after 15 minutes without inbound traffic).
+   * Unset = no ping. Never carries a secret: this is `/healthz`, not the
+   * webhook path.
+   */
+  KEEPALIVE_URL: z
+    .url()
+    .refine((value) => new URL(value).pathname === '/healthz', {
+      message: 'must end in /healthz',
+    })
+    .optional(),
+  KEEPALIVE_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .default(10 * 60 * 1000),
 
   /**
    * Provider requests per second for the token bucket (§7.5, §7.8).

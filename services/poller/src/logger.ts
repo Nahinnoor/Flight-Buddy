@@ -40,6 +40,12 @@ const SENSITIVE_KEYS = [
   'webhookToken',
   'WEBHOOK_TOKEN',
   'WEBHOOK_URL',
+  'webhookUrl',
+  // Webhook payloads (wave 3): provider free text and the whole stored body.
+  // Never logged on purpose; redacted in case a future line does it by accident.
+  'payload',
+  'notificationSummary',
+  'notificationRemark',
   // Personal data (§10, PHASE2_PLAN §5)
   'expo_push_token',
   'expoPushToken',

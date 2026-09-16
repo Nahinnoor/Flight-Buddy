@@ -23,6 +23,8 @@ import { createRateLimiter, type RateLimiter } from './engine/rateLimiter';
 import { runPollPass } from './engine/tick';
 import { createLogger, type Logger } from './logger';
 import { createArchiveBackstopHandler } from './engine/archiveBackstop';
+import { createReconcileHandler } from './engine/reconcile';
+import { createInboxDrainer, type InboxDrainer } from './engine/webhookIngest';
 import { createBoss, startQueue, stopQueue, type PgBoss } from './queue';
 
 /** Everything a pass needs. Passed explicitly so `tick` stays testable. */
@@ -37,16 +39,23 @@ export interface WorkerContext {
   /** Process-wide, so the 1 req/s ceiling holds across passes, not just within one. */
   readonly rateLimiter: RateLimiter;
   readonly feedHealthCache: FeedHealthCache;
+  /** Drains `webhook_inbox`; never throws (a missing inbox never stops polling). */
+  readonly inboxDrainer: InboxDrainer;
 }
 
 /**
- * One pass of the worker loop: claim a batch, poll each flight, log the counts.
+ * One pass of the worker loop: drain the webhook inbox, then claim a batch and
+ * poll each flight.
  *
- * `webhooksEnabled: false` is wave 3's seam — until subscriptions exist, a
- * `live`-tier flight inside T-24 h stays on the failover ladder rather than
- * falling into a 24-hour blind spot (see `engine/ladder.ts`).
+ * The drain goes first so a delivered gate change is applied before any poll of
+ * the same flight; both write the value they saw, so whichever runs second sees
+ * no change (criterion 8). Webhooks are on only when `WEBHOOK_URL` is set; off,
+ * nothing subscribes and every flight stays on the polling ladder.
  */
 export async function tick(context: WorkerContext): Promise<void> {
+  await context.inboxDrainer.drain();
+
+  const webhookUrl = context.config.WEBHOOK_URL;
   await runPollPass({
     pool: context.pool,
     provider: context.provider,
@@ -54,7 +63,11 @@ export async function tick(context: WorkerContext): Promise<void> {
     rateLimiter: context.rateLimiter,
     logger: context.logger,
     feedHealthCache: context.feedHealthCache,
-    webhooksEnabled: false,
+    webhooksEnabled: webhookUrl !== undefined,
+    ...(webhookUrl === undefined ? {} : { webhookUrl }),
+    // 0 disables the backup poll and restores §7.6's "no polling at all".
+    webhookBackupIntervalMs:
+      context.config.WEBHOOK_BACKUP_POLL_MS > 0 ? context.config.WEBHOOK_BACKUP_POLL_MS : undefined,
     batchSize: context.config.POLL_BATCH_SIZE,
   });
 }
@@ -91,6 +104,46 @@ export async function runLoop(context: WorkerContext, signal: AbortSignal): Prom
   }
 }
 
+/**
+ * Keeps a Render **free** web service awake: it spins down after 15 minutes
+ * without inbound traffic and takes about a minute to wake, which is longer than
+ * AeroDataBox's 10-second delivery timeout (ADR 0004).
+ *
+ * Only ever requests `/healthz`, which needs no auth and touches no dependency,
+ * so this costs nothing and carries no secret. Failures are warnings: the worker
+ * must not exit because the API is briefly down.
+ */
+export function startKeepAlive(options: {
+  url: string;
+  intervalMs: number;
+  logger: Logger;
+  signal: AbortSignal;
+  fetchImpl?: typeof fetch;
+}): () => void {
+  const doFetch = options.fetchImpl ?? fetch;
+  const ping = async (): Promise<void> => {
+    try {
+      const response = await doFetch(options.url, {
+        method: 'GET',
+        signal: AbortSignal.timeout(10_000),
+      });
+      options.logger.debug({ status: response.status }, 'keep-alive ping');
+    } catch (error: unknown) {
+      // The URL is not secret, but keep logs uniform: class name only.
+      options.logger.warn(
+        { errorName: error instanceof Error ? error.name : 'unknown' },
+        'keep-alive ping failed',
+      );
+    }
+  };
+
+  void ping();
+  const timer = setInterval(() => void ping(), options.intervalMs);
+  const stop = (): void => clearInterval(timer);
+  options.signal.addEventListener('abort', stop, { once: true });
+  return stop;
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger({ level: config.LOG_LEVEL });
@@ -122,14 +175,38 @@ async function main(): Promise<void> {
   const writer = createPgFlightsWriter((text, values) => pool.query(text, [...values]));
   const rateLimiter = createRateLimiter({ rps: config.PROVIDER_RPS });
   const feedHealthCache = createFeedHealthCache();
+  // `WEBHOOK_URL` absent = webhooks off (today's behaviour): nothing subscribes,
+  // reconcile is a no-op, every flight stays on the ladder. The inbox is drained
+  // either way, so deliveries for subscriptions opened earlier are still applied.
+  const webhooksEnabled = config.WEBHOOK_URL !== undefined;
+
+  const inboxDrainer = createInboxDrainer({
+    pool,
+    provider,
+    writer,
+    rateLimiter,
+    logger,
+    feedHealthCache,
+    webhooksEnabled,
+  });
 
   const boss = createBoss(config);
   await startQueue({
     boss,
     logger,
-    // Wave 2's one scheduled body (§8.9). `credit-check` is wave 4 and
-    // `reconcile-subscriptions` is wave 3; both stay no-ops.
-    handlers: { 'archive-backstop': createArchiveBackstopHandler({ pool, logger }) },
+    // `credit-check` is wave 4 and stays a no-op.
+    handlers: {
+      'archive-backstop': createArchiveBackstopHandler({ pool, logger }),
+      // Shares the process-wide limiter, so the 1 req/s ceiling holds across the
+      // loop and this job.
+      'reconcile-subscriptions': createReconcileHandler({
+        pool,
+        provider,
+        rateLimiter,
+        logger,
+        webhooksEnabled,
+      }),
+    },
   });
 
   const context: WorkerContext = {
@@ -141,6 +218,7 @@ async function main(): Promise<void> {
     writer,
     rateLimiter,
     feedHealthCache,
+    inboxDrainer,
   };
   const shutdown = new AbortController();
 
@@ -160,8 +238,24 @@ async function main(): Promise<void> {
     });
   }
 
+  if (config.KEEPALIVE_URL !== undefined) {
+    startKeepAlive({
+      url: config.KEEPALIVE_URL,
+      intervalMs: config.KEEPALIVE_INTERVAL_MS,
+      logger,
+      signal: shutdown.signal,
+    });
+    logger.info({ intervalMs: config.KEEPALIVE_INTERVAL_MS }, 'keep-alive ping started');
+  }
+
   logger.info(
-    { intervalMs: config.POLL_INTERVAL_MS, batchSize: config.POLL_BATCH_SIZE },
+    // A boolean, never the URL: it carries the receiver's secret token.
+    {
+      intervalMs: config.POLL_INTERVAL_MS,
+      batchSize: config.POLL_BATCH_SIZE,
+      webhooksEnabled,
+      webhookBackupPollMs: config.WEBHOOK_BACKUP_POLL_MS,
+    },
     'poller started',
   );
   await runLoop(context, shutdown.signal);

@@ -59,6 +59,12 @@ export interface TestAppOptions {
   now?: Date;
   user?: AuthUser;
   db?: FakeDatabase;
+  /** Extra environment for `testConfig`, e.g. a generated `WEBHOOK_TOKEN`. */
+  env?: Partial<NodeJS.ProcessEnv>;
+  /** A moving clock. Wins over `now`; the webhook rate limiter reads it. */
+  clock?: () => Date;
+  /** Turn the logger on at `trace` and collect every line into `logs`. */
+  captureLogs?: boolean;
 }
 
 export interface TestApp {
@@ -66,8 +72,13 @@ export interface TestApp {
   db: FakeDatabase;
   /** Tables the *user-scoped* client touched. Must never include `flights`. */
   userCalls: FakeCall[];
-  /** Tables the service-role client touched. Only `flights` belongs here. */
+  /**
+   * Tables the service-role client touched. Only `flights` (via ingestFlight)
+   * and `webhook_inbox` (the receiver's insert) belong here.
+   */
   serviceCalls: FakeCall[];
+  /** Log lines, when `captureLogs` was set. Empty otherwise. */
+  logs: string[];
   /** Provider URLs asked for, in order. */
   asked: string[];
   userClient: Client;
@@ -85,18 +96,23 @@ export function buildTestApp(options: TestAppOptions = {}): TestApp {
     options.provider ?? {},
   );
 
+  const logs: string[] = [];
+  const capture = options.captureLogs === true;
+
   const app = buildApp({
-    config: testConfig(),
-    logger: false,
+    config: testConfig({ ...(capture ? { LOG_LEVEL: 'trace' } : {}), ...options.env }),
+    logger: capture,
+    ...(capture ? { logStream: { write: (line: string) => void logs.push(line) } } : {}),
     provider,
     serviceClient: serviceSide.client,
     createUserClient: () => userSide.client,
     verifyToken: fakeVerifier(user),
-    now: () => options.now ?? new Date('2026-09-12T00:00:00.000Z'),
+    now: options.clock ?? (() => options.now ?? new Date('2026-09-12T00:00:00.000Z')),
   });
 
   return {
     app,
+    logs,
     db,
     userCalls: userSide.calls,
     serviceCalls: serviceSide.calls,

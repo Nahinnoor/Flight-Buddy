@@ -17,7 +17,7 @@ import {
   ProviderRateLimitError,
   ProviderTimeoutError,
 } from '@flightbuddy/flight-provider';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 
 /** The wire shape every non-2xx answer takes. */
@@ -226,9 +226,19 @@ export function registerErrorHandler(app: FastifyInstance): void {
   });
 
   app.setNotFoundHandler((request, reply) => {
-    const body: ApiErrorBody = {
-      error: { code: 'NOT_FOUND', message: `No route for ${request.method} ${request.url}.` },
-    };
-    void reply.status(404).send(body);
+    void reply.status(404).send(notFoundBody(request));
   });
+}
+
+/**
+ * The body of a 404 for an unmatched route.
+ *
+ * Exported because the webhook receiver answers a wrong token with exactly this
+ * body, so a guess at the secret cannot tell "wrong token" from "no such route"
+ * (ADR 0003). It echoes only what the caller sent.
+ */
+export function notFoundBody(request: FastifyRequest): ApiErrorBody {
+  return {
+    error: { code: 'NOT_FOUND', message: `No route for ${request.method} ${request.url}.` },
+  };
 }

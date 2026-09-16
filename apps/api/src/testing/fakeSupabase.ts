@@ -212,6 +212,15 @@ export class FakeDatabase {
             },
           };
         },
+        // `await client.from(t).insert(row)` with no `.select()` — the webhook
+        // receiver's shape. supabase-js builders are thenables; so is this, so
+        // a forced error reaches the caller instead of reading as success.
+        then<T1 = Result<Row>, T2 = never>(
+          onFulfilled?: ((value: Result<Row>) => T1 | PromiseLike<T1>) | null,
+          onRejected?: ((reason: unknown) => T2 | PromiseLike<T2>) | null,
+        ): Promise<T1 | T2> {
+          return Promise.resolve(result).then(onFulfilled, onRejected);
+        },
       };
     }
 

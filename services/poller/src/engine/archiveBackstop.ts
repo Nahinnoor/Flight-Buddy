@@ -29,6 +29,13 @@
  * is a row the provider has stopped describing (§8.8); it retires
  * `NO_TIMES_ARCHIVE_DAYS` after it was created rather than polling daily forever.
  *
+ * A subscribed flight archived here is also detached from its alert subscription
+ * (wave 3). This job holds no provider client, so it does not unsubscribe; the
+ * hourly `reconcile-subscriptions` deletes the provider subscription once no
+ * active row claims it. Clearing the id here keeps a stale one from riding along
+ * if the flight is ever un-archived, which the seed trigger would otherwise read as
+ * "already subscribed" and never schedule.
+ *
  * `flightbuddy_worker` has UPDATE but no DELETE on `flights`, and archiving is a
  * timestamp, not a delete.
  */
@@ -55,7 +62,9 @@ export const NO_TIMES_ARCHIVE_DAYS = 30;
 export const ARCHIVE_BACKSTOP_SQL = `update public.flights
    set archived_at = now(),
        next_poll_at = null,
-       poll_lease_until = null
+       poll_lease_until = null,
+       alert_subscription_id = null,
+       alert_subscribed_at = null
  where archived_at is null
    and coalesce(
          greatest(scheduled_arrival_utc, estimated_arrival_utc, actual_arrival_utc),

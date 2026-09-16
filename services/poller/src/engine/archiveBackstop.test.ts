@@ -14,6 +14,11 @@ import { createFakePool } from './fakePool';
 const logger = createLogger({ level: 'silent' });
 
 describe('ARCHIVE_BACKSTOP_SQL', () => {
+  it('detaches any alert subscription; reconcile deletes it at the provider (wave 3)', () => {
+    expect(ARCHIVE_BACKSTOP_SQL).toContain('alert_subscription_id = null');
+    expect(ARCHIVE_BACKSTOP_SQL).toContain('alert_subscribed_at = null');
+  });
+
   it('archives rather than deletes: the worker role has no DELETE', () => {
     expect(ARCHIVE_BACKSTOP_SQL).toContain('update public.flights');
     expect(ARCHIVE_BACKSTOP_SQL).toContain('archived_at = now()');

@@ -99,6 +99,11 @@ export interface LadderOptions {
    * failover ladder inside T-24 h, because nothing is subscribed yet.
    */
   webhooksEnabled?: boolean;
+  /**
+   * Backup cadence for a subscribed flight inside the alert window (ADR 0004).
+   * `undefined` restores §7.6's literal "no polling at all" behaviour.
+   */
+  webhookBackupIntervalMs?: number | undefined;
 }
 
 function toMs(iso: string | null): number | null {
@@ -200,12 +205,19 @@ export function ladderIntervalMs(
 
   // Inside T-24 h. A subscribed `live` flight is the webhook's job from here to
   // arrival; everything else stays on the failover ladder.
+  //
+  // §7.6 says `next_poll_at = NULL` here. We keep a slow backup poll instead
+  // (ADR 0004): the receiver runs on a Render free web service, which can take
+  // about a minute to wake after a restart, and AeroDataBox gives up after 10 s.
+  // A delivery lost that way would otherwise never be noticed, because nothing
+  // else looks at the flight during the window. Two hours costs ~24 units per
+  // flight per day and bounds how long a missed gate change can hide.
   if (
     (options.webhooksEnabled ?? false) &&
     flight.tracking_tier === 'live' &&
     flight.alert_subscription_id !== null
   ) {
-    return null;
+    return options.webhookBackupIntervalMs ?? null;
   }
 
   if (departed) {

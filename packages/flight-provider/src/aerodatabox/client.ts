@@ -14,18 +14,22 @@ import {
   ProviderTimeoutError,
 } from '../errors';
 import {
+  DEFAULT_MAX_DELIVERY_RETRIES,
   FEED_STATUSES,
   isFeedUp,
+  type AlertSubscription,
   type FeedHealth,
   type FeedStatus,
   type FlightDataProvider,
+  type SubscribeAlertsOptions,
 } from '../provider';
-import { toFlightCandidate } from './mapper';
+import { toFlightCandidate, toUtcIso } from './mapper';
 import {
   airportFeedsSchema,
   balanceSchema,
   flightListSchema,
-  subscriptionSchema,
+  subscriptionContractSchema,
+  subscriptionListSchema,
   type AeroDataBoxAirportFeeds,
 } from './schemas';
 
@@ -54,6 +58,50 @@ export function isLocalDate(value: string): boolean {
 
 /** Response bodies are only ever logged, so they are truncated on the way in. */
 const MAX_LOGGED_BODY = 500;
+
+/**
+ * How error bodies are handled for one endpoint.
+ *
+ * The `/subscriptions/webhook*` endpoints echo the subscriber URL — our receiver
+ * URL **with its secret token** — in their responses, and a 4xx on create may
+ * quote the URL we sent. `ProviderError` keeps a truncated body for debugging, and
+ * pino's error serialiser copies an error's own properties into the log line, so
+ * for those endpoints the body (and any zod `cause`) is dropped at the source.
+ */
+interface BodyPolicy {
+  keepBody: boolean;
+}
+
+const KEEP_BODY: BodyPolicy = { keepBody: true };
+/** For every endpoint whose response can contain the webhook URL. */
+const SECRET_BEARING: BodyPolicy = { keepBody: false };
+
+/** GUID shape: subscription ids go into a URL path and a `uuid` column. */
+const GUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/** A receiver URL the provider can call: absolute http(s). Never echoed in an error. */
+function isWebhookUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+function toAlertSubscription(raw: {
+  id: string;
+  isActive: boolean;
+  createdOnUtc: string;
+  subject: { id: string };
+}): AlertSubscription {
+  return {
+    subscriptionId: raw.id,
+    isActive: raw.isActive,
+    createdAtUtc: toUtcIso(raw.createdOnUtc),
+    flightNumber: raw.subject.id,
+  };
+}
 
 interface RawResponse {
   status: number;
@@ -146,11 +194,16 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
     };
   }
 
+  /** The body to attach to an error under `policy`: truncated, or nothing at all. */
+  function errorBody(raw: RawResponse, policy: BodyPolicy): { body?: string } {
+    return policy.keepBody ? { body: raw.body.slice(0, MAX_LOGGED_BODY) } : {};
+  }
+
   /** Applies the shared status policy; callers only handle their own 404/204. */
-  function assertOk(path: string, raw: RawResponse): void {
+  function assertOk(path: string, raw: RawResponse, policy: BodyPolicy = KEEP_BODY): void {
     if (raw.status === 429) {
       throw new ProviderRateLimitError(`Flight provider rate limit hit on ${path}.`, {
-        body: raw.body.slice(0, MAX_LOGGED_BODY),
+        ...errorBody(raw, policy),
         ...(raw.retryAfterSeconds === undefined
           ? {}
           : { retryAfterSeconds: raw.retryAfterSeconds }),
@@ -159,18 +212,18 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
     if (raw.status < 200 || raw.status >= 300) {
       throw new ProviderError(`Flight provider returned ${raw.status} for ${path}.`, {
         status: raw.status,
-        body: raw.body.slice(0, MAX_LOGGED_BODY),
+        ...errorBody(raw, policy),
       });
     }
   }
 
-  function parseJson(path: string, raw: RawResponse): unknown {
+  function parseJson(path: string, raw: RawResponse, policy: BodyPolicy = KEEP_BODY): unknown {
     try {
       return JSON.parse(raw.body);
     } catch (cause) {
       throw new ProviderDataError(`Flight provider sent unparseable JSON for ${path}.`, {
-        body: raw.body.slice(0, MAX_LOGGED_BODY),
-        cause,
+        ...errorBody(raw, policy),
+        ...(policy.keepBody ? { cause } : {}),
       });
     }
   }
@@ -249,38 +302,75 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       return toFeedHealth(code, parsed.data);
     },
 
-    // ---------- Phase 2 surface: implemented, not yet wired ----------
+    // ---------- Alert API (ADR 0003; webhook-notification-schema.md) ----------
+    //
+    // Every call here uses `SECRET_BEARING`: no response body and no zod cause is
+    // ever attached to an error, and the webhook URL never appears in a message.
 
-    async subscribeAlerts(flightNumber: string, url: string): Promise<{ subscriptionId: string }> {
+    async subscribeAlerts(
+      flightNumber: string,
+      url: string,
+      options: SubscribeAlertsOptions = {},
+    ): Promise<{ subscriptionId: string }> {
       const designator = parseFlightDesignator(flightNumber);
       if (designator === null) {
         throw new ProviderDataError(`"${flightNumber}" is not a flight number.`);
       }
+      const maxDeliveryRetries = options.maxDeliveryRetries ?? DEFAULT_MAX_DELIVERY_RETRIES;
+      if (!Number.isInteger(maxDeliveryRetries) || maxDeliveryRetries < 0 || maxDeliveryRetries > 2) {
+        throw new ProviderDataError('maxDeliveryRetries must be 0, 1 or 2.');
+      }
+      // The URL carries the receiver's secret token: validated, never quoted.
+      if (!isWebhookUrl(url)) {
+        throw new ProviderDataError('The webhook URL must be an absolute http(s) URL.');
+      }
+
+      // Subscriptions carry no date: one subscription fires for every occurrence
+      // of the number, which is why §7.6 opens them at T-24h.
+      // No `useCredits` query parameter: the current spec lists none and credit-based
+      // is the default (docs/api-samples/webhook-notification-schema.md).
       const path = `/subscriptions/webhook/FlightByNumber/${encodeURIComponent(designator.designator)}`;
-      // Subscriptions carry no date: one subscription fires for every
-      // occurrence of the number, which is why §7.6 opens them at T-24h.
       const raw = await request(path, {
         method: 'POST',
-        json: { url, maxDeliveryRetries: 2 },
+        json: { url, maxDeliveryRetries },
       });
-      assertOk(path, raw);
+      assertOk(path, raw, SECRET_BEARING);
 
-      const parsed = subscriptionSchema.safeParse(parseJson(path, raw));
+      const parsed = subscriptionContractSchema.safeParse(parseJson(path, raw, SECRET_BEARING));
       if (!parsed.success) {
-        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`, {
-          body: raw.body.slice(0, MAX_LOGGED_BODY),
-          cause: parsed.error,
-        });
+        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`);
       }
       return { subscriptionId: parsed.data.id };
     },
 
     async unsubscribeAlerts(subscriptionId: string): Promise<void> {
-      const path = `/subscriptions/webhook/${encodeURIComponent(subscriptionId)}`;
+      if (!GUID.test(subscriptionId)) {
+        throw new ProviderDataError('A subscription id must be a GUID.');
+      }
+      const path = `/subscriptions/webhook/${encodeURIComponent(subscriptionId.toLowerCase())}`;
       const raw = await request(path, { method: 'DELETE' });
       // Already gone is the desired end state, not a failure.
       if (raw.status === 404) return;
-      assertOk(path, raw);
+      assertOk(path, raw, SECRET_BEARING);
+    },
+
+    async listSubscriptions(): Promise<AlertSubscription[]> {
+      const path = '/subscriptions/webhook';
+      const raw = await request(path);
+      // Observed 2026-09-14 (`calls.tsv`): 204 with an empty body when the account
+      // has no subscriptions.
+      if (raw.status === 204) return [];
+      assertOk(path, raw, SECRET_BEARING);
+      if (raw.body.trim() === '') return [];
+
+      // One unparseable element fails the whole list on purpose: reconcile acts on
+      // what is *missing* from this list, so a silently shortened list would detach
+      // flights whose subscriptions are fine.
+      const parsed = subscriptionListSchema.safeParse(parseJson(path, raw, SECRET_BEARING));
+      if (!parsed.success) {
+        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`);
+      }
+      return parsed.data.map(toAlertSubscription);
     },
 
     async getCreditBalance(): Promise<number> {

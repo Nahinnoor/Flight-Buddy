@@ -45,6 +45,26 @@ export const configSchema = z.object({
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   /** Comma-separated origins, or `*`. The mobile client is not a browser, so `*` is the default. */
   CORS_ORIGIN: z.string().min(1).default('*'),
+
+  /**
+   * The secret path segment of the AeroDataBox webhook receiver (ADR 0003).
+   * Optional: when unset, `POST /webhooks/aerodatabox/:token` is not registered
+   * at all. An empty value (a copied `.env.example`) counts as unset.
+   *
+   * URL-safe so it survives the provider's URL handling unescaped, at least 32
+   * characters so it cannot be guessed, and at most 100 because that is
+   * Fastify's default `maxParamLength` — a longer token would never match the
+   * route. The messages below name the rule, never the value.
+   */
+  WEBHOOK_TOKEN: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z
+      .string()
+      .min(32, 'must be at least 32 characters')
+      .max(100, 'must be at most 100 characters')
+      .regex(/^[A-Za-z0-9_-]+$/, 'must use only the URL-safe characters A-Z a-z 0-9 _ -')
+      .optional(),
+  ),
 });
 
 export type Config = z.infer<typeof configSchema>;

@@ -28,7 +28,13 @@ export const PGBOSS_SCHEMA = 'pgboss';
  * consumers land in later waves.
  */
 export const QUEUE_NAMES = {
-  /** Wave 3: an accepted AeroDataBox alert body, ingested off the request path (§7.6). */
+  /**
+   * Declared in wave 1 for alert ingestion, but wave 3 does not use it: the API's
+   * receiver writes each delivery to `public.webhook_inbox`, a durable queue in its
+   * own right, and the worker loop drains that table directly
+   * (`engine/webhookIngest.ts`). Kept declared so removing it is a deliberate
+   * decision rather than a side effect.
+   */
   WEBHOOK_INGEST: 'webhook-ingest',
   /** Wave 5: a batch of Expo push sends. */
   PUSH_SEND: 'push-send',
@@ -87,9 +93,9 @@ export type ScheduledHandler = (jobs: JobBatch) => Promise<void>;
  * The no-op bodies wave 1 ships. Each logs that it ran and returns, which is enough
  * to prove the scheduler fires on the deployed worker before any of it does work.
  *
- * Wave 2 supplies a real `archive-backstop` through `startQueue`'s `handlers`
- * override; `credit-check` (wave 4) and `reconcile-subscriptions` (wave 3) are
- * still the no-ops below.
+ * `main.ts` supplies the real `archive-backstop` (wave 2) and
+ * `reconcile-subscriptions` (wave 3) through `startQueue`'s `handlers` override;
+ * `credit-check` (wave 4) is still the no-op below.
  *
  * Handlers must stay idempotent when they grow bodies (§5, "Engineering basics"):
  * a `missed: 'once'` catch-up or a redelivery can run the same occurrence twice.

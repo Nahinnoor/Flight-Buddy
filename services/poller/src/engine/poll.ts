@@ -7,6 +7,7 @@
  *            → ingestFlight            (rule 7: the only writer of flight data)
  *            → detectChanges           (§8.2: against the last known value)
  *            → insert flight_events
+ *            → (wave 3) T-24 h subscribe, or unsubscribe at landed + 30 min
  *            → next_poll_at from the ladder, last_polled_at, failures reset
  * ```
  *
@@ -54,6 +55,12 @@ import {
   type LadderFlight,
 } from './ladder';
 import { insertFlightEvents, recordPollFailure, recordPollSuccess } from './repository';
+import {
+  clampToWindowOpening,
+  closeSubscription,
+  openSubscription,
+  shouldSubscribe,
+} from './subscriptions';
 import type { FlightRow } from './types';
 
 /** §8.8. At this many consecutive failures the flight stops being retried eagerly. */
@@ -73,8 +80,18 @@ export interface PollDependencies {
   now?: () => Date;
   /** Injected for tests. Drives the ladder's ±10 % jitter. */
   rng?: () => number;
-  /** Wave-3 seam, passed straight through to the ladder. */
+  /**
+   * Webhooks on (`WEBHOOK_URL` set). Passed to the ladder, and with `webhookUrl`
+   * it lets a `live` flight subscribe at T-24 h (§7.6).
+   */
   webhooksEnabled?: boolean;
+  /** The receiver URL including its secret token. Never logged. Absent = never subscribe. */
+  webhookUrl?: string;
+  /**
+   * Backup cadence for a subscribed flight inside the alert window (ADR 0004).
+   * Undefined = §7.6's literal "no polling at all".
+   */
+  webhookBackupIntervalMs?: number | undefined;
   feedHealthCache?: FeedHealthCache;
 }
 
@@ -115,8 +132,11 @@ export function operatingDesignator(
   return `${flight.operating_carrier_iata.trim()}${flight.operating_flight_number.trim()}`;
 }
 
-/** The ladder's view of a flight, built from the values the provider just returned. */
-function ladderViewOf(flight: FlightRow, fresh: FlightCandidate): LadderFlight {
+/**
+ * The ladder's view of a flight, built from the values the provider just returned.
+ * Exported for the webhook drain, which schedules from a delivered leg the same way.
+ */
+export function ladderViewOf(flight: FlightRow, fresh: FlightCandidate): LadderFlight {
   return {
     tracking_tier: fresh.trackingTier,
     status: fresh.status,
@@ -269,10 +289,38 @@ export async function pollAndUpdate(
       landedAt !== null && now.getTime() >= landedAt.getTime() + ARCHIVE_AFTER_LANDING_MS;
 
     if (archiveDue) {
+      // Unsubscribe first; a provider failure is logged and the archive proceeds —
+      // the hourly reconcile deletes anything left behind. Done whether or not
+      // webhooks are on now: a subscription opened while they were must not leak.
+      if (flight.alert_subscription_id !== null) {
+        await closeSubscription(deps, flight.id, flight.alert_subscription_id);
+      }
       archivedAt = now;
       next = null;
     } else {
-      next = nextPollAt(ladderViewOf(flight, fresh), now, rng, { webhooksEnabled });
+      let subscriptionId = flight.alert_subscription_id;
+      const webhookUrl = webhooksEnabled ? deps.webhookUrl : undefined;
+
+      // T-24 h (§7.6): a `live` flight with no subscription gets one. On failure
+      // the id stays null, the ladder keeps it on the failover cadence, and the
+      // next poll tries again.
+      if (webhookUrl !== undefined && shouldSubscribe(fresh, subscriptionId, now)) {
+        subscriptionId = await openSubscription({ ...deps, webhookUrl }, flight, now);
+      }
+
+      next = nextPollAt(
+        { ...ladderViewOf(flight, fresh), alert_subscription_id: subscriptionId },
+        now,
+        rng,
+        {
+          webhooksEnabled,
+          webhookBackupIntervalMs: deps.webhookBackupIntervalMs,
+        },
+      );
+      if (webhookUrl !== undefined && next !== null && subscriptionId === null) {
+        // Land the next poll on T-24 h rather than up to four hours after it.
+        next = clampToWindowOpening(next, fresh, now);
+      }
     }
 
     await recordPollSuccess(deps.pool, {

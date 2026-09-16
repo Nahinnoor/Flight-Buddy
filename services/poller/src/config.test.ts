@@ -60,6 +60,22 @@ describe('parseConfig', () => {
     expect(config.OPERATOR_USER_ID).toBe('0f2b9b4e-4a1d-4f4e-9a3f-1c2d3e4f5a6b');
   });
 
+  it('requires WEBHOOK_URL to be https, and never echoes it', () => {
+    const plain = 'http://api.example.invalid/webhooks/aerodatabox/FAKE-TEST-TOKEN-not-a-secret';
+    for (const bad of [plain, 'not a url', 'ftp://example.invalid/x']) {
+      let thrown: unknown;
+      try {
+        parseConfig(env({ WEBHOOK_URL: bad }));
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(ConfigError);
+      expect((thrown as ConfigError).variables).toEqual(['WEBHOOK_URL']);
+      expect((thrown as ConfigError).message).not.toContain('FAKE-TEST-TOKEN');
+      expect((thrown as ConfigError).message).not.toContain('example.invalid');
+    }
+  });
+
   describe('when the environment is unusable', () => {
     it('names the missing required variables and nothing else', () => {
       let thrown: unknown;

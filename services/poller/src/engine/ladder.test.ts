@@ -91,6 +91,27 @@ describe('nextPollAt — the wave-3 webhook seam', () => {
     expect(nextPollAt(unsubscribed, NOW, noJitter, { webhooksEnabled: true })).not.toBeNull();
   });
 
+  it('falls back to the backup cadence inside the window when one is configured', () => {
+    // ADR 0004: the receiver runs on a free Render web service that can sleep, so
+    // a subscribed flight still gets a slow poll rather than nothing at all.
+    const backup = 2 * 60 * 60 * 1000;
+    const at = nextPollAt(subscribed, NOW, noJitter, {
+      webhooksEnabled: true,
+      webhookBackupIntervalMs: backup,
+    });
+    expect(at).not.toBeNull();
+    expect((at as Date).getTime() - NOW.getTime()).toBe(backup);
+  });
+
+  it('still stops polling entirely when the backup cadence is disabled', () => {
+    expect(
+      nextPollAt(subscribed, NOW, noJitter, {
+        webhooksEnabled: true,
+        webhookBackupIntervalMs: undefined,
+      }),
+    ).toBeNull();
+  });
+
   it('polls a subscribed live flight outside T-24h regardless of the flag', () => {
     // Nothing is subscribed three days out, but if it were, the pre-window ladder
     // still owns it: the handover is at T-24h, not at subscription time.

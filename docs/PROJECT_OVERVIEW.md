@@ -176,7 +176,8 @@ A **scheduled job** wakes on a schedule inside the worker process (pg-boss's sch
 
 | Job | Service type | Schedule |
 |---|---|---|
-| Flight poller | Background worker | Continuous loop |
+| Flight poller (and the webhook inbox drain) | Background worker | Continuous loop |
+| Webhook receiver | Web service route, writes `webhook_inbox` | On delivery |
 | Notification sends | pg-boss queue | On demand, with retries |
 | Webhook payload processing | pg-boss queue | On demand |
 | Archive backstop (completed trips) | pg-boss scheduled job in the worker | Daily |
@@ -544,7 +545,7 @@ This is why subscriptions open at T-24h and not at add time. Subscribing three w
 
 | Phase | Action |
 |---|---|
-| T-24 h | `POST /subscriptions/webhook/FlightByNumber/{number}?useCredits=true` with `maxDeliveryRetries: 1` (ADR 0003). Store `alert_subscription_id`. Set `next_poll_at = NULL`. |
+| T-24 h | `POST /subscriptions/webhook/FlightByNumber/{number}` with `maxDeliveryRetries: 1` (ADR 0003; the current spec has no `useCredits` parameter — credit billing is the default). Store `alert_subscription_id`. Set `next_poll_at` to the backup cadence, 2 h by default, rather than NULL (ADR 0004: the receiver runs on a free web service that can cold-start past the provider's 10 s timeout). |
 | Window active | Receive alerts, write to `flights`, emit `flight_events` |
 | Arrival + 30 min | `DELETE /subscriptions/webhook/{id}`, archive |
 
@@ -632,7 +633,7 @@ Policy shape:
 
 **Join codes.** 6 characters from Crockford base32 (no I, O, 0, 1 — people read these aloud). Rate-limit join attempts per IP and per account. Expire after the trip. Owner approval is required in all cases.
 
-**Webhook receiver (Phase 2, ADR 0003).** AeroDataBox does not sign deliveries. The receiver lives at a path containing a 32+ byte random token known only to Render env, compared in constant time; a wrong token is a 404 that queues nothing and logs no payload. Bodies are schema-validated, size-capped and rate-limited, and are data only — never interpolated into SQL, shell or a prompt. A gate change or cancellation arriving by webhook is confirmed with one provider poll before it notifies anyone. The worker connects to Postgres as `flightbuddy_worker`, a role with table- and column-level grants only (no names, emails or contacts, no DELETE), never with the service-role key.
+**Webhook receiver (Phase 2, ADR 0003 and 0004).** The receiver never connects to Postgres or the queue: it writes each validated delivery to `webhook_inbox` with the service-role key it already holds, and the worker drains that table, so the public-facing service carries no extra credential. `subscription.subscriber` is replaced before the row is written, because the provider echoes our delivery URL — which contains the secret token — back in it. The API trusts exactly one proxy hop, so the per-IP rate limit keys on the caller. AeroDataBox does not sign deliveries. The receiver lives at a path containing a 32+ byte random token known only to Render env, compared in constant time; a wrong token is a 404 that queues nothing and logs no payload. Bodies are schema-validated, size-capped and rate-limited, and are data only — never interpolated into SQL, shell or a prompt. A gate change or cancellation arriving by webhook is confirmed with one provider poll before it notifies anyone. The worker connects to Postgres as `flightbuddy_worker`, a role with table- and column-level grants only (no names, emails or contacts, no DELETE), never with the service-role key.
 
 **Prompt injection.** The database will contain user-supplied strings — traveller display names and group names typed by one person about another. Supabase's own documentation describes this attack directly. Agents get `read_only=true` and `project_ref` scoping against production. Write access only against a dev project or branch.
 

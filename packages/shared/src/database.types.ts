@@ -514,6 +514,36 @@ export type Database = {
           },
         ]
       }
+      webhook_inbox: {
+        Row: {
+          attempts: number
+          id: string
+          last_error: string | null
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          subscription_id: string
+        }
+        Insert: {
+          attempts?: number
+          id?: string
+          last_error?: string | null
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          subscription_id: string
+        }
+        Update: {
+          attempts?: number
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          subscription_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -83,6 +83,7 @@ export {
   MAX_BACKOFF_MS,
   MAX_CONSECUTIVE_FAILURES,
   backoffPollAt,
+  ladderViewOf,
   operatingDesignator,
   pollAndUpdate,
   type PollDependencies,
@@ -106,4 +107,55 @@ export {
   recordPollSuccess,
 } from './engine/repository';
 export { runPollPass, type PollPassOptions, type PollPassSummary } from './engine/tick';
+
+// --- wave 3: webhooks and subscriptions (§7.6, ADR 0003) ----------------------
+
+export {
+  CLEAR_SUBSCRIPTION_SQL,
+  COUNT_OTHER_HOLDERS_SQL,
+  FIND_SHARED_SUBSCRIPTION_SQL,
+  MAX_DELIVERY_RETRIES,
+  STORE_SUBSCRIPTION_SQL,
+  clampToWindowOpening,
+  closeSubscription,
+  isSubscribable,
+  openSubscription,
+  shouldSubscribe,
+  webhookWindowOpensAt,
+  type SubscriptionDeps,
+} from './engine/subscriptions';
+export {
+  CLAIM_INBOX_ROW_SQL,
+  CREDIT_LOG_SOURCE,
+  DEFAULT_INBOX_BATCH_SIZE,
+  FIND_SUBSCRIBED_FLIGHTS_SQL,
+  INBOX_MAX_ATTEMPTS,
+  INBOX_REASONS,
+  INSERT_CREDIT_LOG_SQL,
+  LEASE_FLIGHT_FOR_WEBHOOK_SQL,
+  MARK_INBOX_DONE_SQL,
+  MARK_INBOX_FAILED_SQL,
+  VERIFIED_EVENT_TYPES,
+  VerificationLegMissingError,
+  WEBHOOK_APPLIED_SQL,
+  claimInboxRow,
+  createInboxDrainer,
+  drainWebhookInbox,
+  matchLegs,
+  type DrainSummary,
+  type InboxDrainer,
+  type InboxOutcome,
+  type InboxOutcomeKind,
+  type InboxRow,
+  type WebhookIngestDeps,
+} from './engine/webhookIngest';
+export {
+  ACTIVE_SUBSCRIPTIONS_SQL,
+  DETACH_SUBSCRIPTION_SQL,
+  RECONCILE_GRACE_MS,
+  createReconcileHandler,
+  reconcileSubscriptions,
+  type ReconcileDeps,
+  type ReconcileResult,
+} from './engine/reconcile';
 export { ENGINE_TYPES, type FlightRow } from './engine/types';
