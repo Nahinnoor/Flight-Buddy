@@ -30,10 +30,24 @@
  *
  * Rule 7: this file never touches `flights`.
  *
- * The payload is data. It is never logged, echoed, interpolated into SQL
- * (supabase-js sends it as a JSON body; PostgREST parameterizes), a shell or a
- * prompt. Log lines from this file carry fixed messages plus counts or codes;
- * `logging.ts` removes the URL from Fastify's own request lines.
+ * The payload is data. It is never echoed, interpolated into SQL (supabase-js
+ * sends it as a JSON body; PostgREST parameterizes), a shell or a prompt. Log
+ * lines from this file carry fixed messages plus counts or codes; `logging.ts`
+ * removes the URL from Fastify's own request lines.
+ *
+ * **No payload *value* is ever logged.** A rejected body logs the failing field
+ * *paths* and zod's codes, and nothing else (`describeRejection`). That is the
+ * difference between "the envelope has an unexpected key" and printing what the
+ * key contained, and it matters here for four reasons: `subscription.subscriber`
+ * echoes our delivery URL, which ends in `WEBHOOK_TOKEN`; zod's own `message`
+ * quotes the received value, so it is never logged; `notificationSummary` and
+ * `notificationRemark` are provider free text, which must never reach a log an
+ * agent may read (§12: payloads are data, never instructions); and a value could
+ * carry newlines or JSON and forge log entries. Keys are therefore sanitised to
+ * identifier shape, and both the number of issues and the keys named by any one
+ * of them are capped, so no body can flood the log; this runs only *after* the token
+ * guard, so nothing an anonymous caller sends can reach it. The 400 body stays
+ * generic: the diagnosis goes to our logs, never back to the caller.
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
 
@@ -101,6 +115,53 @@ export const webhookEnvelopeSchema = z.strictObject({
 });
 
 export type WebhookEnvelope = z.infer<typeof webhookEnvelopeSchema>;
+
+// ------------------------------------------------ rejection diagnostics ---
+
+/** Caps, so one rejected body cannot flood the log. */
+export const MAX_LOGGED_ISSUES = 8;
+export const MAX_LOGGED_KEYS = 10;
+
+/**
+ * A key printable verbatim: identifier-shaped and short. Anything else becomes
+ * `[key]`, so a value cannot carry a newline or a JSON fragment into a log line.
+ */
+const SAFE_KEY = /^[A-Za-z_$][A-Za-z0-9_$-]{0,39}$/;
+
+export function safeKey(key: string): string {
+  return SAFE_KEY.test(key) ? key : '[key]';
+}
+
+/** `flights.0.departure`, with every non-numeric segment sanitised. */
+export function issuePath(path: readonly PropertyKey[]): string {
+  if (path.length === 0) return '(root)';
+  return path
+    .map((segment) => (typeof segment === 'number' ? String(segment) : safeKey(String(segment))))
+    .join('.');
+}
+
+/** What a rejected body may contribute to a log line: codes and paths, no values. */
+export interface RejectionIssue {
+  readonly code: string;
+  readonly path?: readonly PropertyKey[] | undefined;
+  /** `unrecognized_keys` carries the offending key names; they are keys, so they are sanitised too. */
+  readonly keys?: unknown;
+}
+
+/**
+ * One short string per issue: `invalid_type at flights.0.lastUpdatedUtc`.
+ *
+ * zod's `message` is deliberately absent — it quotes the received value, which is
+ * exactly what must not be logged here (see the module note).
+ */
+export function describeRejection(issues: readonly RejectionIssue[]): string[] {
+  return issues.slice(0, MAX_LOGGED_ISSUES).map((issue) => {
+    const where = `${safeKey(String(issue.code))} at ${issuePath(issue.path ?? [])}`;
+    if (!Array.isArray(issue.keys) || issue.keys.length === 0) return where;
+    const keys = issue.keys.slice(0, MAX_LOGGED_KEYS).map((key) => safeKey(String(key)));
+    return `${where}: ${keys.join(',')}`;
+  });
+}
 
 // ----------------------------------------------------------------- token ---
 
@@ -231,8 +292,18 @@ export function createWebhookRoutes(options: WebhookRouteOptions) {
       async (request, reply) => {
         const parsed = webhookEnvelopeSchema.safeParse(request.body);
         if (!parsed.success) {
-          // The issue count only: issue paths can name attacker-chosen keys.
-          request.log.info({ issues: parsed.error.issues.length }, 'webhook body rejected');
+          // Codes and field paths, never values, and only past the token guard
+          // (see the module note). Without this a real delivery that does not
+          // match the documented contract is indistinguishable from a forgery,
+          // and each one costs a credit — which is how six real alerts were
+          // rejected before anyone could see why.
+          request.log.info(
+            {
+              issues: parsed.error.issues.length,
+              rejected: describeRejection(parsed.error.issues),
+            },
+            'webhook body rejected',
+          );
           return reply.code(400).send(INVALID_BODY);
         }
         const envelope = parsed.data;
