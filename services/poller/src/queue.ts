@@ -93,22 +93,26 @@ export type ScheduledHandler = (jobs: JobBatch) => Promise<void>;
  * The no-op bodies wave 1 ships. Each logs that it ran and returns, which is enough
  * to prove the scheduler fires on the deployed worker before any of it does work.
  *
- * `main.ts` supplies the real `archive-backstop` (wave 2) and
- * `reconcile-subscriptions` (wave 3) through `startQueue`'s `handlers` override;
- * `credit-check` (wave 4) is still the no-op below.
+ * `main.ts` supplies the real `archive-backstop` (wave 2),
+ * `reconcile-subscriptions` (wave 3) and `credit-check` (wave 4,
+ * `engine/creditMonitor.ts`) through `startQueue`'s `handlers` override, so every
+ * body below is now only the fallback a test or a bare `startQueue` gets.
  *
  * Handlers must stay idempotent when they grow bodies (§5, "Engineering basics"):
  * a `missed: 'once'` catch-up or a redelivery can run the same occurrence twice.
  */
 export function createScheduledHandlers(logger: Logger): Record<string, ScheduledHandler> {
   async function handleCreditCheck(jobs: JobBatch): Promise<void> {
-    logger.info({ job: 'credit-check', count: jobs.length }, 'scheduled job ran (no-op, wave 4)');
+    logger.info(
+      { job: 'credit-check', count: jobs.length },
+      'scheduled job ran (no-op; the real body is injected by main.ts)',
+    );
   }
 
   async function handleReconcileSubscriptions(jobs: JobBatch): Promise<void> {
     logger.info(
       { job: 'reconcile-subscriptions', count: jobs.length },
-      'scheduled job ran (no-op, wave 3)',
+      'scheduled job ran (no-op; the real body is injected by main.ts)',
     );
   }
 

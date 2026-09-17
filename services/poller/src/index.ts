@@ -101,8 +101,17 @@ export {
   type ArchiveBackstopResult,
 } from './engine/archiveBackstop';
 export {
+  CREDIT_LOG_SOURCES,
+  INSERT_CREDIT_LOG_SQL,
+  INT4_MAX,
+  INT4_MIN,
+  LATEST_CREDIT_BALANCE_SQL,
   buildInsertEventsSql,
+  insertCreditLog,
   insertFlightEvents,
+  isLoggableBalance,
+  readLatestCreditBalance,
+  type CreditLogSource,
   recordPollFailure,
   recordPollSuccess,
 } from './engine/repository';
@@ -131,7 +140,6 @@ export {
   FIND_SUBSCRIBED_FLIGHTS_SQL,
   INBOX_MAX_ATTEMPTS,
   INBOX_REASONS,
-  INSERT_CREDIT_LOG_SQL,
   LEASE_FLIGHT_FOR_WEBHOOK_SQL,
   MARK_INBOX_DONE_SQL,
   MARK_INBOX_FAILED_SQL,
@@ -158,4 +166,24 @@ export {
   type ReconcileDeps,
   type ReconcileResult,
 } from './engine/reconcile';
+
+// --- wave 4: credit monitor and failover (§7.7, ADR 0003) ---------------------
+
+export {
+  CREDIT_THRESHOLDS,
+  DISARMED_THRESHOLDS_SQL,
+  FAILOVER_SUBSCRIBED_FLIGHTS_SQL,
+  FAILOVER_SWEEP_CEILING_MS,
+  createCreditCheckHandler,
+  createCreditState,
+  crossedThreshold,
+  pollWebhookSettings,
+  readDisarmedThresholds,
+  runCreditCheck,
+  type CreditCheckDeps,
+  type CreditCheckResult,
+  type CreditState,
+  type CreditThreshold,
+  type OperatorAlert,
+} from './engine/creditMonitor';
 export { ENGINE_TYPES, type FlightRow } from './engine/types';

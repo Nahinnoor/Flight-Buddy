@@ -21,6 +21,67 @@ import type { DetectedEvent } from './changeDetector';
 import type { Pool } from '../db';
 import { ENGINE_TYPES } from './types';
 
+// --- provider_credit_log (§7.6, §7.7) ----------------------------------------
+// Shared by the two writers of the log: the webhook drain (`webhookIngest.ts`,
+// the balance every delivery carries) and the hourly `credit-check`
+// (`creditMonitor.ts`). `flightbuddy_worker` holds `select, insert` on the table.
+
+/** `provider_credit_log.balance` is `int`. */
+export const INT4_MAX = 2_147_483_647;
+export const INT4_MIN = -2_147_483_648;
+
+/** The `source` values the migration documents. `post_refill` is written by nobody yet (ADR 0003). */
+export const CREDIT_LOG_SOURCES = {
+  WEBHOOK_PAYLOAD: 'webhook_payload',
+  BALANCE_CHECK: 'balance_check',
+  POST_REFILL: 'post_refill',
+} as const;
+
+export type CreditLogSource = (typeof CREDIT_LOG_SOURCES)[keyof typeof CREDIT_LOG_SOURCES];
+
+export const INSERT_CREDIT_LOG_SQL = `insert into public.provider_credit_log (balance, source)
+values ($1, $2)`;
+
+/**
+ * The most recent reading, from any source, by `id` alone — the same order
+ * `DISARMED_THRESHOLDS_SQL` uses. `observed_at` is `now()` at each insert and two
+ * rows can tie or disagree with insertion order; ordering on it could seed the
+ * worker's credit state at boot from an older, healthier row than the zero reading
+ * that followed it.
+ */
+export const LATEST_CREDIT_BALANCE_SQL = `select balance
+  from public.provider_credit_log
+ order by id desc
+ limit 1`;
+
+/** A whole number the `int` column can hold. Anything else is not written. */
+export function isLoggableBalance(balance: number): boolean {
+  return Number.isInteger(balance) && balance >= INT4_MIN && balance <= INT4_MAX;
+}
+
+/** Record one reading. The caller checks `isLoggableBalance` first. */
+export async function insertCreditLog(
+  pool: Pool,
+  balance: number,
+  source: CreditLogSource,
+): Promise<void> {
+  await pool.query({
+    text: INSERT_CREDIT_LOG_SQL,
+    values: [balance, source],
+    types: ENGINE_TYPES,
+  });
+}
+
+/** The latest logged balance, or `null` when the log is empty. */
+export async function readLatestCreditBalance(pool: Pool): Promise<number | null> {
+  const result = await pool.query<{ balance: number }>({
+    text: LATEST_CREDIT_BALANCE_SQL,
+    types: ENGINE_TYPES,
+  });
+  const row = result.rows[0];
+  return row === undefined ? null : Number(row.balance);
+}
+
 /** Written after a poll that reached the provider and ingested a leg. */
 export const RECORD_POLL_SUCCESS_SQL = `update public.flights
    set next_poll_at = $2,

@@ -23,6 +23,13 @@ import { createRateLimiter, type RateLimiter } from './engine/rateLimiter';
 import { runPollPass } from './engine/tick';
 import { createLogger, type Logger } from './logger';
 import { createArchiveBackstopHandler } from './engine/archiveBackstop';
+import {
+  createCreditCheckHandler,
+  createCreditState,
+  pollWebhookSettings,
+  type CreditState,
+} from './engine/creditMonitor';
+import { readLatestCreditBalance } from './engine/repository';
 import { createReconcileHandler } from './engine/reconcile';
 import { createInboxDrainer, type InboxDrainer } from './engine/webhookIngest';
 import { createBoss, startQueue, stopQueue, type PgBoss } from './queue';
@@ -41,6 +48,8 @@ export interface WorkerContext {
   readonly feedHealthCache: FeedHealthCache;
   /** Drains `webhook_inbox`; never throws (a missing inbox never stops polling). */
   readonly inboxDrainer: InboxDrainer;
+  /** Written by the hourly `credit-check`; read by every pass (§7.7). */
+  readonly creditState: CreditState;
 }
 
 /**
@@ -51,11 +60,14 @@ export interface WorkerContext {
  * the same flight; both write the value they saw, so whichever runs second sees
  * no change (criterion 8). Webhooks are on only when `WEBHOOK_URL` is set; off,
  * nothing subscribes and every flight stays on the polling ladder.
+ *
+ * Read per pass, so it follows the credit state: while the alert balance is
+ * exhausted the pass runs as if webhooks were off (§7.7, `creditMonitor.ts`) —
+ * subscribed flights take the failover ladder and nothing new subscribes.
  */
 export async function tick(context: WorkerContext): Promise<void> {
   await context.inboxDrainer.drain();
 
-  const webhookUrl = context.config.WEBHOOK_URL;
   await runPollPass({
     pool: context.pool,
     provider: context.provider,
@@ -63,8 +75,7 @@ export async function tick(context: WorkerContext): Promise<void> {
     rateLimiter: context.rateLimiter,
     logger: context.logger,
     feedHealthCache: context.feedHealthCache,
-    webhooksEnabled: webhookUrl !== undefined,
-    ...(webhookUrl === undefined ? {} : { webhookUrl }),
+    ...pollWebhookSettings(context.config.WEBHOOK_URL, context.creditState),
     // 0 disables the backup poll and restores §7.6's "no polling at all".
     webhookBackupIntervalMs:
       context.config.WEBHOOK_BACKUP_POLL_MS > 0 ? context.config.WEBHOOK_BACKUP_POLL_MS : undefined,
@@ -180,6 +191,29 @@ async function main(): Promise<void> {
   // either way, so deliveries for subscriptions opened earlier are still applied.
   const webhooksEnabled = config.WEBHOOK_URL !== undefined;
 
+  // Seeded from the log so a deploy during a credit outage keeps failing over
+  // (§7.7). If the read fails, start healthy and say so: the hourly check sets the
+  // truth, and in the meantime subscribed flights still get the backup poll.
+  let lastBalance: number | null = null;
+  try {
+    lastBalance = await readLatestCreditBalance(pool);
+  } catch (error: unknown) {
+    logger.warn(
+      { errorName: error instanceof Error ? error.name : 'UnknownError' },
+      'could not read the last credit balance; assuming credits are available until credit-check runs',
+    );
+  }
+  const creditState = createCreditState(lastBalance);
+  if (creditState.exhausted()) {
+    logger.error(
+      { balance: lastBalance },
+      'last recorded alert credit balance is zero: polling subscribed flights on the failover ladder',
+    );
+  }
+
+  // Deliveries only arrive while credits remain, so the drain keeps the boot-time
+  // setting; a straggler scheduled onto the backup cadence during an outage is
+  // pulled back by the next hourly sweep.
   const inboxDrainer = createInboxDrainer({
     pool,
     provider,
@@ -194,7 +228,6 @@ async function main(): Promise<void> {
   await startQueue({
     boss,
     logger,
-    // `credit-check` is wave 4 and stays a no-op.
     handlers: {
       'archive-backstop': createArchiveBackstopHandler({ pool, logger }),
       // Shares the process-wide limiter, so the 1 req/s ceiling holds across the
@@ -205,6 +238,17 @@ async function main(): Promise<void> {
         rateLimiter,
         logger,
         webhooksEnabled,
+      }),
+      // §7.7. Wave 5 adds `onOperatorAlert` here (the Expo push to
+      // OPERATOR_USER_ID); until then the job's log line is the operator alert.
+      'credit-check': createCreditCheckHandler({
+        pool,
+        provider,
+        rateLimiter,
+        logger,
+        webhooksEnabled,
+        creditState,
+        operatorUserId: config.OPERATOR_USER_ID,
       }),
     },
   });
@@ -219,6 +263,7 @@ async function main(): Promise<void> {
     rateLimiter,
     feedHealthCache,
     inboxDrainer,
+    creditState,
   };
   const shutdown = new AbortController();
 

@@ -63,6 +63,15 @@ export interface FixtureProviderOptions {
   allLive?: boolean;
   /** Answers for the `/subscriptions/webhook*` endpoints. */
   subscriptions?: SubscriptionStub;
+  /**
+   * `GET /subscriptions/balance`. A number answers `{ creditsRemaining }`; `null`
+   * answers the captured 200 with an empty body (`subscriptions-balance.json`),
+   * which the client reads as 0; a function is asked on every call, so a test can
+   * drain the balance between runs. Unset: the captured empty body.
+   */
+  balance?: number | null | (() => number | null);
+  /** Non-200 makes the balance read fail with that status. */
+  balanceStatus?: number;
 }
 
 export interface SubscriptionStub {
@@ -124,6 +133,21 @@ export function fixtureProvider(flightsFixture: string, options: FixtureProvider
       return new Response(fixtureBody(live ? 'health-feeds-KJFK' : 'health-feeds-PAWG'), {
         status: 200,
       });
+    }
+
+    if (url.includes('/subscriptions/balance')) {
+      const status = options.balanceStatus ?? 200;
+      if (status !== 200) return new Response('', { status });
+      const credits = typeof options.balance === 'function' ? options.balance() : options.balance;
+      if (credits === null || credits === undefined) return new Response('', { status: 200 });
+      return new Response(
+        JSON.stringify({
+          creditsRemaining: credits,
+          lastRefilledUtc: '2026-09-15 02:00Z',
+          lastDeductedUtc: '2026-09-15 12:00Z',
+        }),
+        { status: 200 },
+      );
     }
 
     if (url.includes('/subscriptions/webhook')) {

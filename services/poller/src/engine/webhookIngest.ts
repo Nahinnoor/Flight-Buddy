@@ -74,7 +74,7 @@ import { detectChanges, type FlightEventType } from './changeDetector';
 import { nextPollAt } from './ladder';
 import { DEFAULT_LEASE_MS, releaseLease } from './lease';
 import { ladderViewOf, operatingDesignator } from './poll';
-import { insertFlightEvents } from './repository';
+import { CREDIT_LOG_SOURCES, insertCreditLog, insertFlightEvents, isLoggableBalance } from './repository';
 import { ENGINE_TYPES, type FlightRow } from './types';
 
 /** Give up on a row after this many failed attempts (the brief: 5). */
@@ -88,10 +88,6 @@ export const VERIFIED_EVENT_TYPES: ReadonlySet<FlightEventType> = new Set<Flight
   'gate_change',
   'cancelled',
 ]);
-
-/** `provider_credit_log.balance` is `int`. */
-const INT4_MAX = 2_147_483_647;
-const INT4_MIN = -2_147_483_648;
 
 // --- SQL --------------------------------------------------------------------
 // `flightbuddy_worker` holds `select, update (processed_at, attempts, last_error)`
@@ -149,11 +145,14 @@ export const WEBHOOK_APPLIED_SQL = `update public.flights
        poll_lease_until = null
  where id = $1`;
 
-/** §7.6: the balance every delivery carries is free monitoring. */
-export const INSERT_CREDIT_LOG_SQL = `insert into public.provider_credit_log (balance, source)
-values ($1, $2)`;
+/**
+ * §7.6: the balance every delivery carries is free monitoring. The statement and
+ * its int4 guard live in `repository.ts`, shared with the hourly `credit-check`;
+ * re-exported here so existing imports keep working.
+ */
+export { INSERT_CREDIT_LOG_SQL } from './repository';
 
-export const CREDIT_LOG_SOURCE = 'webhook_payload';
+export const CREDIT_LOG_SOURCE = CREDIT_LOG_SOURCES.WEBHOOK_PAYLOAD;
 
 /** Fixed reason codes written to `last_error` for rows that are done but not applied. */
 export const INBOX_REASONS = {
@@ -443,12 +442,15 @@ async function handleRow(
 
     // 4. Free balance monitoring (§7.6). Once per delivery, only on success.
     const credits = delivery.creditsRemaining;
-    if (credits !== null && credits >= INT4_MIN && credits <= INT4_MAX) {
-      await deps.pool.query({
-        text: INSERT_CREDIT_LOG_SQL,
-        values: [credits, CREDIT_LOG_SOURCE],
-        types: ENGINE_TYPES,
-      });
+    if (credits !== null && isLoggableBalance(credits)) {
+      await insertCreditLog(deps.pool, credits, CREDIT_LOG_SOURCE);
+    } else if (credits !== null) {
+      // The delivery schema already requires an integer, so only an int4 overflow
+      // reaches here. Say so, as `credit-check` does; the value itself is not logged.
+      logger.warn(
+        { inboxId: row.id },
+        'delivery credit balance is not a loggable integer; not recorded',
+      );
     }
 
     await markDone(client, row.id, null);

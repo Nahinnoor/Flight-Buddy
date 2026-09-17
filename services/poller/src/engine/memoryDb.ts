@@ -27,9 +27,15 @@ import {
 } from '@flightbuddy/flight-provider';
 
 import type { Pool } from '../db';
+import { DISARMED_THRESHOLDS_SQL, FAILOVER_SUBSCRIBED_FLIGHTS_SQL } from './creditMonitor';
 import { CLAIM_DUE_FLIGHTS_SQL, RELEASE_LEASE_SQL } from './lease';
 import { ACTIVE_SUBSCRIPTIONS_SQL, DETACH_SUBSCRIPTION_SQL } from './reconcile';
-import { RECORD_POLL_FAILURE_SQL, RECORD_POLL_SUCCESS_SQL } from './repository';
+import {
+  INSERT_CREDIT_LOG_SQL,
+  LATEST_CREDIT_BALANCE_SQL,
+  RECORD_POLL_FAILURE_SQL,
+  RECORD_POLL_SUCCESS_SQL,
+} from './repository';
 import {
   CLEAR_SUBSCRIPTION_SQL,
   COUNT_OTHER_HOLDERS_SQL,
@@ -40,7 +46,6 @@ import type { FlightRow } from './types';
 import {
   CLAIM_INBOX_ROW_SQL,
   FIND_SUBSCRIBED_FLIGHTS_SQL,
-  INSERT_CREDIT_LOG_SQL,
   LEASE_FLIGHT_FOR_WEBHOOK_SQL,
   MARK_INBOX_DONE_SQL,
   MARK_INBOX_FAILED_SQL,
@@ -73,6 +78,10 @@ export interface MemoryDb {
   flights: Map<string, FlightRow>;
   events: MemoryEvent[];
   inbox: MemoryInboxRow[];
+  /**
+   * `provider_credit_log`, in insertion order — the array index stands in for the
+   * `bigserial` id. Push to it directly to seed earlier readings.
+   */
   creditLog: { balance: number; source: string }[];
   statements: { text: string; values: readonly unknown[] }[];
   setNow(now: Date): void;
@@ -341,6 +350,38 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
       case INSERT_CREDIT_LOG_SQL:
         creditLog.push({ balance: Number(values[0]), source: String(values[1]) });
         return [];
+
+      case LATEST_CREDIT_BALANCE_SQL: {
+        const last = creditLog.at(-1);
+        return last === undefined ? [] : [{ balance: last.balance }];
+      }
+
+      case DISARMED_THRESHOLDS_SQL: {
+        const [marks, source] = values as [number[], string];
+        return marks
+          .filter((mark) => {
+            let rearmedAt = -1;
+            creditLog.forEach((row, index) => {
+              if (row.balance > mark) rearmedAt = index;
+            });
+            return creditLog.some(
+              (row, index) => index > rearmedAt && row.source === source && row.balance <= mark,
+            );
+          })
+          .map((mark) => ({ mark }));
+      }
+
+      case FAILOVER_SUBSCRIBED_FLIGHTS_SQL: {
+        const ceiling = nowMs() + Number(values[0]);
+        const swept = [...flights.values()].filter(
+          (f) =>
+            f.archived_at === null &&
+            f.alert_subscription_id !== null &&
+            (f.next_poll_at === null || (millis(f.next_poll_at) as number) > ceiling),
+        );
+        for (const f of swept) f.next_poll_at = now.toISOString();
+        return swept.map((f) => ({ id: f.id }));
+      }
 
       case ACTIVE_SUBSCRIPTIONS_SQL:
         return [...flights.values()]
