@@ -20,9 +20,12 @@
  * 3. **Body**: JSON only (`text/plain` is removed for this route → 415), at most
  *    256 KB (→ 413), parsed by Fastify's own JSON parser (prototype-poisoning
  *    protection on; a parse failure carries no payload text).
- * 4. **Schema**: the documented `FlightNotificationContract` envelope
- *    (`docs/api-samples/webhook-notification-schema.md`), strict at the top
- *    level like the provider's own contract. Invalid → 400, generic message.
+ * 4. **Schema**: the `FlightNotificationContract` envelope
+ *    (`docs/api-samples/webhook-notification-schema.md`) as real deliveries
+ *    send it. Unknown top-level keys are **stripped, not rejected** (see
+ *    `webhookEnvelopeSchema`), and item fields beyond the few needed to trust
+ *    the shape are left to the worker's strict parse. Invalid → 400, generic
+ *    message.
  * 5. **One `webhook_inbox` row** via the service-role client, then `200
  *    {"status":"accepted"}` at once — the provider requires a 2XX within 10 s
  *    and bills per retry. Insert failure → 503, so it retries once (ADR 0003).
@@ -36,7 +39,13 @@
  * removes the URL from Fastify's own request lines.
  *
  * **No payload *value* is ever logged.** A rejected body logs the failing field
- * *paths* and zod's codes, and nothing else (`describeRejection`). That is the
+ * *paths* and zod's codes, and nothing else (`describeRejection`) — except that
+ * an `invalid_type` issue also names the JSON *type* found at its path, from a
+ * fixed vocabulary of seven words (`string`, `number`, `boolean`, `null`,
+ * `array`, `object`, `undefined`; `jsonTypeOf`). That word is computed by us,
+ * never copied from the body, so it is a type name and never a value; the same
+ * vocabulary names an optional envelope field that an accepted delivery had
+ * dropped for the wrong type. That is the
  * difference between "the envelope has an unexpected key" and printing what the
  * key contained, and it matters here for four reasons: `subscription.subscriber`
  * echoes our delivery URL, which ends in `WEBHOOK_TOKEN`; zod's own `message`
@@ -90,25 +99,69 @@ export const STORED_SUBSCRIPTION_FIELDS = [
  * One `FlightNotificationItemContract`. Only what the receiver needs to trust
  * the shape is required here; the rest passes through untouched, because the
  * worker re-parses every item with `@flightbuddy/flight-provider`'s schema.
+ *
+ * `status` must be **present** but may be any JSON type. The spec says string;
+ * every real delivery so far failed that check (`invalid_type at
+ * flights.0.status`, 2026-09-16/17), and its real type is not yet captured. The
+ * receiver's job is authenticate, bound and store: typing `status` is the
+ * worker's, which stays strict, so a delivery it cannot read waits in
+ * `webhook_inbox` for inspection instead of being answered 400 and lost — a
+ * rejection is charged a credit and triggers the paid retry as well.
  */
 export const webhookFlightItemSchema = z.looseObject({
   number: z.string().min(1),
-  status: z.string().min(1),
+  status: z.unknown().nonoptional(),
   departure: z.looseObject({}),
   arrival: z.looseObject({}),
   lastUpdatedUtc: z.string().min(1),
 });
 
+/** Bounds for the three undocumented envelope fields real deliveries carry. */
+export const WEBHOOK_DELIVERY_ID_MAX = 128;
+export const WEBHOOK_TIMESTAMP_MAX = 64;
+export const WEBHOOK_DELIVERY_ATTEMPT_MAX = 1_000;
+
 /**
- * `FlightNotificationContract`. `strictObject` because the provider declares
- * `additionalProperties: false` at this level: an extra key is not them.
+ * The envelope fields real deliveries carry that the spec does not document.
+ * Optional and bounded. A value of the wrong type is **dropped** (`.catch`), not
+ * rejected: none of them authenticates anything, and rejecting a delivery over
+ * metadata would lose the alert and cost a second credit (the dropped field is
+ * named, by type only, on the accept log line).
+ */
+export const ENVELOPE_META_FIELDS = ['id', 'timestampUtc', 'deliveryAttempt'] as const;
+
+/**
+ * `FlightNotificationContract`, as real deliveries send it.
+ *
+ * **`z.object`, which strips unknown keys, not `strictObject`.** This used to be
+ * strict because the spec declares `additionalProperties: false` here, on the
+ * theory that an extra key meant the sender was not AeroDataBox. Both halves of
+ * that were wrong: every real delivery carries three undocumented top-level keys
+ * (`id`, `timestampUtc`, `deliveryAttempt`), so strictness rejected every real
+ * alert (~34 POSTs across two flights, each billed, each retried and billed
+ * again); and a key's presence never authenticated anything — the constant-time
+ * token guard in `onRequest` does, before this schema runs. Stripping keeps the
+ * storage guarantee strictness was also giving: `parsed.data` holds only the
+ * keys modelled here, and the handler stores `parsed.data`, never
+ * `request.body`, so an unmodelled top-level key cannot reach `webhook_inbox`.
+ *
+ * `id` is kept (bounded) because it is the natural delivery idempotency key.
  *
  * `subscription.id` is checked as a GUID (any 8-4-4-4-12 hex), which is exactly
  * what the Postgres `uuid` column accepts. zod's stricter `uuid()` also demands
  * RFC version/variant bits; rejecting a real delivery over those would lose an
  * alert for no security gain.
  */
-export const webhookEnvelopeSchema = z.strictObject({
+export const webhookEnvelopeSchema = z.object({
+  id: z.string().min(1).max(WEBHOOK_DELIVERY_ID_MAX).optional().catch(undefined),
+  timestampUtc: z.string().min(1).max(WEBHOOK_TIMESTAMP_MAX).optional().catch(undefined),
+  deliveryAttempt: z
+    .number()
+    .int()
+    .min(0)
+    .max(WEBHOOK_DELIVERY_ATTEMPT_MAX)
+    .optional()
+    .catch(undefined),
   flights: z.array(webhookFlightItemSchema).max(WEBHOOK_MAX_FLIGHTS),
   subscription: z.looseObject({ id: z.guid() }),
   balance: z.looseObject({}).nullish(),
@@ -140,6 +193,66 @@ export function issuePath(path: readonly PropertyKey[]): string {
     .join('.');
 }
 
+/**
+ * The only words `jsonTypeOf` can return. A fixed vocabulary, so what reaches
+ * a log line is always one of these and never anything from the body.
+ */
+export const JSON_TYPE_NAMES = [
+  'string',
+  'number',
+  'boolean',
+  'null',
+  'array',
+  'object',
+  'undefined',
+] as const;
+
+export type JsonTypeName = (typeof JSON_TYPE_NAMES)[number];
+
+/** The JSON type of a value, as one word of `JSON_TYPE_NAMES`. Never the value. */
+export function jsonTypeOf(value: unknown): JsonTypeName {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  switch (typeof value) {
+    case 'string':
+      return 'string';
+    case 'number':
+    case 'bigint':
+      return 'number';
+    case 'boolean':
+      return 'boolean';
+    case 'undefined':
+      return 'undefined';
+    default:
+      // Objects; nothing else comes out of JSON.parse.
+      return 'object';
+  }
+}
+
+/**
+ * The value at `path` inside `input`, following **own** properties only (so a
+ * path can never reach `__proto__` or anything inherited) and array indexes
+ * only on arrays. Anything that does not resolve is `undefined`.
+ */
+function valueAt(input: unknown, path: readonly PropertyKey[]): unknown {
+  let current = input;
+  for (const segment of path) {
+    if (Array.isArray(current)) {
+      if (typeof segment !== 'number' || !Number.isInteger(segment)) return undefined;
+      if (segment < 0 || segment >= current.length) return undefined;
+      current = current[segment] as unknown;
+    } else if (typeof current === 'object' && current !== null) {
+      if (typeof segment === 'symbol') return undefined;
+      const key = String(segment);
+      if (!Object.hasOwn(current, key)) return undefined;
+      current = (current as Record<string, unknown>)[key];
+    } else {
+      return undefined;
+    }
+  }
+  return current;
+}
+
 /** What a rejected body may contribute to a log line: codes and paths, no values. */
 export interface RejectionIssue {
   readonly code: string;
@@ -149,18 +262,44 @@ export interface RejectionIssue {
 }
 
 /**
- * One short string per issue: `invalid_type at flights.0.lastUpdatedUtc`.
+ * One short string per issue: `invalid_type at flights.0.status (received number)`.
  *
  * zod's `message` is deliberately absent — it quotes the received value, which is
- * exactly what must not be logged here (see the module note).
+ * exactly what must not be logged here (see the module note). When the parsed
+ * `input` is passed, an `invalid_type` issue also names the JSON type found at its
+ * path — one word of `JSON_TYPE_NAMES`, computed here, never a value.
  */
-export function describeRejection(issues: readonly RejectionIssue[]): string[] {
+export function describeRejection(
+  issues: readonly RejectionIssue[],
+  options?: { input: unknown },
+): string[] {
   return issues.slice(0, MAX_LOGGED_ISSUES).map((issue) => {
-    const where = `${safeKey(String(issue.code))} at ${issuePath(issue.path ?? [])}`;
+    let where = `${safeKey(String(issue.code))} at ${issuePath(issue.path ?? [])}`;
+    if (options !== undefined && issue.code === 'invalid_type') {
+      where += ` (received ${jsonTypeOf(valueAt(options.input, issue.path ?? []))})`;
+    }
     if (!Array.isArray(issue.keys) || issue.keys.length === 0) return where;
     const keys = issue.keys.slice(0, MAX_LOGGED_KEYS).map((key) => safeKey(String(key)));
     return `${where}: ${keys.join(',')}`;
   });
+}
+
+/**
+ * Envelope metadata fields the body carried but the schema dropped for the wrong
+ * type or size, as `id (received number)`: a field name from our own list and a
+ * type name, never a value.
+ */
+export function droppedMetaFields(input: unknown, envelope: WebhookEnvelope): string[] {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return [];
+  const dropped: string[] = [];
+  for (const field of ENVELOPE_META_FIELDS) {
+    if (!Object.hasOwn(input, field)) continue;
+    const received = (input as Record<string, unknown>)[field];
+    if (received !== undefined && envelope[field] === undefined) {
+      dropped.push(`${field} (received ${jsonTypeOf(received)})`);
+    }
+  }
+  return dropped;
 }
 
 // ----------------------------------------------------------------- token ---
@@ -292,7 +431,7 @@ export function createWebhookRoutes(options: WebhookRouteOptions) {
       async (request, reply) => {
         const parsed = webhookEnvelopeSchema.safeParse(request.body);
         if (!parsed.success) {
-          // Codes and field paths, never values, and only past the token guard
+          // Codes, field paths and JSON type names, never values, and only past the token guard
           // (see the module note). Without this a real delivery that does not
           // match the documented contract is indistinguishable from a forgery,
           // and each one costs a credit — which is how six real alerts were
@@ -300,7 +439,7 @@ export function createWebhookRoutes(options: WebhookRouteOptions) {
           request.log.info(
             {
               issues: parsed.error.issues.length,
-              rejected: describeRejection(parsed.error.issues),
+              rejected: describeRejection(parsed.error.issues, { input: request.body }),
             },
             'webhook body rejected',
           );
@@ -320,6 +459,9 @@ export function createWebhookRoutes(options: WebhookRouteOptions) {
         for (const key of STORED_SUBSCRIPTION_FIELDS) {
           if (subscription[key] !== undefined) storedSubscription[key] = subscription[key];
         }
+        // `envelope` is the parse result, never `request.body`: it holds only the
+        // keys `webhookEnvelopeSchema` models, because `z.object` stripped the rest.
+        // Items pass through whole (`looseObject`) for the worker's strict parse.
         const stored = { ...envelope, subscription: storedSubscription };
 
         let failure: string | undefined;
@@ -342,7 +484,13 @@ export function createWebhookRoutes(options: WebhookRouteOptions) {
           return reply.code(503).send(UNAVAILABLE);
         }
 
-        request.log.info({ flights: envelope.flights.length }, 'webhook accepted');
+        const dropped = droppedMetaFields(request.body, envelope);
+        request.log.info(
+          dropped.length === 0
+            ? { flights: envelope.flights.length }
+            : { flights: envelope.flights.length, dropped },
+          'webhook accepted',
+        );
         return reply.code(200).send({ status: 'accepted' as const });
       },
     );

@@ -96,7 +96,7 @@ The new surfaces are an unauthenticated webhook URL, a long-running process hold
 
 **Webhook endpoint**
 - The URL carries a secret path segment: 32+ random bytes, stored only in Render env, compared in constant time. A wrong token returns 404, queues nothing, and logs no payload. Rotating it is free: create new subscriptions, delete old ones.
-- Strict zod schema, a small body-size cap, and a per-IP rate limit. Unknown subscription ids are acknowledged and dropped.
+- Strict zod schema, a small body-size cap, and a per-IP rate limit. Unknown subscription ids are acknowledged and dropped. *(Reversed at the receiver's top level on 2026-09-18, see ADR 0004: the real envelope carries undocumented keys, and strictness rejected every real delivery. Unknown keys are now stripped, never stored; the worker's parse stays strict.)*
 - The payload is **data, never instructions**: parsed into typed fields, mapped through the existing status enum, never interpolated into SQL, shell or any prompt. Only provider fields reach `flights`, through `ingestFlight`'s parameterized upsert.
 - Because deliveries are unsigned, a forged request with a stolen URL could inject a fake gate. Mitigation (owner decision in §8): before notifying a *gate* or *cancellation* change that arrived by webhook, cross-check it with one provider poll (2 units).
 

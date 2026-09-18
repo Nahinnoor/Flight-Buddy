@@ -56,7 +56,19 @@ answer, and the owner made one cost decision:
 - Overview §7.6's "no polling at all inside the window" is now "the backup cadence, or nothing when
   it is disabled"; §4's service table gains the inbox. Updated in the same commit (rule 14).
 - The stored payload is not byte-identical to what the provider sent. Anything reconstructing a
-  delivery from `webhook_inbox` must know `subscriber` was removed.
+  delivery from `webhook_inbox` must know `subscriber` was removed, and (since 2026-09-18) that any
+  unmodelled top-level key was stripped.
+- **Envelope strictness reversed (2026-09-18).** The receiver's top level was `strictObject`,
+  following the spec's `additionalProperties: false`, and ADR 0003 describes the payload as
+  "validated by a strict schema". Real deliveries carry three undocumented top-level keys (`id`,
+  `timestampUtc`, `deliveryAttempt`) and a non-string `flights[].status`, so strictness rejected
+  every real alert — each rejection billed, and retried and billed again (ADR 0003 decision 2). The
+  receiver now **strips** unknown top-level keys and only requires `status` to be present; the
+  constant-time token guard, not the key set, is what authenticates a delivery. Decision 2 is
+  unchanged and still holds: only the parsed envelope is stored, never the raw body, so a stripped
+  key cannot reach `webhook_inbox`, and `subscription` is still an allow-list with `subscriber`
+  redacted. The worker's parse stays strict about what it reads (items, and `status` as a string),
+  so a delivery it cannot read is closed as `InvalidPayload` with its payload kept for inspection.
 - Before beta, switch the API to a paid instance and revisit decision 4: with no cold starts, the
   backup poll can go back to 0 and save ~24 units per tracked flight per day.
 - If AeroDataBox ever signs deliveries, ADR 0003's verification poll can go; the inbox, the

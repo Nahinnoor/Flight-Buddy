@@ -5,7 +5,11 @@
  * `webhook_inbox`; the worker re-validates it here before anything is written
  * (defence in depth — a row in a table is not proof it came through the
  * receiver). The contract is the one documented in
- * `docs/api-samples/webhook-notification-schema.md`.
+ * `docs/api-samples/webhook-notification-schema.md`, plus the three undocumented
+ * envelope fields real deliveries carry (`id`, `timestampUtc`, `deliveryAttempt`;
+ * see `flightNotificationSchema`). Items stay strict, and `status` must be a
+ * string: a real delivery whose `status` is not is refused here, and the worker
+ * closes its inbox row with the payload intact rather than guessing.
  *
  * ## The payload is data, never instructions
  *

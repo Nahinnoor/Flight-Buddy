@@ -389,7 +389,12 @@ async function handleRow(
   const { logger } = deps;
   const now = (deps.now ?? (() => new Date()))();
 
-  // 1. Re-validate. A body that fails is permanently bad: done, not retried.
+  // 1. Re-validate. A body that fails is permanently bad: closed at once with a
+  //    fixed reason code — no provider call, no five retries — and its `payload`
+  //    is left untouched (MARK_INBOX_DONE_SQL writes only processed_at, attempts
+  //    and last_error), so a delivery off the documented contract stays in the
+  //    inbox for inspection. This is where a real delivery whose `status` is not
+  //    a string lands until its type is captured and modelled.
   let delivery: AlertDelivery;
   try {
     delivery = parseAlertDelivery(row.payload);
@@ -399,7 +404,7 @@ async function handleRow(
   } catch (error) {
     if (!(error instanceof ProviderDataError)) throw error;
     await markDone(client, row.id, INBOX_REASONS.INVALID_PAYLOAD);
-    logger.warn({ inboxId: row.id, errorName: error.name }, 'webhook delivery failed validation; dropped');
+    logger.warn({ inboxId: row.id, errorName: error.name }, 'webhook delivery failed validation; closed, payload kept');
     return outcome(row.id, 'invalid', { errorName: error.name });
   }
 

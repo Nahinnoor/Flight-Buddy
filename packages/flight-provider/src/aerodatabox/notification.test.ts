@@ -94,9 +94,46 @@ describe('parseAlertDelivery', () => {
     expect(delivery.unmappedCount).toBe(1);
   });
 
-  describe('is strict where the spec says additionalProperties: false', () => {
+  describe('the envelope real deliveries send', () => {
+    const real = () =>
+      envelope({
+        id: '0d6f3b1c-7a2e-4f55-9b1d-6c8e2a4f7b30',
+        timestampUtc: '2026-09-17 09:41Z',
+        deliveryAttempt: 1,
+      });
+
+    it('accepts the three undocumented envelope fields', () => {
+      expect(parseAlertDelivery(real()).subscriptionId).toBe(SUB_ID);
+    });
+
+    it('strips an unknown envelope key instead of rejecting the delivery', () => {
+      const delivery = parseAlertDelivery({ ...real(), extra: SUMMARY });
+      expect(delivery.legs).toHaveLength(1);
+      expect(JSON.stringify(delivery)).not.toContain('ignore previous instructions');
+    });
+
+    const invalid: [string, Json][] = [
+      ['a non-string id', { id: 12 }],
+      ['an over-long id', { id: 'x'.repeat(129) }],
+      ['a non-integer deliveryAttempt', { deliveryAttempt: 1.5 }],
+      ['a negative deliveryAttempt', { deliveryAttempt: -1 }],
+      ['a non-string timestampUtc', { timestampUtc: 0 }],
+    ];
+    for (const [label, overrides] of invalid) {
+      it(`rejects ${label}`, () => {
+        expect(() => parseAlertDelivery({ ...real(), ...overrides })).toThrow(ProviderDataError);
+      });
+    }
+
+    it('still refuses a status that is not a string: no guessing at an enum', () => {
+      // The receiver now stores this shape; the worker must not map it.
+      const numeric = { ...real(), flights: [item({ status: 2, codeshareStatus: 1 })] };
+      expect(() => parseAlertDelivery(numeric)).toThrow(ProviderDataError);
+    });
+  });
+
+  describe('is strict where the spec says additionalProperties: false (items)', () => {
     const invalid: [string, unknown][] = [
-      ['an unknown envelope key', envelope({ extra: true })],
       ['an unknown item key', envelope({ flights: [item({ injected: 'x' })] })],
       ['an item missing a required field', envelope({ flights: [item({ isCargo: undefined })] })],
       ['a mistyped item field', envelope({ flights: [item({ status: 7 })] })],

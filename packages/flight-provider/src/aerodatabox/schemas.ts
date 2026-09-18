@@ -104,9 +104,11 @@ export const balanceSchema = z.looseObject({
 // Unlike the lookup schemas above these are **strict about what we read**: every
 // documented required field must be present with its documented type, because
 // these values steer money (subscriptions bill credits) and flight writes. Unknown
-// keys are *stripped* (`z.object`), not passed through — and the two objects the
-// spec marks `additionalProperties: false` (the delivery envelope and its items)
-// reject unknown keys outright.
+// keys are *stripped* (`z.object`), not passed through. Delivery items, which the
+// spec marks `additionalProperties: false`, reject unknown keys outright; the
+// delivery envelope, which the spec marks the same way, does **not**, because real
+// deliveries carry three undocumented top-level keys (see
+// `flightNotificationSchema`).
 // ---------------------------------------------------------------------------
 
 /**
@@ -171,12 +173,30 @@ export const notificationItemSchema = z.strictObject({
 
 /**
  * `FlightNotificationContract`: the body AeroDataBox POSTs to the receiver.
- * `additionalProperties: false` in the spec, so strict here.
+ *
+ * **Strips unknown top-level keys (`z.object`), not strict.** The spec says
+ * `additionalProperties: false`, but every real delivery (2026-09-16/17) carried
+ * `id`, `timestampUtc` and `deliveryAttempt`, which it does not document. They are
+ * modelled here as optional and bounded, with the same types and bounds as the
+ * receiver's `webhookEnvelopeSchema` (`apps/api/src/routes/webhooks.ts`); the
+ * receiver drops a wrongly typed one before storing, so a stored row only ever
+ * holds values these accept. Nothing reads them yet (`id` is the future delivery
+ * idempotency key).
+ *
+ * The items stay strict, and so do `status` and `codeshareStatus` as strings,
+ * although real deliveries do not send `status` as a string (type not yet
+ * captured). That is deliberate: a delivery this cannot read is closed in the
+ * inbox as `InvalidPayload` with its payload kept for inspection, rather than
+ * guessed at — a wrong guess at an enum's numbering turns an on-time departure
+ * into a cancellation.
  *
  * `flights` is capped: billing is per item, so a real delivery is small, and the
  * cap bounds the work one inbox row can cause.
  */
-export const flightNotificationSchema = z.strictObject({
+export const flightNotificationSchema = z.object({
+  id: z.string().min(1).max(128).optional(),
+  timestampUtc: z.string().min(1).max(64).optional(),
+  deliveryAttempt: z.number().int().min(0).max(1_000).optional(),
   flights: z.array(notificationItemSchema).max(200),
   subscription: subscriptionContractSchema,
   balance: deliveryBalanceSchema.nullish(),

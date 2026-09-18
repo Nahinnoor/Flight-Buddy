@@ -17,11 +17,13 @@ import {
   MAX_LOGGED_ISSUES,
   MAX_LOGGED_KEYS,
   REDACTED_SUBSCRIBER,
+  JSON_TYPE_NAMES,
   WEBHOOK_BODY_LIMIT_BYTES,
   WEBHOOK_MAX_FLIGHTS,
   WEBHOOK_RATE_LIMIT,
   describeRejection,
   issuePath,
+  jsonTypeOf,
   safeKey,
   tokenMatches,
 } from './webhooks';
@@ -197,6 +199,103 @@ describe('POST /webhooks/aerodatabox/:token — accepted', () => {
     expect(db.rows('webhook_inbox')).toHaveLength(1);
   });
 
+  it('accepts an unknown top-level key and does not store it', async () => {
+    const { app, db, url, logs } = webhookApp({ captureLogs: true });
+    const planted = 'UNMODELLED-KEY-MARKER-3b8f';
+
+    const response = await app.inject({
+      method: 'POST',
+      url,
+      payload: envelope({ injected: planted, [planted]: { nested: planted } }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const rows = db.rows('webhook_inbox');
+    expect(rows).toHaveLength(1);
+    const payload = rows[0]?.payload as Record<string, unknown>;
+    expect(Object.keys(payload).sort()).toEqual(['balance', 'flights', 'subscription']);
+    expect(JSON.stringify(payload)).not.toContain(planted);
+    expect(logs.join('')).not.toContain(planted);
+  });
+
+  it('accepts the real delivery shape: the three envelope fields and a non-string status', async () => {
+    // What every real delivery so far has been rejected over (2026-09-16/17):
+    // `id`, `timestampUtc` and `deliveryAttempt` at the top level, and a `status`
+    // that is not a string. The number here is a stand-in; the real type is not
+    // yet captured, and the worker (not the receiver) decides what it means.
+    const { app, db, url, token, logs } = webhookApp({ captureLogs: true });
+    const planted = 'UNMODELLED-KEY-MARKER-9e41';
+    const body = envelope({
+      id: '0d6f3b1c-7a2e-4f55-9b1d-6c8e2a4f7b30',
+      timestampUtc: '2026-09-17 09:41Z',
+      deliveryAttempt: 0,
+      flights: [flightItem({ status: 2, codeshareStatus: 1 })],
+      somethingNew: planted,
+    });
+
+    const response = await app.inject({ method: 'POST', url, payload: body });
+
+    expect(response.statusCode).toBe(200);
+    const rows = db.rows('webhook_inbox');
+    expect(rows).toHaveLength(1);
+    const payload = rows[0]?.payload as Record<string, unknown>;
+    expect(payload).toMatchObject({
+      id: '0d6f3b1c-7a2e-4f55-9b1d-6c8e2a4f7b30',
+      timestampUtc: '2026-09-17 09:41Z',
+      deliveryAttempt: 0,
+      subscription: { id: SUBSCRIPTION_ID, subscriber: REDACTED_SUBSCRIBER },
+    });
+    // The item is stored whole, status and all, for the worker's strict parse.
+    expect((payload.flights as Record<string, unknown>[])[0]).toMatchObject({
+      status: 2,
+      codeshareStatus: 1,
+    });
+    expect(Object.keys(payload).sort()).toEqual([
+      'balance',
+      'deliveryAttempt',
+      'flights',
+      'id',
+      'subscription',
+      'timestampUtc',
+    ]);
+    const stored = JSON.stringify(payload);
+    expect(stored).not.toContain(planted);
+    expect(stored).not.toContain(token);
+    expect(logs.join('')).not.toContain(planted);
+  });
+
+  it('drops a wrongly typed envelope field instead of refusing the delivery, and names only its type', async () => {
+    const { app, db, url, logs } = webhookApp({ captureLogs: true });
+
+    const response = await app.inject({
+      method: 'POST',
+      url,
+      payload: envelope({
+        id: 987654321,
+        timestampUtc: PAYLOAD_MARKER.repeat(10),
+        deliveryAttempt: '1',
+      }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const payload = db.rows('webhook_inbox')[0]?.payload as Record<string, unknown>;
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty('id');
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty('timestampUtc');
+    expect(JSON.parse(JSON.stringify(payload))).not.toHaveProperty('deliveryAttempt');
+
+    const accepted = logs
+      .map((line) => JSON.parse(line) as { msg?: string; dropped?: string[] })
+      .find((line) => line.msg === 'webhook accepted');
+    expect(accepted?.dropped).toEqual([
+      'id (received number)',
+      'timestampUtc (received string)',
+      'deliveryAttempt (received string)',
+    ]);
+    const text = logs.join('');
+    expect(text).not.toContain('987654321');
+    expect(text).not.toContain(PAYLOAD_MARKER);
+  });
+
   it('needs no Authorization header — the token is the credential', async () => {
     const { app, url } = webhookApp();
 
@@ -351,6 +450,7 @@ describe('POST /webhooks/aerodatabox/:token — bodies it refuses', () => {
   });
   const { id: _id, ...subscriptionWithoutId } = envelope().subscription as Record<string, unknown>;
   const { lastUpdatedUtc: _updated, ...itemWithoutUpdated } = flightItem();
+  const { status: _status, ...itemWithoutStatus } = flightItem();
 
   const cases: Array<[string, { payload: string; contentType?: string }, number, string]> = [
     [
@@ -375,8 +475,8 @@ describe('POST /webhooks/aerodatabox/:token — bodies it refuses', () => {
       'VALIDATION_ERROR',
     ],
     [
-      'an extra top-level key',
-      { payload: JSON.stringify(envelope({ injected: PAYLOAD_MARKER })) },
+      'a flight without status',
+      { payload: JSON.stringify(envelope({ flights: [itemWithoutStatus] })) },
       400,
       'VALIDATION_ERROR',
     ],
@@ -574,7 +674,7 @@ describe('POST /webhooks/aerodatabox/:token — logging', () => {
       ).statusCode,
     ).toBe(400);
     expect(
-      (await app.inject({ method: 'POST', url, payload: envelope({ injected: PAYLOAD_MARKER }) }))
+      (await app.inject({ method: 'POST', url, payload: envelope({ flights: PAYLOAD_MARKER }) }))
         .statusCode,
     ).toBe(400);
     // Too large.
@@ -668,6 +768,88 @@ describe('rejection diagnostics (codes and field paths, never values)', () => {
     expect(lines.join('')).not.toContain(PAYLOAD_MARKER);
   });
 
+  it('names the received JSON type from a fixed vocabulary, never the value', () => {
+    const input = {
+      flights: [
+        { status: 7, number: PAYLOAD_MARKER, isCargo: true, gate: null, legs: [PAYLOAD_MARKER] },
+      ],
+      subscription: { note: { text: PAYLOAD_MARKER } },
+    };
+    const at = (path: PropertyKey[]) =>
+      describeRejection([{ code: 'invalid_type', path }], { input })[0];
+
+    expect(at(['flights', 0, 'status'])).toBe('invalid_type at flights.0.status (received number)');
+    expect(at(['flights', 0, 'number'])).toBe('invalid_type at flights.0.number (received string)');
+    expect(at(['flights', 0, 'isCargo'])).toBe(
+      'invalid_type at flights.0.isCargo (received boolean)',
+    );
+    expect(at(['flights', 0, 'gate'])).toBe('invalid_type at flights.0.gate (received null)');
+    expect(at(['flights', 0, 'legs'])).toBe('invalid_type at flights.0.legs (received array)');
+    expect(at(['subscription', 'note'])).toBe(
+      'invalid_type at subscription.note (received object)',
+    );
+    expect(at(['flights', 0, 'missing'])).toBe(
+      'invalid_type at flights.0.missing (received undefined)',
+    );
+    // Out of range, a string index on an array, an inherited key: never resolved.
+    expect(at(['flights', 5, 'status'])).toContain('(received undefined)');
+    expect(at(['flights', 'length'])).toContain('(received undefined)');
+    expect(at(['__proto__'])).toBe('invalid_type at __proto__ (received undefined)');
+    expect(at(['subscription', 'toString'])).toContain('(received undefined)');
+
+    // Only invalid_type carries it, and nothing but the seven words ever appears.
+    expect(describeRejection([{ code: 'too_big', path: ['flights'] }], { input })).toEqual([
+      'too_big at flights',
+    ]);
+    const all = [
+      ['flights', 0, 'status'],
+      ['flights', 0, 'number'],
+      ['flights', 0, 'legs', 0],
+      ['subscription', 'note', 'text'],
+    ].map((path) => describeRejection([{ code: 'invalid_type', path }], { input })[0] ?? '');
+    for (const line of all) {
+      expect(line).not.toContain(PAYLOAD_MARKER);
+      expect(JSON_TYPE_NAMES).toContain(/\(received (\w+)\)$/.exec(line)?.[1]);
+    }
+  });
+
+  it('maps every JSON value to one of the seven type names', () => {
+    const values: unknown[] = ['', 0, -1.5, true, null, [], {}, undefined];
+    expect(values.map(jsonTypeOf)).toEqual([
+      'string',
+      'number',
+      'number',
+      'boolean',
+      'null',
+      'array',
+      'object',
+      'undefined',
+    ]);
+  });
+
+  it('logs the received type of a real rejection, and still no value', async () => {
+    const { app, url, logs } = webhookApp({ captureLogs: true });
+
+    await app.inject({
+      method: 'POST',
+      url,
+      payload: envelope({ subscription: { id: SUBSCRIPTION_ID }, flights: [{ number: 7, note: PAYLOAD_MARKER }] }),
+    });
+
+    const rejected = logs
+      .map((line) => JSON.parse(line) as { msg?: string; rejected?: string[] })
+      .find((line) => line.msg === 'webhook body rejected');
+
+    expect(rejected?.rejected).toEqual([
+      'invalid_type at flights.0.number (received number)',
+      'invalid_type at flights.0.status (received undefined)',
+      'invalid_type at flights.0.departure (received undefined)',
+      'invalid_type at flights.0.arrival (received undefined)',
+      'invalid_type at flights.0.lastUpdatedUtc (received undefined)',
+    ]);
+    expect(logs.join('')).not.toContain(PAYLOAD_MARKER);
+  });
+
   it('lists unrecognized keys, sanitised and capped', () => {
     const keys = Array.from({ length: MAX_LOGGED_KEYS + 3 }, (_, i) => `extra${i}`);
 
@@ -686,7 +868,7 @@ describe('rejection diagnostics (codes and field paths, never values)', () => {
     const response = await app.inject({
       method: 'POST',
       url,
-      payload: envelope({ injected: PAYLOAD_MARKER }),
+      payload: envelope({ flights: PAYLOAD_MARKER }),
     });
 
     expect(response.statusCode).toBe(400);
@@ -697,7 +879,8 @@ describe('rejection diagnostics (codes and field paths, never values)', () => {
       .map((line) => JSON.parse(line) as { msg?: string; rejected?: string[] })
       .find((line) => line.msg === 'webhook body rejected');
 
-    expect(rejected?.rejected).toEqual(['unrecognized_keys at (root): injected']);
+    // The JSON type found there, never the value.
+    expect(rejected?.rejected).toEqual(['invalid_type at flights (received string)']);
     const text = logs.join('');
     expect(text).not.toContain(PAYLOAD_MARKER);
     expect(text).not.toContain(token);
@@ -713,6 +896,6 @@ describe('rejection diagnostics (codes and field paths, never values)', () => {
       .map((line) => JSON.parse(line) as { msg?: string; rejected?: string[] })
       .find((line) => line.msg === 'webhook body rejected');
 
-    expect(rejected?.rejected).toEqual(['invalid_type at flights.0.lastUpdatedUtc']);
+    expect(rejected?.rejected).toEqual(['invalid_type at flights.0.lastUpdatedUtc (received undefined)']);
   });
 });

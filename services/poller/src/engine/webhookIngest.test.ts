@@ -277,11 +277,11 @@ describe('drainWebhookInbox — what is never applied', () => {
     expect((await h.drain()).unknownSubscription).toBe(1);
   });
 
-  it('re-validates the envelope: a body off the contract is dropped at once, not retried', async () => {
+  it('re-validates the envelope: a body off the contract is closed at once, not retried', async () => {
     const h = harness();
     const inboxId = h.db.addInbox({
       subscription_id: SUB,
-      payload: { ...alertEnvelope(), injected: 'x' },
+      payload: { ...alertEnvelope(), flights: 'not-an-array' },
     });
 
     const summary = await h.drain();
@@ -293,6 +293,60 @@ describe('drainWebhookInbox — what is never applied', () => {
       processed_at: NOW.toISOString(),
     });
     expect(h.db.flight(FLIGHT).updated_at).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  it('closes a real-shaped delivery it cannot read: reason code, payload kept, no provider call', async () => {
+    // The shape the receiver now stores: the three envelope fields and a `status`
+    // that is not a string (its real type is not yet captured). The worker must
+    // not guess: it closes the row once and keeps the payload for inspection.
+    const h = harness();
+    const base = alertEnvelope({ mutate: status('Departed') });
+    const payload = {
+      ...base,
+      id: '0d6f3b1c-7a2e-4f55-9b1d-6c8e2a4f7b30',
+      timestampUtc: '2026-09-11 20:00Z',
+      deliveryAttempt: 0,
+      flights: (base.flights as Record<string, unknown>[]).map((leg) => ({
+        ...leg,
+        status: 2,
+        codeshareStatus: 1,
+      })),
+    };
+    const kept = JSON.parse(JSON.stringify(payload)) as unknown;
+    const inboxId = h.db.addInbox({ subscription_id: SUB, payload });
+
+    const first = await h.drain();
+    const second = await h.drain();
+
+    expect(first).toMatchObject({ claimed: 1, invalid: 1, processed: 0, failed: 0 });
+    // Closed, so the next pass does not claim it again: one attempt, not five.
+    expect(second.claimed).toBe(0);
+    const row = h.db.inbox.find((r) => r.id === inboxId);
+    expect(row).toMatchObject({
+      attempts: 1,
+      last_error: 'InvalidPayload',
+      processed_at: NOW.toISOString(),
+    });
+    expect(row?.payload).toEqual(kept);
+    // No provider call of any kind, no limiter slot, no flight write, no event.
+    expect(h.fx.requests).toHaveLength(0);
+    expect(h.count()).toBe(0);
+    expect(h.db.events).toEqual([]);
+    expect(h.db.creditLog).toEqual([]);
+    expect(h.db.flight(FLIGHT).updated_at).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  it('strips an unknown envelope key and applies the delivery', async () => {
+    const h = harness();
+    const inboxId = h.db.addInbox({
+      subscription_id: SUB,
+      payload: { ...alertEnvelope(), injected: 'x' },
+    });
+
+    const summary = await h.drain();
+
+    expect(summary.processed).toBe(1);
+    expect(h.db.inbox.find((r) => r.id === inboxId)?.last_error).toBeNull();
   });
 
   it('rejects an envelope whose subscription differs from its inbox row', async () => {
@@ -414,7 +468,7 @@ describe('the payload is data: nothing from it reaches a log, a row or an error'
   it('across applied, rejected and failed deliveries', async () => {
     const h = harness({ poll: { mutate: withDepartureGate('B99') } });
     h.deliver({ mutate: withDepartureGate('B99') });
-    h.db.addInbox({ subscription_id: SUB, payload: { ...alertEnvelope(), injected: 'x' } });
+    h.db.addInbox({ subscription_id: SUB, payload: { ...alertEnvelope(), flights: 'x' } });
     await h.drain();
 
     const failing = harness({ poll: { flightsStatus: 500 } });
