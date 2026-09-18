@@ -3,7 +3,7 @@
  *
  * | When | What |
  * |---|---|
- * | A `live` flight's poll lands inside T-24 h, webhooks on | subscribe (or join an existing subscription), store the id; the ladder then returns `null` |
+ * | A `live` flight's poll lands at or after the window opening (`webhookWindowOpensAt`: scheduled arrival − 24 h + 30 min, ADR 0005), webhooks on | subscribe (or join an existing subscription), store the id; the ladder then returns the backup cadence |
  * | Landed + 30 min (the archiving poll) | unsubscribe if no other active row shares it, clear the id, archive |
  * | Hourly | `reconcile.ts` deletes what nothing claims and detaches what the provider lost |
  *
@@ -83,7 +83,40 @@ export interface SubscriptionDeps {
   logger: Logger;
 }
 
-/** The instant the webhook window opens: T-24 h on the ladder's departure anchor. */
+/** 30 minutes after the previous day's occurrence is scheduled to land (ADR 0005). */
+export const WINDOW_OPENS_AFTER_PREVIOUS_LANDING_MS = 30 * 60_000;
+
+function toMs(iso: string | null): number | null {
+  if (iso === null) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * The instant the webhook window opens (ADR 0005): **30 minutes after yesterday's
+ * occurrence of this number is scheduled to land**, i.e.
+ * `scheduled_arrival_utc − 24 h + 30 min` — equivalently T-24 h plus the
+ * scheduled duration plus 30 minutes. JFK–LAX (~6 h) opens ~17.5 h out; a 16 h
+ * long-haul ~7.5 h out.
+ *
+ * Why not T-24 h: a subscription is keyed by number with no date (§7.6), so at
+ * T-24 h the previous day's same-numbered flight is departing and every alert it
+ * sends — takeoff, en-route updates, landing — is billed to us before our own
+ * flight has sent anything. The drain ignores those deliveries (they match no
+ * tracked row), but the credits are already spent.
+ *
+ * - **No scheduled arrival, or one not after the scheduled departure:** T-24 h on
+ *   the ladder's departure anchor, as before — subscribe early rather than never.
+ * - **Never later than departure** (the anchor): a pathological duration still
+ *   subscribes before the plane leaves.
+ * - The ladder's T-24 h boundary does not move. Between T-24 h and this instant an
+ *   unsubscribed `live` flight is on the failover ladder (hourly more than 6 h
+ *   out), which covers the gap by polling.
+ *
+ * Built on **scheduled** times: yesterday's flight landing late can still bill us
+ * its landing alert (and anything after it). That is an accepted approximation —
+ * the previous occurrence's real arrival is not something we track.
+ */
 export function webhookWindowOpensAt(fresh: FlightCandidate): number | null {
   const departure = departureAnchor({
     tracking_tier: fresh.trackingTier,
@@ -96,7 +129,16 @@ export function webhookWindowOpensAt(fresh: FlightCandidate): number | null {
     actual_arrival_utc: fresh.actualArrivalUtc,
     alert_subscription_id: null,
   });
-  return departure === null ? null : departure - LADDER_BOUNDARIES.TWENTY_FOUR_HOURS;
+  if (departure === null) return null;
+
+  const fallback = departure - LADDER_BOUNDARIES.TWENTY_FOUR_HOURS;
+  const scheduledDeparture = toMs(fresh.scheduledDepartureUtc) ?? departure;
+  const scheduledArrival = toMs(fresh.scheduledArrivalUtc);
+  if (scheduledArrival === null || scheduledArrival <= scheduledDeparture) return fallback;
+
+  const opensAt =
+    scheduledArrival - LADDER_BOUNDARIES.TWENTY_FOUR_HOURS + WINDOW_OPENS_AFTER_PREVIOUS_LANDING_MS;
+  return Math.min(opensAt, departure);
 }
 
 /**
@@ -130,8 +172,9 @@ export function shouldSubscribe(
 /**
  * Pull a pre-window poll forward to the moment the window opens.
  *
- * The 48–24 h band polls every 4 h, so without this a flight would be subscribed
- * anywhere up to four hours after T-24 h. Only applies to a flight that will want a
+ * Before T-24 h the 48–24 h band polls every 4 h, and after it the failover band
+ * polls hourly, so without this a flight would be subscribed up to four hours (or
+ * one hour) after the window opens. Only applies to a flight that will want a
  * subscription; everything else keeps the ladder's answer.
  */
 export function clampToWindowOpening(next: Date, fresh: FlightCandidate, now: Date): Date {

@@ -1,0 +1,101 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "balance": {
+    "lastDeductedUtc": "2026-09-18 23:21Z",
+    "lastRefilledUtc": "2026-09-15 01:46",
+    "creditsRemaining": 65
+  },
+  "flights": [
+    {
+      "number": "DL 1915",
+      "status": 2,
+      "airline": {
+        "iata": "DL",
+        "icao": "DAL",
+        "name": "Delta Air Lines"
+      },
+      "arrival": {
+        "airport": {
+          "iata": "LAX",
+          "icao": "KLAX",
+          "name": "Los Angeles",
+          "location": {
+            "lat": 33.9425,
+            "lon": -118.408
+          },
+          "timeZone": "America/Los_Angeles",
+          "shortName": "Los Angeles",
+          "countryCode": "US",
+          "municipalityName": "Los Angeles"
+        },
+        "quality": [0, 1],
+        "terminal": "3",
+        "revisedTime": {
+          "utc": "2026-09-19 04:26Z",
+          "local": "2026-09-18 21:26-07:00"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-19 05:10Z",
+          "local": "2026-09-18 22:10-07:00"
+        }
+      },
+      "isCargo": false,
+      "aircraft": {
+        "reg": "N000ZZ",
+        "modeS": "000000",
+        "model": "Boeing 767-300"
+      },
+      "callSign": "ZZZ0000",
+      "departure": {
+        "airport": {
+          "iata": "JFK",
+          "icao": "KJFK",
+          "name": "New York John F Kennedy",
+          "location": {
+            "lat": 40.6398,
+            "lon": -73.7789
+          },
+          "timeZone": "America/New_York",
+          "shortName": "John F Kennedy",
+          "countryCode": "US",
+          "municipalityName": "New York"
+        },
+        "quality": [0, 1],
+        "terminal": "4",
+        "runwayTime": {
+          "utc": "2026-09-18 23:20Z",
+          "local": "2026-09-18 19:20-04:00"
+        },
+        "revisedTime": {
+          "utc": "2026-09-18 23:20Z",
+          "local": "2026-09-18 19:20-04:00"
+        },
+        "scheduledTime": {
+          "utc": "2026-09-18 23:00Z",
+          "local": "2026-09-18 19:00-04:00"
+        }
+      },
+      "lastUpdatedUtc": "2026-09-18 23:21Z",
+      "codeshareStatus": 1,
+      "greatCircleDistance": {
+        "Km": 3982.94,
+        "Nm": 2150.62,
+        "Feet": 13067389.36,
+        "Mile": 2474.88,
+        "Meter": 3982940.28
+      }
+    }
+  ],
+  "subscription": {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "subject": {
+      "id": "DL 1915",
+      "type": 0
+    },
+    "isActive": true,
+    "subscriber": "[redacted: may contain the delivery URL]",
+    "billingType": 1,
+    "createdOnUtc": "2026-09-18 23:05"
+  },
+  "timestampUtc": "2026-09-18 23:21:13Z"
+}

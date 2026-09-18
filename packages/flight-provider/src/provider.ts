@@ -115,6 +115,12 @@ export interface AlertDelivery {
   legs: FlightCandidate[];
   /** Items that could not be expressed as a candidate (no IATA code, no zone). */
   unmappedCount: number;
+  /**
+   * Field paths (e.g. `flights[0].status`) whose integer enum was outside the
+   * spec's table and was read as `Unknown`. Paths only — never the value — so a
+   * caller can log them as they are.
+   */
+  unrecognisedEnumFields: string[];
 }
 
 /**

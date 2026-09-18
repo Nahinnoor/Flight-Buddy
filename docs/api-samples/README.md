@@ -5,7 +5,7 @@ Real responses from AeroDataBox via RapidAPI (`aerodatabox.p.rapidapi.com`), cap
 none of them touch the network: §12.1 allows 20 exploratory calls per agent, which is not a budget
 tests can draw on.
 
-Bodies are verbatim, only pretty-printed. No request headers, and therefore no API key, are stored.
+Bodies are verbatim, only pretty-printed — except `webhook-delivery-*`, which is sanitised (see its row). No request headers, and therefore no API key, are stored.
 An empty body is recorded as `{"_note": "HTTP <status> ... with an empty body"}` so the file is
 still valid JSON — those cases are marked below.
 
@@ -44,6 +44,7 @@ that day and departed the day before.
 | `subscriptions-balance.json` | `GET /subscriptions/balance` | **200, empty body** | The §11 smoke test. See the warning below. |
 | `flights-airport-KJFK-departures-codeshare-discovery.json` | `GET /flights/airports/icao/KJFK/2026-09-11T21:00/2026-09-11T22:00?direction=Departure&withLeg=true&withCancelled=true&withCodeshared=true&withCargo=false&withPrivate=false` | 200 | Discovery, not a mapper fixture. 58 departures, **zero** marked `IsCodeshared` — only `IsOperator` and `Unknown`. |
 | `flights-airport-EHAM-departures-codeshare-discovery.json` | `GET /flights/airports/icao/EHAM/2026-09-12T08:00/2026-09-12T09:00?direction=Departure&withLeg=true&withCancelled=true&withCodeshared=true&withCargo=false&withPrivate=false` | 200 | Discovery. 128 departures, 98 `IsCodeshared` — this is where `DL 9659` was found. Also shows the marketing entry and its operating twin (`KL 1405`) side by side. |
+| `webhook-delivery-real-enroute.json` | **Inbound** `POST` to our receiver (not a call we made), 2026-09-18 23:21 UTC; read from `webhook_inbox` | 200 (accepted) | **The first real alert delivery.** DL1915 JFK→LAX, the 2026-09-18 occurrence, one minute after takeoff. Shows the webhook serializer's **integer enums** (`status: 2` = EnRoute, `codeshareStatus: 1`, `quality: [0,1]`, `subject.type: 0`, `billingType: 1`), PascalCase `greatCircleDistance`, and the stored envelope (`deliveryAttempt` dropped by the receiver, `subscriber` redacted by it). **Sanitised, not verbatim:** the delivery `id`, subscription `id`, aircraft `reg` and `modeS`, and `callSign` are synthetic; everything else, including every enum integer, is as stored. See `webhook-notification-schema.md`. |
 
 ## Provider behaviour worth knowing
 
@@ -88,6 +89,9 @@ Every row in `calls.tsv` is one real provider call and the quota it spent (§12.
 
 - A plain name is a **captured fixture**: the response body is the `<name>.json` file beside this
   README, and tests build against it (§12.2).
+- A **`webhook-delivery-`** prefix is a delivery the provider **sent us**, not a call we made: it cost one
+  alert credit (billed per item per delivery), not API units. The file is read from `webhook_inbox`
+  after the receiver's own redaction, then sanitised further (the README row says what was replaced).
 - A **`liveops-`** prefix is an operational call against the running system — checking the credit
   balance, tracking the owner's own flight — whose body is deliberately **not** captured: it is one
   person's itinerary, not a fixture, and §10 keeps user data out of the repo. Nothing builds against

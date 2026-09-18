@@ -10,6 +10,7 @@
  *   → re-validate the envelope        (parseAlertDelivery — defence in depth)
  *   → rows holding that subscription  (none → processed, "unknown subscription")
  *   → match each item to its row      (operating number + origin IATA + origin-local date; never [0])
+ *     no leg matches any row?  → processed, "no tracked leg": nothing ingested
  *   → lease the flight row            (the same lease the poll claim uses)
  *   → detectChanges(current, webhook, source 'webhook')
  *   → gate_change / cancelled?  verification poll; the POLLED leg is what is
@@ -158,6 +159,19 @@ export const CREDIT_LOG_SOURCE = CREDIT_LOG_SOURCES.WEBHOOK_PAYLOAD;
 export const INBOX_REASONS = {
   INVALID_PAYLOAD: 'InvalidPayload',
   UNKNOWN_SUBSCRIPTION: 'UnknownSubscription',
+  /**
+   * The subscription is ours, but no delivered leg's canonical key matches a row
+   * holding it. The usual cause: a subscription is keyed by number with no date
+   * (§7.6), so it fires for every day's occurrence, and this one is another day's.
+   */
+  NO_TRACKED_LEG: 'NoTrackedLeg',
+  /**
+   * Every leg was unmappable — typically a `status` code outside the spec's
+   * table, which is dropped rather than recorded as `unknown` (see
+   * `parseAlertDelivery`). Distinct from `NoTrackedLeg` so the two causes can be
+   * told apart in the inbox.
+   */
+  UNMAPPABLE_LEG: 'UnmappableLeg',
 } as const;
 
 // --- types ------------------------------------------------------------------
@@ -188,6 +202,8 @@ export interface WebhookIngestDeps {
 export type InboxOutcomeKind =
   | 'processed'
   | 'unknown_subscription'
+  /** Our subscription, but no leg is a flight we track (another day's occurrence). */
+  | 'no_tracked_leg'
   | 'invalid'
   /** A matched flight was leased by a poll; the row waits for the next pass. */
   | 'deferred'
@@ -210,6 +226,7 @@ export interface DrainSummary {
   claimed: number;
   processed: number;
   unknownSubscription: number;
+  noTrackedLeg: number;
   invalid: number;
   deferred: number;
   failed: number;
@@ -369,6 +386,21 @@ async function applyLeg(
   }
 }
 
+/** §7.6: log a delivery's balance to `provider_credit_log`, when it carries one. */
+async function logDeliveryBalance(
+  deps: WebhookIngestDeps,
+  inboxId: string,
+  credits: number | null,
+): Promise<void> {
+  if (credits !== null && isLoggableBalance(credits)) {
+    await insertCreditLog(deps.pool, credits, CREDIT_LOG_SOURCE);
+  } else if (credits !== null) {
+    // The delivery schema already requires an integer, so only an int4 overflow
+    // reaches here. Say so, as `credit-check` does; the value itself is not logged.
+    deps.logger.warn({ inboxId }, 'delivery credit balance is not a loggable integer; not recorded');
+  }
+}
+
 async function markDone(client: PoolClient, inboxId: string, reason: string | null): Promise<void> {
   await client.query({ text: MARK_INBOX_DONE_SQL, values: [inboxId, reason], types: ENGINE_TYPES });
 }
@@ -393,8 +425,7 @@ async function handleRow(
   //    fixed reason code — no provider call, no five retries — and its `payload`
   //    is left untouched (MARK_INBOX_DONE_SQL writes only processed_at, attempts
   //    and last_error), so a delivery off the documented contract stays in the
-  //    inbox for inspection. This is where a real delivery whose `status` is not
-  //    a string lands until its type is captured and modelled.
+  //    inbox for inspection.
   let delivery: AlertDelivery;
   try {
     delivery = parseAlertDelivery(row.payload);
@@ -406,6 +437,15 @@ async function handleRow(
     await markDone(client, row.id, INBOX_REASONS.INVALID_PAYLOAD);
     logger.warn({ inboxId: row.id, errorName: error.name }, 'webhook delivery failed validation; closed, payload kept');
     return outcome(row.id, 'invalid', { errorName: error.name });
+  }
+
+  // An integer enum outside the spec's table was read as `Unknown` (our
+  // `unknown`) rather than guessed at. Field paths only, never values.
+  if (delivery.unrecognisedEnumFields.length > 0) {
+    logger.warn(
+      { inboxId: row.id, fields: delivery.unrecognisedEnumFields },
+      'webhook delivery carried enum values outside the documented tables; read as Unknown',
+    );
   }
 
   try {
@@ -427,6 +467,31 @@ async function handleRow(
 
     // 3. Apply each leg to its own row.
     const { matched, ignored } = matchLegs(holders.rows, delivery.legs);
+
+    if (matched.size === 0) {
+      // Nothing here is a flight we track — typically another day's occurrence of
+      // a tracked number (§7.6). Never ingested: `ingestFlight` upserts on the
+      // canonical key, so ingesting it would create a `flights` row nobody holds.
+      // The balance is still real (the delivery was billed), so it is logged.
+      await logDeliveryBalance(deps, row.id, delivery.creditsRemaining);
+      const nothingMappable = delivery.legs.length === 0 && delivery.unmappedCount > 0;
+      await markDone(
+        client,
+        row.id,
+        nothingMappable ? INBOX_REASONS.UNMAPPABLE_LEG : INBOX_REASONS.NO_TRACKED_LEG,
+      );
+      logger.info(
+        {
+          inboxId: row.id,
+          subscriptionId: delivery.subscriptionId,
+          ignoredLegs: ignored,
+          unmappedLegs: delivery.unmappedCount,
+        },
+        'webhook delivery matches no tracked flight; nothing ingested',
+      );
+      return outcome(row.id, 'no_tracked_leg');
+    }
+
     const applied: AppliedLeg[] = [];
 
     for (const [flightId, leg] of matched) {
@@ -446,17 +511,7 @@ async function handleRow(
     }
 
     // 4. Free balance monitoring (§7.6). Once per delivery, only on success.
-    const credits = delivery.creditsRemaining;
-    if (credits !== null && isLoggableBalance(credits)) {
-      await insertCreditLog(deps.pool, credits, CREDIT_LOG_SOURCE);
-    } else if (credits !== null) {
-      // The delivery schema already requires an integer, so only an int4 overflow
-      // reaches here. Say so, as `credit-check` does; the value itself is not logged.
-      logger.warn(
-        { inboxId: row.id },
-        'delivery credit balance is not a loggable integer; not recorded',
-      );
-    }
+    await logDeliveryBalance(deps, row.id, delivery.creditsRemaining);
 
     await markDone(client, row.id, null);
 
@@ -553,6 +608,7 @@ export async function drainWebhookInbox(deps: WebhookIngestDeps): Promise<DrainS
     claimed: 0,
     processed: 0,
     unknownSubscription: 0,
+    noTrackedLeg: 0,
     invalid: 0,
     deferred: 0,
     failed: 0,
@@ -576,6 +632,9 @@ export async function drainWebhookInbox(deps: WebhookIngestDeps): Promise<DrainS
       case 'unknown_subscription':
         summary.unknownSubscription += 1;
         break;
+      case 'no_tracked_leg':
+        summary.noTrackedLeg += 1;
+        break;
       case 'invalid':
         summary.invalid += 1;
         break;
@@ -597,6 +656,7 @@ export async function drainWebhookInbox(deps: WebhookIngestDeps): Promise<DrainS
         claimed: summary.claimed,
         processed: summary.processed,
         unknownSubscription: summary.unknownSubscription,
+        noTrackedLeg: summary.noTrackedLeg,
         invalid: summary.invalid,
         deferred: summary.deferred,
         failed: summary.failed,

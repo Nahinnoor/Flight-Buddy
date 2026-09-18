@@ -7,7 +7,7 @@
  *            → ingestFlight            (rule 7: the only writer of flight data)
  *            → detectChanges           (§8.2: against the last known value)
  *            → insert flight_events
- *            → (wave 3) T-24 h subscribe, or unsubscribe at landed + 30 min
+ *            → (wave 3) subscribe at the window opening (ADR 0005), or unsubscribe at landed + 30 min
  *            → next_poll_at from the ladder, last_polled_at, failures reset
  * ```
  *
@@ -83,7 +83,7 @@ export interface PollDependencies {
   rng?: () => number;
   /**
    * Webhooks on (`WEBHOOK_URL` set). Passed to the ladder, and with `webhookUrl`
-   * it lets a `live` flight subscribe at T-24 h (§7.6).
+   * it lets a `live` flight subscribe once its window opens (§7.6, ADR 0005).
    */
   webhooksEnabled?: boolean;
   /** The receiver URL including its secret token. Never logged. Absent = never subscribe. */
@@ -328,7 +328,8 @@ export async function pollAndUpdate(
         subscriptionId = null;
       }
 
-      // T-24 h (§7.6): a `live` flight with no subscription gets one. On failure
+      // Window opening (§7.6, ADR 0005: yesterday's same flight has landed + 30 min):
+      // a `live` flight with no subscription gets one. On failure
       // the id stays null, the ladder keeps it on the failover cadence, and the
       // next poll tries again.
       if (webhookUrl !== undefined && shouldSubscribe(fresh, subscriptionId, now)) {
@@ -345,7 +346,7 @@ export async function pollAndUpdate(
         },
       );
       if (webhookUrl !== undefined && next !== null && subscriptionId === null) {
-        // Land the next poll on T-24 h rather than up to four hours after it.
+        // Land the next poll on the window opening rather than up to a band later.
         next = clampToWindowOpening(next, fresh, now);
       }
     }

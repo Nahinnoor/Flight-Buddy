@@ -10,7 +10,7 @@
  *    subscribe whose id never made it into the database.
  * 2. An active row whose subscription the provider no longer has (or reports
  *    inactive) is detached and put back on the ladder (`next_poll_at = now()`), so
- *    it is polled at once and, still inside T-24 h, re-subscribes on that poll.
+ *    it is polled at once and, past its window opening, re-subscribes on that poll.
  *
  * ## The grace window
  *

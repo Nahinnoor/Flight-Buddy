@@ -7,12 +7,16 @@
  * would take out a lookup for nothing.
  *
  * Enums arrive as plain `string` for the same reason — a new `FlightStatus`
- * member must degrade to `'unknown'` in the mapper, not throw here.
+ * member must degrade to `'unknown'` in the mapper, not throw here. (The lookup
+ * API writes enums as strings; the webhook delivery schemas below also accept
+ * the integers that serializer writes — `enums.ts`.)
  *
  * These types stop at this directory. Nothing above `aerodatabox/` may name
  * them (§7.1).
  */
 import { z } from 'zod';
+
+import { enumWireSchema } from './enums';
 
 /**
  * An instant in both zones. Note the format: AeroDataBox emits
@@ -145,20 +149,45 @@ export const deliveryBalanceSchema = z.object({
 });
 
 /**
+ * `SubscriptionContract` as a **delivery** carries it. The webhook serializer
+ * writes `subject.type` and `billingType` as integers (`0`, `1`; see `enums.ts`),
+ * where the REST list endpoint writes strings. This is a separate schema so the
+ * list schema reconcile uses stays exactly as strict as the endpoint it reads.
+ * Nothing reads these two fields; `notification.ts` still normalises them so an
+ * out-of-table value is reported like any other.
+ */
+export const deliverySubscriptionSchema = subscriptionContractSchema.extend({
+  subject: z.object({
+    type: enumWireSchema,
+    id: z.string(),
+  }),
+  billingType: enumWireSchema.nullish(),
+});
+
+/** A delivery movement: `quality[]` members are integers on the webhook (`[0,1]`). */
+export const deliveryMovementSchema = movementSchema.extend({
+  quality: z.array(enumWireSchema).nullish(),
+});
+
+/**
  * `FlightNotificationItemContract`: a lookup `FlightContract` plus two strings of
  * provider free text. `additionalProperties: false` in the spec, so strict here.
  *
- * The nested movement/aircraft/airline objects reuse the lookup schemas, which
- * the mapper already understands; fields we never read are typed `unknown`.
+ * `status` and `codeshareStatus` accept the documented string **or** its integer
+ * (the webhook serializer sends integers; `enums.ts`), and nothing else.
+ * `notification.ts` turns them back into names before the lookup mapper sees them.
+ *
+ * `greatCircleDistance` arrives as an object with PascalCase keys (`Km`, `Mile`,
+ * ...), unlike the lookup's lowercase; nothing reads it, so it stays `unknown`.
  */
 export const notificationItemSchema = z.strictObject({
   number: z.string(),
-  status: z.string(),
-  codeshareStatus: z.string(),
+  status: enumWireSchema,
+  codeshareStatus: enumWireSchema,
   isCargo: z.boolean(),
   lastUpdatedUtc: z.string(),
-  departure: movementSchema,
-  arrival: movementSchema,
+  departure: deliveryMovementSchema,
+  arrival: deliveryMovementSchema,
   /** Provider free text. Data only: dropped in `parseAlertDelivery`, never logged or stored. */
   notificationSummary: z.string().nullish(),
   /** Provider free text. Data only: dropped in `parseAlertDelivery`, never logged or stored. */
@@ -175,20 +204,16 @@ export const notificationItemSchema = z.strictObject({
  * `FlightNotificationContract`: the body AeroDataBox POSTs to the receiver.
  *
  * **Strips unknown top-level keys (`z.object`), not strict.** The spec says
- * `additionalProperties: false`, but every real delivery (2026-09-16/17) carried
- * `id`, `timestampUtc` and `deliveryAttempt`, which it does not document. They are
- * modelled here as optional and bounded, with the same types and bounds as the
- * receiver's `webhookEnvelopeSchema` (`apps/api/src/routes/webhooks.ts`); the
- * receiver drops a wrongly typed one before storing, so a stored row only ever
- * holds values these accept. Nothing reads them yet (`id` is the future delivery
- * idempotency key).
+ * `additionalProperties: false`, but every real delivery (2026-09-16/17/18)
+ * carried `id`, `timestampUtc` and `deliveryAttempt`, which it does not document.
+ * `id` and `timestampUtc` are strings. `deliveryAttempt` is really an **object**
+ * (first capture, 2026-09-18), not the int modelled here and in the receiver's
+ * `webhookEnvelopeSchema` (`apps/api/src/routes/webhooks.ts`): the receiver drops
+ * a wrongly typed one before storing, so a stored row never holds it and this
+ * optional int never sees it. Nothing reads any of the three yet (`id` is the
+ * future delivery idempotency key).
  *
- * The items stay strict, and so do `status` and `codeshareStatus` as strings,
- * although real deliveries do not send `status` as a string (type not yet
- * captured). That is deliberate: a delivery this cannot read is closed in the
- * inbox as `InvalidPayload` with its payload kept for inspection, rather than
- * guessed at — a wrong guess at an enum's numbering turns an on-time departure
- * into a cancellation.
+ * Enums inside `flights` and `subscription` may be integers (see `enums.ts`).
  *
  * `flights` is capped: billing is per item, so a real delivery is small, and the
  * cap bounds the work one inbox row can cause.
@@ -198,7 +223,7 @@ export const flightNotificationSchema = z.object({
   timestampUtc: z.string().min(1).max(64).optional(),
   deliveryAttempt: z.number().int().min(0).max(1_000).optional(),
   flights: z.array(notificationItemSchema).max(200),
-  subscription: subscriptionContractSchema,
+  subscription: deliverySubscriptionSchema,
   balance: deliveryBalanceSchema.nullish(),
 });
 

@@ -23,7 +23,11 @@
  * | *failover* final 45 min of flight | every 10 min |
  *
  * The failover rows apply **permanently** to `scheduled`-tier flights, and to
- * `live`-tier flights for as long as they are not subscribed.
+ * `live`-tier flights for as long as they are not subscribed. A `live` flight is
+ * subscribed at the webhook window opening (`webhookWindowOpensAt`, ADR 0005:
+ * scheduled arrival − 24 h + 30 min), which is at or after T-24 h; between the
+ * two it is unsubscribed and so on the failover ladder (hourly more than 6 h out).
+ * The T-24 h boundary here does not move.
  *
  * ## The wave-3 seam
  *

@@ -218,11 +218,49 @@ describe('POST /webhooks/aerodatabox/:token — accepted', () => {
     expect(logs.join('')).not.toContain(planted);
   });
 
+  it('stores only the allow-listed balance fields', async () => {
+    const { app, db, url, token, logs } = webhookApp({ captureLogs: true });
+    const planted = 'UNMODELLED-BALANCE-MARKER-51c7';
+
+    const response = await app.inject({
+      method: 'POST',
+      url,
+      payload: envelope({
+        balance: {
+          creditsRemaining: 42,
+          lastRefilledUtc: '2026-09-15 00:00Z',
+          lastDeductedUtc: '2026-09-18 12:00Z',
+          notices: planted,
+          callbackUrl: `https://api.example.invalid/webhooks/aerodatabox/${token}`,
+        },
+      }),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const payload = db.rows('webhook_inbox')[0]?.payload as Record<string, unknown>;
+    expect(payload.balance).toEqual({
+      creditsRemaining: 42,
+      lastRefilledUtc: '2026-09-15 00:00Z',
+      lastDeductedUtc: '2026-09-18 12:00Z',
+    });
+    const stored = JSON.stringify(payload);
+    expect(stored).not.toContain(planted);
+    expect(stored).not.toContain(token);
+    expect(logs.join('')).not.toContain(planted);
+  });
+
+  it('stores a null balance as null', async () => {
+    const { app, db, url } = webhookApp();
+    const response = await app.inject({ method: 'POST', url, payload: envelope({ balance: null }) });
+    expect(response.statusCode).toBe(200);
+    const payload = db.rows('webhook_inbox')[0]?.payload as Record<string, unknown>;
+    expect(payload.balance).toBeNull();
+  });
+
   it('accepts the real delivery shape: the three envelope fields and a non-string status', async () => {
-    // What every real delivery so far has been rejected over (2026-09-16/17):
-    // `id`, `timestampUtc` and `deliveryAttempt` at the top level, and a `status`
-    // that is not a string. The number here is a stand-in; the real type is not
-    // yet captured, and the worker (not the receiver) decides what it means.
+    // What every real delivery was rejected over before 2026-09-18: `id`,
+    // `timestampUtc` and `deliveryAttempt` at the top level, and a `status` that
+    // is not a string (an integer, as captured; the worker decides what it means).
     const { app, db, url, token, logs } = webhookApp({ captureLogs: true });
     const planted = 'UNMODELLED-KEY-MARKER-9e41';
     const body = envelope({

@@ -93,6 +93,29 @@ export const STORED_SUBSCRIPTION_FIELDS = [
   'subject',
 ] as const;
 
+/**
+ * The only `balance` fields copied into `webhook_inbox`, for the same reason as
+ * `STORED_SUBSCRIPTION_FIELDS`: an allow list of the documented fields rather
+ * than whatever the provider sends. The provider has now proven its contract
+ * wrong in several places (undocumented envelope keys, integer enums, an object
+ * `deliveryAttempt`, PascalCase `greatCircleDistance`), so an undocumented
+ * `balance` key is not assumed to be harmless.
+ */
+export const STORED_BALANCE_FIELDS = [
+  'creditsRemaining',
+  'lastRefilledUtc',
+  'lastDeductedUtc',
+] as const;
+
+/** A copy of `source` holding only `fields` that are present. */
+function pick(source: Record<string, unknown>, fields: readonly string[]): Record<string, unknown> {
+  const picked: Record<string, unknown> = {};
+  for (const key of fields) {
+    if (Object.hasOwn(source, key) && source[key] !== undefined) picked[key] = source[key];
+  }
+  return picked;
+}
+
 // ---------------------------------------------------------------- schema ---
 
 /**
@@ -101,10 +124,10 @@ export const STORED_SUBSCRIPTION_FIELDS = [
  * worker re-parses every item with `@flightbuddy/flight-provider`'s schema.
  *
  * `status` must be **present** but may be any JSON type. The spec says string;
- * every real delivery so far failed that check (`invalid_type at
- * flights.0.status`, 2026-09-16/17), and its real type is not yet captured. The
- * receiver's job is authenticate, bound and store: typing `status` is the
- * worker's, which stays strict, so a delivery it cannot read waits in
+ * real deliveries send an **integer** (captured 2026-09-18,
+ * `docs/api-samples/webhook-delivery-real-enroute.json`). The receiver's job is
+ * authenticate, bound and store: typing `status` is the worker's (string or
+ * integer, from the spec's own numbering), so a delivery it cannot read waits in
  * `webhook_inbox` for inspection instead of being answered 400 and lost — a
  * rejection is charged a credit and triggers the paid retry as well.
  */
@@ -454,15 +477,25 @@ export function createWebhookRoutes(options: WebhookRouteOptions) {
         // against a real delivery — so the stored subscription is an **allow
         // list** of documented, token-free fields rather than a block list of one.
         // The worker matches deliveries by id and needs nothing else.
-        const subscription = envelope.subscription as Record<string, unknown>;
-        const storedSubscription: Record<string, unknown> = { subscriber: REDACTED_SUBSCRIBER };
-        for (const key of STORED_SUBSCRIPTION_FIELDS) {
-          if (subscription[key] !== undefined) storedSubscription[key] = subscription[key];
-        }
+        const storedSubscription: Record<string, unknown> = {
+          subscriber: REDACTED_SUBSCRIBER,
+          ...pick(envelope.subscription as Record<string, unknown>, STORED_SUBSCRIPTION_FIELDS),
+        };
+        // `balance` is allow-listed the same way (see STORED_BALANCE_FIELDS);
+        // `null` and absent are kept as they came.
+        const balance =
+          envelope.balance === null || envelope.balance === undefined
+            ? envelope.balance
+            : pick(envelope.balance as Record<string, unknown>, STORED_BALANCE_FIELDS);
         // `envelope` is the parse result, never `request.body`: it holds only the
         // keys `webhookEnvelopeSchema` models, because `z.object` stripped the rest.
         // Items pass through whole (`looseObject`) for the worker's strict parse.
-        const stored = { ...envelope, subscription: storedSubscription };
+        const { balance: _balance, ...rest } = envelope;
+        const stored = {
+          ...rest,
+          subscription: storedSubscription,
+          ...(balance === undefined ? {} : { balance }),
+        };
 
         let failure: string | undefined;
         try {

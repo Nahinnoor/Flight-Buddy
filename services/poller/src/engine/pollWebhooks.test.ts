@@ -26,6 +26,10 @@ const DEPARTURE = Date.parse('2026-09-12T01:59:00.000Z');
 /** T-6 h: inside the webhook window. */
 const NOW = new Date(DEPARTURE - 6 * HOUR);
 const LANDED = Date.parse('2026-09-12T06:57:00.000Z');
+/** The capture's scheduled arrival. */
+const SCHEDULED_ARRIVAL = Date.parse('2026-09-12T07:38:00.000Z');
+/** ADR 0005: scheduled arrival − 24 h + 30 min = T-17 h 51 min for this 5 h 39 min flight. */
+const OPENS = SCHEDULED_ARRIVAL - 24 * HOUR + 30 * MINUTE;
 
 const landed = (legs: Record<string, unknown>[]) =>
   legs.map((leg) => ({ ...leg, status: 'Arrived' }));
@@ -67,7 +71,7 @@ function harness(options: Options = {}) {
   return { db, fx, count, log, deps, poll, posts, deletes, now };
 }
 
-describe('T-24 h: subscribe (§7.6)', () => {
+describe('window opening: subscribe (§7.6, ADR 0005)', () => {
   it('subscribes a live flight inside the window, stores the id and stops polling it', async () => {
     const h = harness({ subscriptions: { createId: SUB } });
     const row = h.db.addFlight(b6FlightRow({ next_poll_at: NOW.toISOString() }));
@@ -136,7 +140,7 @@ describe('T-24 h: subscribe (§7.6)', () => {
   });
 
   it('before the window, schedules the next poll for the moment it opens', async () => {
-    const now = new Date(DEPARTURE - 26 * HOUR); // 4-hourly band; +4 h would overshoot T-24 h
+    const now = new Date(OPENS - 30 * MINUTE); // hourly failover band; +1 h would overshoot the opening
     const on = harness({ now });
     const off = harness({ now, webhooks: false });
     const row = b6FlightRow();
@@ -147,8 +151,43 @@ describe('T-24 h: subscribe (§7.6)', () => {
     const without = await off.poll(row);
 
     expect(on.posts()).toHaveLength(0);
-    expect(withWebhooks.nextPollAt).toEqual(new Date(DEPARTURE - 24 * HOUR));
-    expect(without.nextPollAt).toEqual(new Date(now.getTime() + LADDER_INTERVALS.EVERY_4H));
+    expect(withWebhooks.nextPollAt).toEqual(new Date(OPENS));
+    expect(without.nextPollAt).toEqual(new Date(now.getTime() + LADDER_INTERVALS.HOURLY));
+  });
+
+  it('subscribes at the opening instant itself', async () => {
+    const h = harness({ now: new Date(OPENS), subscriptions: { createId: SUB } });
+    const row = h.db.addFlight(b6FlightRow());
+    await h.poll(row);
+    expect(h.posts()).toHaveLength(1);
+    expect(h.db.flight(row.id).alert_subscription_id).toBe(SUB);
+  });
+});
+
+describe('ADR 0005: between T-24 h and the window opening, the ladder covers the gap', () => {
+  // The previous day's DL/B6 same-numbered flight is still in the air here, so no
+  // subscription is opened — and the flight must not be left on the 4-hour band.
+  it('does not subscribe, and polls hourly (the failover band), not every 4 h', async () => {
+    const now = new Date(DEPARTURE - 20 * HOUR); // inside T-24 h, before OPENS (T-17 h 51)
+    const h = harness({ now });
+    const row = h.db.addFlight(b6FlightRow());
+
+    const outcome = await h.poll(row);
+
+    expect(h.posts()).toHaveLength(0);
+    expect(h.db.flight(row.id).alert_subscription_id).toBeNull();
+    expect(outcome.nextPollAt).toEqual(new Date(now.getTime() + LADDER_INTERVALS.HOURLY));
+  });
+
+  it('before T-24 h the 4-hour band stands when it lands before the opening', async () => {
+    const now = new Date(DEPARTURE - 26 * HOUR);
+    const h = harness({ now });
+    const row = h.db.addFlight(b6FlightRow());
+
+    const outcome = await h.poll(row);
+
+    expect(h.posts()).toHaveLength(0);
+    expect(outcome.nextPollAt).toEqual(new Date(now.getTime() + LADDER_INTERVALS.EVERY_4H));
   });
 });
 

@@ -66,7 +66,7 @@
  * while the balance is exhausted the poll pass runs **exactly as if webhooks were
  * off**. The ladder skips the subscribed branch and a subscribed flight is polled
  * on the failover ladder; and, with no receiver URL, `pollAndUpdate` never reaches
- * `shouldSubscribe`, so an unsubscribed `live` flight crossing T-24 h during the
+ * `shouldSubscribe`, so an unsubscribed `live` flight reaching its window opening during the
  * outage does not open a subscription that could deliver nothing. Closing a
  * subscription at archive, or when a flight stops being subscribable, is
  * independent of that switch and keeps working.
@@ -102,7 +102,7 @@
  * webhooks, with its subscription never having left. `shouldSubscribe` returns
  * `false` for a row that already holds an id, so recovery makes no provider call; a
  * row that lost its subscription meanwhile re-subscribes on its next poll through
- * the existing T-24 h path. The state only flips on this job's next reading, so a
+ * the existing window-opening path. The state only flips on this job's next reading, so a
  * refill is noticed within the hour — until then flights simply poll more often.
  *
  * `CreditState` is in memory, shared by this job and the loop in one process.

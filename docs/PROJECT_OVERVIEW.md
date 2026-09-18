@@ -493,7 +493,7 @@ Two jobs: the pre-window schedule, and the failover schedule when alerts are una
 | > 7 days | Weekly |
 | 7 days – 48 h | Daily |
 | 48 – 24 h | Every 4 h |
-| **T-24 h → arrival** | **Webhooks. No polling.** |
+| **T-24 h → arrival** | **Webhooks. No polling.** Subscribed from the window opening (§7.6, ADR 0005); until then on the failover rows. |
 | *Failover:* 24 – 6 h | Hourly |
 | *Failover:* 6 – 1.25 h | Every 15 min |
 | *Failover:* T-75 min → wheels up | Every 5 min |
@@ -541,17 +541,19 @@ returning *;
 
 Subscriptions are **keyed by flight number with no date parameter**. A subscription to `KL1600` fires for every occurrence of that number, every day it operates, and **never expires** until we delete it (2026 alert API, ADR 0003). Billing is credit-based: 1 credit per flight item per delivery attempt, deducted when **sent**, not delivered. Deliveries are **not signed** by the provider; the receiver is protected by a secret URL token, and a gate change or cancellation that arrives by webhook is confirmed with one poll before it notifies anyone (§10).
 
-This is why subscriptions open at T-24h and not at add time. Subscribing three weeks out bleeds credits daily on a flight nobody is watching.
+This is why subscriptions do not open at add time: subscribing three weeks out bleeds credits daily on a flight nobody is watching. It is also why they do not open at T-24 h (ADR 0005): for a daily flight, T-24 h is when the **previous day's** occurrence departs, and every alert it sends — takeoff, en-route updates, landing, roughly 10–12 credits — would be billed before our own flight sends anything. The first real delivery captured was exactly that (`docs/api-samples/webhook-delivery-real-enroute.json`). So the window opens **30 minutes after the previous day's same flight is scheduled to land**: `scheduled_arrival_utc − 24 h + 30 min`, never later than departure, and T-24 h when there is no usable scheduled arrival. Between T-24 h and the opening an unsubscribed `live` flight stays on the failover ladder (hourly), so the gap is polled, not blind. Scheduled times are an approximation: a late previous occurrence can still bill its landing alert.
+
+**Other days' occurrences are ignored, not ingested.** A delivery can describe any day's occurrence of the number. The worker matches each delivered leg to a subscribed row on the full canonical key (carrier, number, `departure_date_local`, origin); a leg that matches no row is never passed to `ingestFlight`, so it creates no `flights` row and no `flight_events`. A delivery none of whose legs match is closed in `webhook_inbox` with reason `NoTrackedLeg`; its balance is still logged. The credit it cost is spent regardless — the opening rule above is what limits that cost.
 
 | Phase | Action |
 |---|---|
-| T-24 h | `POST /subscriptions/webhook/FlightByNumber/{number}` with `maxDeliveryRetries: 1` (ADR 0003; the current spec has no `useCredits` parameter — credit billing is the default). Store `alert_subscription_id`. Set `next_poll_at` to the backup cadence, 2 h by default, rather than NULL (ADR 0004: the receiver runs on a free web service that can cold-start past the provider's 10 s timeout). |
+| Window opens: scheduled arrival − 24 h + 30 min (ADR 0005; T-24 h without a scheduled arrival; never after departure) | `POST /subscriptions/webhook/FlightByNumber/{number}` with `maxDeliveryRetries: 1` (ADR 0003; the current spec has no `useCredits` parameter — credit billing is the default). Store `alert_subscription_id`. Set `next_poll_at` to the backup cadence, 2 h by default, rather than NULL (ADR 0004: the receiver runs on a free web service that can cold-start past the provider's 10 s timeout). |
 | Window active | Receive alerts, write to `flights`, emit `flight_events` |
 | Arrival + 30 min | `DELETE /subscriptions/webhook/{id}`, archive |
 
 Creating and deleting are free. Only alerts cost.
 
-**The webhook endpoint must return 200 immediately.** Validate, enqueue to pg-boss, respond. Never process inline. AeroDataBox charges for send attempts including retries, so a slow or erroring endpoint costs 3× for nothing.
+**The webhook endpoint must return 200 immediately.** Validate, write one `webhook_inbox` row, respond (ADR 0004 replaced the pg-boss enqueue). Never process inline. AeroDataBox charges for send attempts including retries, so a slow or erroring endpoint costs 3× for nothing.
 
 Alert payloads include the remaining credit balance — log it to `provider_credit_log` on every receipt. Free monitoring.
 
@@ -563,7 +565,7 @@ Required behaviour:
 
 1. An hourly scheduled job in the worker calls `GET /subscriptions/balance` (free).
 2. **No automatic refill (ADR 0003).** Credits are not drawn from the plan automatically; the balance only grows through `POST /subscriptions/balance/refill` (1 credit = 1 API unit), which the owner calls by hand. Below the low-water mark (300, then 100, then 0 credits) the job alerts the owner. It alerts **once per downward crossing**, not on every hourly reading below a mark: a mark is disarmed by the job's own `balance_check` reading at or below it, and re-armed by any later reading above it (webhook payload, refill or check). Webhook payloads never disarm a mark, so a delivery that logs a low balance first cannot swallow the alert. On the very first reading every mark is armed.
-3. **On zero balance, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken. The flight **keeps** its `alert_subscription_id` (the provider pauses subscriptions and resumes them on refill; detaching would let the hourly reconcile delete them). While the last reading is at or below zero, the poll pass runs as if webhooks were off: subscribed flights are polled on the failover ladder rather than the backup cadence, and **no new subscription is opened** at T-24 h against an empty balance. When a reading returns above zero, the ordinary poll path puts subscribed flights back on the backup cadence and subscribes the rest; there is no separate recovery path.
+3. **On zero balance, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken. The flight **keeps** its `alert_subscription_id` (the provider pauses subscriptions and resumes them on refill; detaching would let the hourly reconcile delete them). While the last reading is at or below zero, the poll pass runs as if webhooks were off: subscribed flights are polled on the failover ladder rather than the backup cadence, and **no new subscription is opened** at the window opening against an empty balance. When a reading returns above zero, the ordinary poll path puts subscribed flights back on the backup cadence and subscribes the rest; there is no separate recovery path.
 4. Alert the operator: a push notification to the owner's own phone through the Expo pipeline (`OPERATOR_USER_ID`). No Sentry or email for now (ADR 0003). Wave 4 detects and returns a typed operator alert and logs it (`warn`, `error` at zero); wave 5 connects the push.
 
 Write an integration test that drains a dev balance to zero and asserts the poller takes over. Note the unit quota is per calendar month on RapidAPI; the owner is the only one who refills.

@@ -1,41 +1,76 @@
-# AeroDataBox web-hook delivery: documented shape (no live capture yet)
+# AeroDataBox web-hook delivery: documented shape, corrected by a real capture
 
 Source: AeroDataBox's public OpenAPI 3.0.4 spec (`https://api.market/store/aedbx/aerodatabox/openapi.yaml`,
-read 2026-09-15). This is the **documented** contract. Wave 3 builds its receiver schema from it and
-replaces this file's status line once one real delivery has been captured into
-`docs/api-samples/webhook-<case>.json` (§12.2).
+read 2026-09-15 and again 2026-09-18), **corrected by the first real delivery**, captured 2026-09-18
+23:21 UTC and saved (sanitised) as `webhook-delivery-real-enroute.json`. Where the two disagree,
+the capture wins and the difference is marked below.
 
-## What real deliveries showed (2026-09-16/17) — the spec is wrong in two places
+## What the real capture showed — five things the spec gets wrong or leaves out
 
-No real body has been captured yet; this section comes from the receiver's rejection log, which
-records zod issue codes and field paths, never values. Every real delivery (~34 POSTs across two
-tracked flights) was rejected with exactly the same two issues:
+1. **The envelope carries three undocumented top-level fields: `id` (string, a GUID),
+   `timestampUtc` (string) and `deliveryAttempt` (an object).** The spec's
+   `additionalProperties: false` at the envelope level is false in practice. The receiver strips
+   unknown top-level keys, keeps `id` and `timestampUtc`, and **drops `deliveryAttempt`**: it models it
+   as a bounded int, the real value is an object, and a wrongly typed metadata field is dropped
+   rather than refused. So `deliveryAttempt` never reaches `webhook_inbox`, and its inner shape has
+   not been captured.
+2. **Enums are integers, not strings.** The webhook serializer writes every enum as its number; the
+   lookup REST API (and the spec's `type: string`) write the name. The numbering is the spec's own:
+   each enum schema's description lists `0 - Name, 1 - Name, ...`, in the same order as its `enum`
+   array. Tables below.
+3. **`greatCircleDistance` has PascalCase keys** (`Feet`, `Km`, `Meter`, `Mile`, `Nm`), where the
+   lookup API uses lowercase. Nothing reads it; the worker types it `unknown`.
+4. **Timestamps are not uniformly zoned.** `balance.lastRefilledUtc` and
+   `subscription.createdOnUtc` arrived without a `Z` (`"2026-09-15 01:46"`), while
+   `lastDeductedUtc` and every flight time had one. Nothing parses those two fields.
+5. **Airports carry a nested `location` (`lat`, `lon`)** not in the lookup schema. The movement and
+   airport schemas are loose, so it passes through unread.
 
-```
-invalid_type at flights.0.status
-unrecognized_keys at (root): id,timestampUtc,deliveryAttempt
-```
+Every other field matched its documented type. The item carried no key outside the strict item
+schema, and **no `notificationSummary` or `notificationRemark`** keys were present.
 
-1. **The envelope carries three undocumented top-level fields: `id`, `timestampUtc`,
-   `deliveryAttempt`.** The spec's `additionalProperties: false` at the envelope level is **false in
-   practice**. Their types are not confirmed; the receiver models them as optional, bounded
-   `string` / `string` / non-negative `int` and drops (rather than rejects on) a value of any other
-   type, logging the received JSON type name. `id` is the likely delivery idempotency key.
-2. **`flights[].status` is not a string**, although the spec says it is. Its real type is **not
-   confirmed** (the log names paths, not values). The leading hypothesis is an integer — .NET's
-   default JSON serializer writes enums as numbers — which would make `codeshareStatus` and any
-   nested enum arrays integers too. **Do not map integers to statuses until a real body is
-   captured**: guessing the enum order turns an on-time departure into a cancellation.
-3. **Unknown: whether items carry undocumented keys too.** The receiver's item schema has always
-   passed unknown item keys through, so the log could not have reported them. The worker's item
-   schema is strict, so the first captured body will show it either way.
+### Integer enums (spec numbering, confirmed 2026-09-18)
 
-Since this fix: the receiver strips unknown top-level keys and accepts any JSON type for `status`
-(present, not typed), stores the delivery, and answers 200. The worker (`flightNotificationSchema`)
-stays strict — `status` and `codeshareStatus` must be strings — so a real delivery is closed in
-`webhook_inbox` as `InvalidPayload` **with its payload kept**. That stored row is the capture this
-file is still waiting for; the rejection log now also records the received JSON type
-(`invalid_type at flights.0.status (received number)`) for any delivery that is still refused.
+One table per enum, in code at `packages/flight-provider/src/aerodatabox/enums.ts`. The worker
+accepts **either** the string name **or** the integer and normalises to the name, so the existing
+lookup mapper handles both. An integer outside its table is never guessed at and never throws; the
+worker logs the field path (e.g. `flights[0].status`), never the value. For `codeshareStatus` and
+`quality` it reads as `Unknown`. For **`status`** the whole leg is dropped instead, and the delivery
+closes as `UnmappableLeg` if nothing else was mappable: the stored status stands, because a status
+wiped to `unknown` and later restored would fire `cancelled`/`diverted` a second time (the detector
+fires on the edge into them). Any other JSON type is still refused.
+
+| Spec schema | Where | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `FlightStatus` | `flights[].status` | Unknown | Expected | EnRoute | CheckIn | Boarding | GateClosed | Departed | Delayed | Approaching | Arrived | Canceled | Diverted | CanceledUncertain |
+| `CodeshareStatus` | `flights[].codeshareStatus` | Unknown | IsOperator | IsCodeshared | | | | | | | | | | |
+| `FlightAirportMovementQualityEnum` | `departure.quality[]`, `arrival.quality[]` | Basic | Live | Approximate | | | | | | | | | | |
+| `SubscriptionBillingType` | `subscription.billingType` | LifetimeBased | CreditBased | | | | | | | | | | | |
+| `SubscriptionSubjectType` | `subscription.subject.type` | FlightByNumber | FlightByAirportIcao | | | | | | | | | | | |
+
+The capture checks out against reality: DL1915's status **2** (EnRoute) arrived one minute after
+that aircraft's takeoff; codeshare **1** (IsOperator — Delta operates DL1915); quality **[0,1]**
+(Basic + Live); subject **0** (FlightByNumber); billing **1** (CreditBased). The REST list endpoint
+(`GET /subscriptions/webhook`) still returns strings, and its schema stays strings-only.
+
+### Other days' occurrences
+
+A subscription is keyed by number with **no date** (overview §7.6), so a delivery can describe any
+day's occurrence of that number. The captured one did: it was DL1915's **2026-09-18** flight,
+delivered for a subscription opened for the **2026-09-19** one. The worker matches each leg to a
+subscribed row on the whole canonical key (carrier, number, origin-local departure date, origin);
+a leg with no match is never ingested (no `flights` row, no `flight_events`), and a delivery with no
+matching leg at all is closed in `webhook_inbox` with reason **`NoTrackedLeg`**, its balance still
+logged to `provider_credit_log`. The credit is spent regardless; ADR 0005 moves the subscription
+opening to after the previous occurrence's scheduled landing to stop buying these.
+
+### History: before the capture (2026-09-16/17)
+
+About 34 real POSTs were rejected by the receiver with the same two issues
+(`invalid_type at flights.0.status`, `unrecognized_keys at (root): id,timestampUtc,deliveryAttempt`).
+Commit `2ddf8c0` made the receiver strip unknown top-level keys and store any JSON type for `status`,
+and the worker closed such rows as `InvalidPayload` with the payload kept. The first of those stored
+rows is the capture above; the worker now reads it.
 
 ## Envelope — `FlightNotificationContract`
 
@@ -47,9 +82,9 @@ this level; real deliveries contradict it (above).
 | `flights` | `FlightNotificationItemContract[]` | yes | Created or modified flights. Billing is 1 credit **per item**. |
 | `subscription` | `SubscriptionContract` | yes | Which subscription fired (below). |
 | `balance` | `SubscriptionBalanceContract` | no | Remaining credits after this delivery (§7.6 free monitoring). |
-| `id` | undocumented (modelled as string ≤ 128) | seen in every real delivery | Observed, not in the spec. Likely a delivery id. |
-| `timestampUtc` | undocumented (modelled as string ≤ 64) | seen in every real delivery | Observed, not in the spec. |
-| `deliveryAttempt` | undocumented (modelled as int 0–1000) | seen in every real delivery | Observed, not in the spec. Likely counts retries. |
+| `id` | undocumented; string (a GUID) | seen in every real delivery | Observed, not in the spec. Likely the delivery idempotency key. Modelled as string ≤ 128. |
+| `timestampUtc` | undocumented; string (`"2026-09-18 23:21:13Z"`, with seconds) | seen in every real delivery | Observed, not in the spec. Modelled as string ≤ 64. |
+| `deliveryAttempt` | undocumented; **object** (inner shape not captured) | seen in every real delivery | Modelled as int 0–1000, so the receiver drops it and it is never stored. |
 
 ## Flight item — `FlightNotificationItemContract`
 
@@ -57,9 +92,11 @@ The same fields as the lookup's `FlightContract` (which `packages/flight-provide
 already parses), plus two human-readable strings. `additionalProperties: false`.
 
 Required: `number`, `status`, `codeshareStatus`, `isCargo`, `lastUpdatedUtc`, `departure`, `arrival`.
-**`status` is documented as a string but is not one in real deliveries** (type unconfirmed, above).
+**`status` and `codeshareStatus` are documented as strings but arrive as integers**, as do the
+`quality[]` members of `departure` / `arrival` (tables above).
 Optional: `notificationSummary` (string, nullable), `notificationRemark` (string, nullable),
-`greatCircleDistance`, `flightPlan`, `callSign`, `aircraft`, `airline`, `location`.
+`greatCircleDistance` (real: object with PascalCase keys), `flightPlan`, `callSign`, `aircraft`,
+`airline`, `location`.
 
 - `departure` / `arrival` are `FlightAirportMovementContract`, the same movement shape the lookup mapper
   already turns into UTC instants, gate and terminal.
@@ -70,17 +107,25 @@ Optional: `notificationSummary` (string, nullable), `notificationRemark` (string
 ## Subscription — `SubscriptionContract`
 
 Required: `id` (uuid — the value stored in `flights.alert_subscription_id`), `isActive`, `createdOnUtc`,
-`subject`, `subscriber`. Optional: `billingType` (`LifetimeBased` deprecated, `CreditBased`),
+`subject`, `subscriber`. Optional: `billingType` (`LifetimeBased` deprecated, `CreditBased`; **an integer
+in deliveries**, a string from the REST API),
 `expiresOnUtc` (null = never expires), `activateBeforeUtc`, `notices`.
 `subject` = `{ type: 'FlightByNumber' | 'FlightByAirportIcao', id: 'DL 47' }` — `id` is the flight number
-as subscribed.
+as subscribed; `type` is **an integer in deliveries** (`0`), a string from the REST API.
 
-**Receiver rule:** an unknown `subscription.id` (not on any active flight row) is acknowledged with 200 and
-dropped — never ingested.
+The receiver stores an **allow list** of subscription fields (`id`, `isActive`, `billingType`,
+`createdOnUtc`, `expiresOnUtc`, `activateBeforeUtc`, `subject`) and replaces `subscriber`, which echoes
+our delivery URL and so the secret token, with a fixed redaction placeholder.
+
+**Unknown subscription:** the receiver stores every authenticated delivery; the worker closes one whose
+`subscription.id` is on no active flight row with reason `UnknownSubscription` — never ingested. One whose
+subscription is ours but whose legs match no tracked row is closed as `NoTrackedLeg` (above).
 
 ## Balance — `SubscriptionBalanceContract`
 
-Required: `creditsRemaining` (int64), `lastRefilledUtc`, `lastDeductedUtc` (date-time). This is also the
+Required: `creditsRemaining` (int64), `lastRefilledUtc`, `lastDeductedUtc` (date-time; the capture's
+`lastRefilledUtc` had no zone suffix). The receiver stores only these three fields (an allow list, like
+`subscription`). This is also the
 body of `GET /subscriptions/balance`, which returns 200 with an **empty** body when the account has never
 been refilled (observed 2026-09-13).
 

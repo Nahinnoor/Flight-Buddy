@@ -28,6 +28,12 @@ const HOUR = 3_600_000;
 /** The captured B6 1411's departure. */
 const DEPARTURE = Date.parse('2026-09-12T01:59:00.000Z');
 const NOW = new Date(DEPARTURE - 6 * HOUR);
+const MINUTE = 60_000;
+/** The captured B6 1411's scheduled arrival: a 5 h 39 min flight. */
+const ARRIVAL = Date.parse('2026-09-12T07:38:00.000Z');
+/** ADR 0005: yesterday's occurrence has landed + 30 min. T-17 h 51 min here. */
+const OPENS = ARRIVAL - 24 * HOUR + 30 * MINUTE;
+const iso = (ms: number) => new Date(ms).toISOString();
 
 /** The captured leg as a lookup returns it with both airports live. */
 async function liveLeg(overrides: Partial<FlightCandidate> = {}): Promise<FlightCandidate> {
@@ -47,19 +53,69 @@ describe('shouldSubscribe', () => {
     expect(shouldSubscribe(leg, null, NOW)).toBe(true);
   });
 
-  it('opens at exactly T-24 h on the departure anchor, not a millisecond before', async () => {
+  it('opens at scheduled arrival − 24 h + 30 min (ADR 0005), not a millisecond before', async () => {
     const leg = await liveLeg();
+    expect(leg.scheduledArrivalUtc).toBe(iso(ARRIVAL));
+    expect(webhookWindowOpensAt(leg)).toBe(OPENS);
+    expect(OPENS).toBe(DEPARTURE - 17 * HOUR - 51 * MINUTE);
+    expect(shouldSubscribe(leg, null, new Date(OPENS))).toBe(true);
+    expect(shouldSubscribe(leg, null, new Date(OPENS - 1))).toBe(false);
+  });
+
+  it('no longer opens at T-24 h: the previous occurrence is still flying then', async () => {
+    const leg = await liveLeg();
+    expect(shouldSubscribe(leg, null, new Date(DEPARTURE - 24 * HOUR))).toBe(false);
+    expect(shouldSubscribe(leg, null, new Date(DEPARTURE - 20 * HOUR))).toBe(false);
+  });
+
+  it('is anchored on the scheduled arrival: a later estimate of our departure does not move it', async () => {
+    const leg = await liveLeg({ estimatedDepartureUtc: iso(DEPARTURE + 2 * HOUR) });
+    expect(webhookWindowOpensAt(leg)).toBe(OPENS);
+  });
+
+  it('falls back to T-24 h on the departure anchor with no scheduled arrival', async () => {
+    const leg = await liveLeg({ scheduledArrivalUtc: null });
     expect(webhookWindowOpensAt(leg)).toBe(DEPARTURE - 24 * HOUR);
     expect(shouldSubscribe(leg, null, new Date(DEPARTURE - 24 * HOUR))).toBe(true);
     expect(shouldSubscribe(leg, null, new Date(DEPARTURE - 24 * HOUR - 1))).toBe(false);
+
+    // The fallback moves with a later estimate, like the ladder does.
+    const delayed = await liveLeg({
+      scheduledArrivalUtc: null,
+      estimatedDepartureUtc: iso(DEPARTURE + 2 * HOUR),
+    });
+    expect(webhookWindowOpensAt(delayed)).toBe(DEPARTURE - 22 * HOUR);
   });
 
-  it('moves with a later estimate, like the ladder does', async () => {
-    const leg = await liveLeg({
-      estimatedDepartureUtc: new Date(DEPARTURE + 2 * HOUR).toISOString(),
+  it('falls back to T-24 h when the scheduled arrival is not after the scheduled departure', async () => {
+    for (const arrival of [DEPARTURE, DEPARTURE - HOUR]) {
+      const leg = await liveLeg({ scheduledArrivalUtc: iso(arrival) });
+      expect(webhookWindowOpensAt(leg)).toBe(DEPARTURE - 24 * HOUR);
+    }
+  });
+
+  it('long-haul: a 16 h flight opens 7.5 h before departure', async () => {
+    const leg = await liveLeg({ scheduledArrivalUtc: iso(DEPARTURE + 16 * HOUR) });
+    expect(webhookWindowOpensAt(leg)).toBe(DEPARTURE - 7 * HOUR - 30 * MINUTE);
+    expect(shouldSubscribe(leg, null, new Date(DEPARTURE - 8 * HOUR))).toBe(false);
+    expect(shouldSubscribe(leg, null, new Date(DEPARTURE - 7 * HOUR - 30 * MINUTE))).toBe(true);
+  });
+
+  it('is never later than departure, whatever the duration', async () => {
+    // 23 h 45 min scheduled: the formula alone would open 15 min after departure.
+    const long = await liveLeg({ scheduledArrivalUtc: iso(DEPARTURE + 23 * HOUR + 45 * MINUTE) });
+    expect(webhookWindowOpensAt(long)).toBe(DEPARTURE);
+    // A (pathological) 30 h one.
+    const absurd = await liveLeg({ scheduledArrivalUtc: iso(DEPARTURE + 30 * HOUR) });
+    expect(webhookWindowOpensAt(absurd)).toBe(DEPARTURE);
+    expect(shouldSubscribe(absurd, null, new Date(DEPARTURE))).toBe(true);
+    expect(shouldSubscribe(absurd, null, new Date(DEPARTURE - 1))).toBe(false);
+    // The clamp uses the departure anchor, so a later estimate is the limit.
+    const delayed = await liveLeg({
+      scheduledArrivalUtc: iso(DEPARTURE + 30 * HOUR),
+      estimatedDepartureUtc: iso(DEPARTURE + HOUR),
     });
-    expect(shouldSubscribe(leg, null, new Date(DEPARTURE - 23 * HOUR))).toBe(false);
-    expect(shouldSubscribe(leg, null, new Date(DEPARTURE - 22 * HOUR))).toBe(true);
+    expect(webhookWindowOpensAt(delayed)).toBe(DEPARTURE + HOUR);
   });
 
   it('never subscribes a scheduled- or manual-tier flight (§7.3)', async () => {
@@ -91,10 +147,18 @@ describe('shouldSubscribe', () => {
 describe('clampToWindowOpening', () => {
   const at = (ms: number) => new Date(ms);
 
-  it('pulls a 4-hourly pre-window poll back to T-24 h', async () => {
-    const now = at(DEPARTURE - 26 * HOUR);
+  it('pulls an hourly failover poll back to the window opening', async () => {
+    const now = at(OPENS - 30 * MINUTE);
+    const next = at(now.getTime() + HOUR);
+    expect(clampToWindowOpening(next, await liveLeg(), now)).toEqual(at(OPENS));
+  });
+
+  it('pulls a 4-hourly pre-window poll back to the opening when it would overshoot', async () => {
+    // A 1 h flight opens at T-22 h 30, so a 4-hourly poll from T-25 h would overshoot it.
+    const leg = await liveLeg({ scheduledArrivalUtc: iso(DEPARTURE + HOUR) });
+    const now = at(DEPARTURE - 25 * HOUR);
     const next = at(now.getTime() + 4 * HOUR);
-    expect(clampToWindowOpening(next, await liveLeg(), now)).toEqual(at(DEPARTURE - 24 * HOUR));
+    expect(clampToWindowOpening(next, leg, now)).toEqual(at(DEPARTURE - 22 * HOUR - 30 * MINUTE));
   });
 
   it('leaves a poll that already lands before the window alone', async () => {

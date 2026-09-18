@@ -18,6 +18,7 @@ import {
   b6FlightRow,
   captureLogger,
   countingLimiter,
+  fixtureBody,
   fixtureCandidates,
   fixtureProvider,
   withDepartureGate,
@@ -31,7 +32,10 @@ const FLIGHT = 'flight-b6';
 
 type Legs = (legs: Record<string, unknown>[]) => Record<string, unknown>[];
 
-const status = (value: string): Legs => (legs) => legs.map((leg) => ({ ...leg, status: value }));
+const status =
+  (value: string): Legs =>
+  (legs) =>
+    legs.map((leg) => ({ ...leg, status: value }));
 /** Revised departure 45 minutes later than the capture's 01:59Z. */
 const delayed45: Legs = (legs) =>
   legs.map((leg) => ({
@@ -109,7 +113,11 @@ describe('drainWebhookInbox — applying a delivery', () => {
     const summary = await h.drain();
 
     expect(summary.outcomes[0]?.events).toEqual(['delay']);
-    expect(h.db.events[0]).toMatchObject({ event_type: 'delay', source: 'webhook', flight_id: FLIGHT });
+    expect(h.db.events[0]).toMatchObject({
+      event_type: 'delay',
+      source: 'webhook',
+      flight_id: FLIGHT,
+    });
     expect(h.fx.lookups()).toHaveLength(0);
     expect(h.db.flight(FLIGHT).estimated_departure_utc).toBe('2026-09-12T02:44:00.000Z');
   });
@@ -230,7 +238,9 @@ describe('ADR 0003 decision 1: gate changes and cancellations are confirmed by a
 
     await h.drain();
 
-    expect(h.db.inbox.find((r) => r.id === inboxId)?.last_error).toBe('VerificationLegMissingError');
+    expect(h.db.inbox.find((r) => r.id === inboxId)?.last_error).toBe(
+      'VerificationLegMissingError',
+    );
   });
 
   it(`gives up after ${INBOX_MAX_ATTEMPTS} attempts: processed, logged, never retried`, async () => {
@@ -268,7 +278,9 @@ describe('drainWebhookInbox — what is never applied', () => {
     });
     expect(h.db.creditLog).toEqual([]);
     expect(h.fx.requests).toHaveLength(0);
-    expect(h.log.records().find((r) => r.inboxId === inboxId)?.msg).toContain('unknown subscription');
+    expect(h.log.records().find((r) => r.inboxId === inboxId)?.msg).toContain(
+      'unknown subscription',
+    );
   });
 
   it('treats a subscription held only by an archived flight as unknown', async () => {
@@ -296,9 +308,9 @@ describe('drainWebhookInbox — what is never applied', () => {
   });
 
   it('closes a real-shaped delivery it cannot read: reason code, payload kept, no provider call', async () => {
-    // The shape the receiver now stores: the three envelope fields and a `status`
-    // that is not a string (its real type is not yet captured). The worker must
-    // not guess: it closes the row once and keeps the payload for inspection.
+    // The shape the receiver stores, with a `status` of a JSON type that is
+    // neither of the provider's two enum encodings (string name, integer). The
+    // worker must not guess: it closes the row once and keeps the payload.
     const h = harness();
     const base = alertEnvelope({ mutate: status('Departed') });
     const payload = {
@@ -308,7 +320,7 @@ describe('drainWebhookInbox — what is never applied', () => {
       deliveryAttempt: 0,
       flights: (base.flights as Record<string, unknown>[]).map((leg) => ({
         ...leg,
-        status: 2,
+        status: { value: 2 },
         codeshareStatus: 1,
       })),
     };
@@ -373,9 +385,12 @@ describe('drainWebhookInbox — what is never applied', () => {
         })),
     });
 
+    const inboxId = h.db.inbox[0]?.id;
     const summary = await h.drain();
 
-    expect(summary.outcomes[0]).toMatchObject({ kind: 'processed', flightIds: [] });
+    expect(summary.outcomes[0]).toMatchObject({ kind: 'no_tracked_leg', flightIds: [] });
+    expect(summary.noTrackedLeg).toBe(1);
+    expect(h.db.inbox.find((r) => r.id === inboxId)?.last_error).toBe('NoTrackedLeg');
     expect(h.db.flight(FLIGHT).updated_at).toBe('2026-09-01T00:00:00.000Z');
     expect(h.db.flights.size).toBe(1); // and certainly no new row for that date
   });
@@ -416,19 +431,27 @@ describe('drainWebhookInbox — matching and scheduling', () => {
 
     const summary = await h.drain();
 
-    expect([...(summary.outcomes[0]?.flightIds ?? [])].sort()).toEqual(['as65-leg-2', 'as65-leg-4']);
+    expect([...(summary.outcomes[0]?.flightIds ?? [])].sort()).toEqual([
+      'as65-leg-2',
+      'as65-leg-4',
+    ]);
     expect(h.db.events).toEqual([]);
     const applied = h.log.records().find((r) => r.msg === 'webhook delivery applied');
     expect(applied).toMatchObject({ ignoredLegs: legs.length - 2 });
   });
 
   it('defers a delivery whose flight a poll is holding, then applies it once released', async () => {
-    const h = harness({ row: { poll_lease_until: new Date(NOW.getTime() + 60_000).toISOString() } });
+    const h = harness({
+      row: { poll_lease_until: new Date(NOW.getTime() + 60_000).toISOString() },
+    });
     const inboxId = h.deliver({ mutate: delayed45 });
 
     const first = await h.drain();
     expect(first.deferred).toBe(1);
-    expect(h.db.inbox.find((r) => r.id === inboxId)).toMatchObject({ attempts: 0, processed_at: null });
+    expect(h.db.inbox.find((r) => r.id === inboxId)).toMatchObject({
+      attempts: 0,
+      processed_at: null,
+    });
     expect(h.db.events).toEqual([]);
 
     h.db.flight(FLIGHT).poll_lease_until = null;
@@ -439,9 +462,12 @@ describe('drainWebhookInbox — matching and scheduling', () => {
 
   it('drains oldest first and stops at the batch size', async () => {
     const h = harness({ batchSize: 2 });
-    const ids = ['2026-09-11T19:00:03.000Z', '2026-09-11T19:00:01.000Z', '2026-09-11T19:00:02.000Z'].map(
-      (receivedAt) =>
-        h.db.addInbox({ subscription_id: SUB, payload: alertEnvelope(), received_at: receivedAt }),
+    const ids = [
+      '2026-09-11T19:00:03.000Z',
+      '2026-09-11T19:00:01.000Z',
+      '2026-09-11T19:00:02.000Z',
+    ].map((receivedAt) =>
+      h.db.addInbox({ subscription_id: SUB, payload: alertEnvelope(), received_at: receivedAt }),
     );
 
     const summary = await h.drain();
@@ -493,7 +519,9 @@ describe('the payload is data: nothing from it reaches a log, a row or an error'
 describe('createInboxDrainer', () => {
   /** A pool whose inbox claim fails the way Postgres does before the migration lands. */
   function missingInboxPool(code: string): Pool {
-    const error = Object.assign(new Error('relation "public.webhook_inbox" does not exist'), { code });
+    const error = Object.assign(new Error('relation "public.webhook_inbox" does not exist'), {
+      code,
+    });
     return {
       connect: async () => ({
         query: async (config: unknown) => {
@@ -542,5 +570,170 @@ describe('createInboxDrainer', () => {
     await expect(drainer.drain()).resolves.toMatchObject({ claimed: 0 });
 
     expect(log.records().map((r) => r.msg)).toContain('webhook inbox reachable again');
+  });
+});
+
+describe('the real capture: webhook-delivery-real-enroute.json (DL1915, 2026-09-18 occurrence)', () => {
+  const REAL_SUB = '00000000-0000-4000-8000-000000000002';
+  const TRACKED = 'flight-dl1915';
+
+  /** The row the owner tracks: DL1915 JFK→LAX on the 19th, subscribed. */
+  function dl1915Row(overrides: Partial<FlightRow> = {}): FlightRow {
+    return b6FlightRow({
+      id: TRACKED,
+      operating_carrier_iata: 'DL',
+      operating_flight_number: '1915',
+      departure_date_local: '2026-09-19',
+      origin_iata: 'JFK',
+      destination_iata: 'LAX',
+      origin_tz: 'America/New_York',
+      destination_tz: 'America/Los_Angeles',
+      status: 'scheduled',
+      tracking_tier: 'live',
+      terminal: '4',
+      scheduled_departure_utc: '2026-09-19T23:00:00.000Z',
+      estimated_departure_utc: null,
+      scheduled_arrival_utc: '2026-09-20T05:10:00.000Z',
+      estimated_arrival_utc: null,
+      aircraft_reg: null,
+      aircraft_model: null,
+      alert_subscription_id: REAL_SUB,
+      alert_subscribed_at: '2026-09-18T23:05:00.000Z',
+      ...overrides,
+    });
+  }
+
+  function realHarness(row: FlightRow) {
+    const now = new Date('2026-09-18T23:21:30.000Z');
+    const db = createMemoryDb({ now });
+    db.addFlight(row);
+    const fx = fixtureProvider('flights-number-live-today', { allLive: true });
+    const { limiter, count } = countingLimiter();
+    const log = captureLogger();
+    const deps: WebhookIngestDeps = {
+      pool: db.pool,
+      provider: fx.provider,
+      writer: db.writer,
+      rateLimiter: limiter,
+      logger: log.logger,
+      now: () => now,
+      rng: () => 0.5,
+      webhooksEnabled: true,
+      feedHealthCache: createFeedHealthCache(),
+    };
+    const payload = JSON.parse(fixtureBody('webhook-delivery-real-enroute')) as unknown;
+    const inboxId = db.addInbox({ subscription_id: REAL_SUB, payload });
+    return { db, fx, count, log, inboxId, now, drain: () => drainWebhookInbox(deps) };
+  }
+
+  it("ignores another day's occurrence: no ingest, no new flight row, no events, reason code", async () => {
+    // Exactly what reached the inbox: the subscription fired for the 18th's
+    // flight while the tracked row is the 19th's (§7.6: keyed by number, no date).
+    const h = realHarness(dl1915Row());
+    const before = { ...h.db.flight(TRACKED) };
+
+    const summary = await h.drain();
+
+    expect(summary).toMatchObject({
+      claimed: 1,
+      noTrackedLeg: 1,
+      processed: 0,
+      invalid: 0,
+      failed: 0,
+    });
+    expect(summary.outcomes[0]).toMatchObject({
+      kind: 'no_tracked_leg',
+      flightIds: [],
+      events: [],
+    });
+    // No `ingestFlight`: no row for 2026-09-18 appeared, and the tracked row is untouched.
+    expect(h.db.flights.size).toBe(1);
+    expect(h.db.flight(TRACKED)).toEqual(before);
+    expect(h.db.events).toEqual([]);
+    // No provider call, no limiter slot.
+    expect(h.fx.requests).toHaveLength(0);
+    expect(h.count()).toBe(0);
+    // Closed once, with the reason; the billed balance is still recorded.
+    expect(h.db.inbox.find((r) => r.id === h.inboxId)).toMatchObject({
+      attempts: 1,
+      last_error: 'NoTrackedLeg',
+      processed_at: h.now.toISOString(),
+    });
+    expect(h.db.creditLog).toEqual([{ balance: 65, source: 'webhook_payload' }]);
+    const line = h.log.records().find((r) => r.inboxId === h.inboxId);
+    expect(line).toMatchObject({ ignoredLegs: 1, unmappedLegs: 0 });
+    expect((await h.drain()).claimed).toBe(0);
+  });
+
+  it('end to end: when the delivered day is the tracked one, it maps to en_route and is applied', async () => {
+    const h = realHarness(
+      dl1915Row({
+        departure_date_local: '2026-09-18',
+        scheduled_departure_utc: '2026-09-18T23:00:00.000Z',
+        scheduled_arrival_utc: '2026-09-19T05:10:00.000Z',
+      }),
+    );
+
+    const summary = await h.drain();
+
+    expect(summary).toMatchObject({ claimed: 1, processed: 1, invalid: 0 });
+    expect(summary.outcomes[0]?.flightIds).toEqual([TRACKED]);
+    expect(h.db.flights.size).toBe(1);
+    expect(h.db.flight(TRACKED)).toMatchObject({
+      status: 'en_route',
+      actual_departure_utc: '2026-09-18T23:20:00.000Z',
+      estimated_arrival_utc: '2026-09-19T04:26:00.000Z',
+      tracking_tier: 'live',
+    });
+    expect(h.db.events.map((e) => [e.event_type, e.source])).toContainEqual([
+      'departed',
+      'webhook',
+    ]);
+    // Departed is not a verified event type: no poll was made.
+    expect(h.fx.requests).toHaveLength(0);
+    expect(h.db.inbox.find((r) => r.id === h.inboxId)?.last_error).toBeNull();
+  });
+
+  it('an out-of-table status changes nothing: the stored status stands, no event is written', async () => {
+    // The review's case: a cancelled flight must not bounce through `unknown`,
+    // or the next genuine `cancelled` would emit a second cancellation event.
+    const h = realHarness(
+      dl1915Row({
+        departure_date_local: '2026-09-18',
+        scheduled_departure_utc: '2026-09-18T23:00:00.000Z',
+        status: 'cancelled',
+      }),
+    );
+    const before = structuredClone(h.db.flight(TRACKED));
+    const row = h.db.inbox.find((r) => r.id === h.inboxId);
+    const payload = row?.payload as { flights: Record<string, unknown>[] };
+    payload.flights = payload.flights.map((leg) => ({ ...leg, status: 4242 }));
+
+    await h.drain();
+
+    const warn = h.log.records().find((r) => r.level === 'warn' && r.inboxId === h.inboxId);
+    expect(warn).toMatchObject({ fields: ['flights[0].status'] });
+    expect(h.log.text()).not.toContain('4242');
+    expect(h.db.flight(TRACKED)).toEqual(before);
+    expect(h.db.flight(TRACKED).status).toBe('cancelled');
+    expect(h.db.events).toHaveLength(0);
+    expect(h.db.inbox.find((r) => r.id === h.inboxId)?.last_error).toBe('UnmappableLeg');
+  });
+
+  it('an out-of-table codeshare or quality code still degrades and applies (it drives no event)', async () => {
+    const h = realHarness(
+      dl1915Row({
+        departure_date_local: '2026-09-18',
+        scheduled_departure_utc: '2026-09-18T23:00:00.000Z',
+      }),
+    );
+    const row = h.db.inbox.find((r) => r.id === h.inboxId);
+    const payload = row?.payload as { flights: Record<string, unknown>[] };
+    payload.flights = payload.flights.map((leg) => ({ ...leg, codeshareStatus: 4242 }));
+
+    await h.drain();
+
+    expect(h.log.text()).not.toContain('4242');
+    expect(h.db.flight(TRACKED).status).toBe('en_route');
   });
 });
