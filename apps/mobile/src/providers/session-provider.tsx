@@ -17,6 +17,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
 
 import {
   configureGoogleSignIn,
@@ -24,6 +25,7 @@ import {
   signInWithGoogle,
   signOut as performSignOut,
 } from '@/lib/auth';
+import { isUsableSession } from '@/lib/email-auth';
 import { registerPushToken } from '@/lib/push';
 import { startSupabaseAutoRefresh, supabase } from '@/lib/supabase';
 
@@ -38,12 +40,62 @@ interface SessionContextValue {
    * sees the sign-in screen flash before their dashboard.
    */
   isLoading: boolean;
+  /**
+   * True from the moment a password-reset link is exchanged until a new
+   * password is saved (or the reset is abandoned). The session is real while
+   * this is true, so the route guard must hold the user on the set-password
+   * screen rather than let them into the app on a link alone.
+   */
+  isRecovering: boolean;
+  /** The new password is saved: leave recovery and continue into the app. */
+  finishRecovery: () => Promise<void>;
+  /** Abandon the reset: sign the recovery session out. */
+  cancelRecovery: () => Promise<void>;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
+
+/**
+ * Persisted so that killing the app on the set-password screen does not turn
+ * the recovery session into an ordinary signed-in one on the next launch.
+ * Holds no secret — just "1".
+ */
+const RECOVERY_FLAG_KEY = 'flightbuddy.recovery-pending';
+
+async function readRecoveryFlag(): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(RECOVERY_FLAG_KEY)) === '1';
+  } catch {
+    return false;
+  }
+}
+
+async function writeRecoveryFlag(pending: boolean): Promise<void> {
+  try {
+    if (pending) await SecureStore.setItemAsync(RECOVERY_FLAG_KEY, '1');
+    else await SecureStore.deleteItemAsync(RECOVERY_FLAG_KEY);
+  } catch (error) {
+    console.warn('[auth] could not store the recovery flag', error instanceof Error ? error.name : 'unknown');
+  }
+}
+
+/**
+ * An email account that was never confirmed must not get a working session,
+ * whatever Supabase handed back. This is the backstop behind the checks in
+ * `email-auth.ts`: whichever path produced the session, the provider refuses
+ * it and clears it from the keychain. Signing out is deferred out of the
+ * auth-state callback, where calling back into supabase can deadlock.
+ */
+function acceptSession(next: Session | null): Session | null {
+  if (next === null || isUsableSession(next)) return next;
+  setTimeout(() => {
+    void supabase.auth.signOut({ scope: 'local' });
+  }, 0);
+  return null;
+}
 
 function nameFromSession(session: Session | null): string | null {
   if (session === null) return null;
@@ -59,6 +111,7 @@ function nameFromSession(session: Session | null): string | null {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRecovering, setIsRecovering] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -73,11 +126,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // who has a valid stored session. `session` is deliberately not reset in
     // `catch` — it starts null, so resetting could only discard a real
     // session delivered first by onAuthStateChange.
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
+    Promise.all([supabase.auth.getSession(), readRecoveryFlag()])
+      .then(([{ data }, recoveryPending]) => {
         if (!active) return;
-        setSession(data.session);
+        const restored = acceptSession(data.session);
+        setSession(restored);
+        // A flag without a session is stale (signed out elsewhere, expired).
+        if (restored !== null && recoveryPending) setIsRecovering(true);
+        else if (recoveryPending) void writeRecoveryFlag(false);
       })
       .catch((error: unknown) => {
         console.warn('[auth] could not restore the stored session', error);
@@ -89,9 +145,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // Fires for SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED and USER_UPDATED. The
     // callback only sets state: calling back into supabase from inside it can
     // deadlock the auth client's internal lock.
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, next) => {
+    //
+    // PASSWORD_RECOVERY is emitted by `exchangeCodeForSession` when the stored
+    // PKCE verifier belongs to a reset, before the call returns — so the
+    // session and the recovery flag land in the same render and the guard
+    // never sees one without the other.
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, next) => {
       if (!active) return;
-      setSession(next);
+      const accepted = acceptSession(next);
+      if (event === 'PASSWORD_RECOVERY' && accepted !== null) {
+        setIsRecovering(true);
+        void writeRecoveryFlag(true);
+      } else if (event === 'SIGNED_OUT' || accepted === null) {
+        setIsRecovering(false);
+        void writeRecoveryFlag(false);
+      }
+      setSession(accepted);
       setIsLoading(false);
     });
 
@@ -128,16 +197,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const handleSignOut = useCallback(async () => {
     await performSignOut();
     setSession(null);
+    setIsRecovering(false);
+    void writeRecoveryFlag(false);
+  }, []);
+
+  const finishRecovery = useCallback(async () => {
+    await writeRecoveryFlag(false);
+    setIsRecovering(false);
+  }, []);
+
+  // Local scope: abandoning a reset must work offline, and the recovery
+  // session was only ever on this device.
+  const cancelRecovery = useCallback(async () => {
+    await writeRecoveryFlag(false);
+    await supabase.auth.signOut({ scope: 'local' });
+    setIsRecovering(false);
+    setSession(null);
   }, []);
 
   const handleApple = useCallback(async () => {
     const next = await signInWithApple();
-    setSession(next);
+    setSession(acceptSession(next));
   }, []);
 
   const handleGoogle = useCallback(async () => {
     const next = await signInWithGoogle();
-    setSession(next);
+    setSession(acceptSession(next));
   }, []);
 
   const value = useMemo<SessionContextValue>(
@@ -146,11 +231,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       userId,
       displayName: nameFromSession(session),
       isLoading,
+      isRecovering,
+      finishRecovery,
+      cancelRecovery,
       signInWithApple: handleApple,
       signInWithGoogle: handleGoogle,
       signOut: handleSignOut,
     }),
-    [session, userId, isLoading, handleApple, handleGoogle, handleSignOut],
+    [
+      session,
+      userId,
+      isLoading,
+      isRecovering,
+      finishRecovery,
+      cancelRecovery,
+      handleApple,
+      handleGoogle,
+      handleSignOut,
+    ],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

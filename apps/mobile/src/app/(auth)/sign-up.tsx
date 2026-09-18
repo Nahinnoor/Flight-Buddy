@@ -1,22 +1,20 @@
 /**
- * Sign in — the approved layout (variant B): email and password above the
- * fold, primary button directly under them, "Forgot password?" on the
- * password row, and Apple and Google below a divider.
+ * Create an account — name, email, password, in the approved variant B
+ * arrangement, with Apple and Google below a divider.
  *
- * Outcomes:
- * - **Signed in:** nothing to do here. The route guard sees the session and
- *   moves into the app; one place decides where you are.
- * - **Not yet confirmed:** the check-inbox screen, with resend. Safe to reveal
- *   because Supabase only says "not confirmed" after the password matched
- *   (see `copy.ts`, rule 1).
- * - **Anything else:** one neutral sentence. Which of "wrong password" and
- *   "no such account" it was is never shown.
+ * The name goes to Supabase as `full_name` in the user metadata, which is what
+ * the `on_auth_user_created` trigger copies into `profiles.display_name`
+ * (supabase/migrations/20260912011737_profiles.sql). No API or schema change.
+ *
+ * Every outcome that reached the server and was not a password problem lands
+ * on "check your inbox" — including an address that already has an account.
+ * See `copy.ts`, rule 3.
  */
 import { useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { EmailField, PasswordField } from '@/components/auth/auth-fields';
+import { EmailField, NameField, PasswordField } from '@/components/auth/auth-fields';
 import { useAuthDraft } from '@/components/auth/auth-draft';
 import {
   AuthHero,
@@ -31,34 +29,42 @@ import { AuthCopy } from '@/components/auth/copy';
 import { SocialSignIn } from '@/components/auth/social-buttons';
 import {
   isClean,
-  validateCurrentPassword,
   validateEmail,
+  validateName,
+  validateNewPassword,
   type FieldErrors,
 } from '@/components/auth/validation';
 import { ThemedText } from '@/components/themed-text';
-import { signInWithEmail } from '@/lib/auth';
+import { Spacing } from '@/constants/theme';
+import { signUpWithEmail } from '@/lib/auth';
 
-export default function SignInScreen() {
+export default function SignUpScreen() {
   const router = useRouter();
   const { email, setEmail } = useAuthDraft();
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [socialBusy, setSocialBusy] = useState(false);
+  const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
   const busy = submitting || socialBusy;
 
   const onSubmit = async () => {
     if (busy) return;
-    const errors = { email: validateEmail(email), password: validateCurrentPassword(password) };
+    const errors = {
+      name: validateName(name),
+      email: validateEmail(email),
+      password: validateNewPassword(password),
+    };
     setFieldErrors(errors);
     setSubmitError(null);
     if (!isClean(errors)) return;
 
     setSubmitting(true);
-    const result = await signInWithEmail({ email, password });
+    const result = await signUpWithEmail({ name, email, password });
     setSubmitting(false);
 
     if (result.status === 'failed') {
@@ -66,15 +72,25 @@ export default function SignInScreen() {
       return;
     }
     setPassword('');
+    // 'signed-in' only happens if the project auto-confirms; the guard takes
+    // it from there.
     if (result.status === 'check-inbox') router.replace('/check-inbox');
   };
 
   return (
     <AuthScaffold>
-      <AuthHero title="Sign in" subtitle={AuthCopy.tagline} size="compact" />
+      <AuthHero title="Create an account" size="compact" />
 
       <View style={AuthLayout.formStack}>
+        <NameField
+          value={name}
+          onChangeText={setName}
+          error={fieldErrors.name}
+          editable={!busy}
+          onSubmitEditing={() => emailRef.current?.focus()}
+        />
         <EmailField
+          ref={emailRef}
           value={email}
           onChangeText={setEmail}
           error={fieldErrors.email}
@@ -84,7 +100,7 @@ export default function SignInScreen() {
         />
         <PasswordField
           ref={passwordRef}
-          purpose="current"
+          purpose="new"
           value={password}
           onChangeText={setPassword}
           error={fieldErrors.password}
@@ -92,17 +108,18 @@ export default function SignInScreen() {
           returnKeyType="go"
           onSubmitEditing={() => void onSubmit()}
         />
-        {/* Inline rather than under the button: the moment someone needs it is
-            the moment they are looking at the password box. */}
-        <TextLink
-          label="Forgot password?"
-          align="right"
-          onPress={() => router.push('/forgot-password')}
-        />
 
         {submitError !== null ? <Notice tone="critical">{submitError}</Notice> : null}
 
-        <PrimaryButton label="Sign in" busy={submitting} disabled={socialBusy} onPress={() => void onSubmit()} />
+        <PrimaryButton
+          label="Create account"
+          busy={submitting}
+          disabled={socialBusy}
+          onPress={() => void onSubmit()}
+        />
+        <ThemedText type="small" themeColor="textSecondary" style={styles.confirmNote}>
+          {AuthCopy.confirmRequired}
+        </ThemedText>
       </View>
 
       <Divider />
@@ -118,10 +135,16 @@ export default function SignInScreen() {
 
       <View style={AuthLayout.footer}>
         <ThemedText type="small" themeColor="textSecondary">
-          New to FlightBuddy?
+          Already have an account?
         </ThemedText>
-        <TextLink label="Create an account" onPress={() => router.replace('/sign-up')} />
+        <TextLink label="Sign in" onPress={() => router.replace('/sign-in')} />
       </View>
     </AuthScaffold>
   );
 }
+
+const styles = StyleSheet.create({
+  confirmNote: {
+    marginTop: Spacing.half,
+  },
+});

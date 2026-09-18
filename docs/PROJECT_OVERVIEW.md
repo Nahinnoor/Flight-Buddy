@@ -34,7 +34,7 @@ Solo flight tracking is a commodity — Flighty, TripIt, and airline apps all do
 
 ### MVP scope — in
 
-- Email/social auth (Sign in with Apple + Google)
+- Auth: email + password with the address confirmed before the account works, Sign in with Apple, and Google (email added 2026-09-18; PKCE links back into the app at `flightbuddy://auth/callback`)
 - Add a flight by flight number + date, enriched from AeroDataBox
 - Personal dashboard: status, gate, terminal, scheduled/estimated times, duration, delay, countdown
 - Multi-segment trips (layovers)
@@ -679,6 +679,8 @@ Supabase MCP, two entries:
 - prod: `?project_ref=<prod>&read_only=true`
 
 **The Supabase MCP cannot configure auth providers.** Sign in with Apple and Google are dashboard tasks: Services ID, signing key, redirect URLs. Manual, once, by the owner.
+
+Email + password is dashboard-configured the same way: the email provider on with **Confirm email** required; **minimum password length 8**, matching `MIN_PASSWORD_LENGTH` and the iOS `passwordRules` (Supabase defaults to 6, and a mismatch means iOS saves a password the server then rejects); `flightbuddy://auth/callback` in **Redirect URLs** (without it Supabase falls back to the Site URL and links open in a browser); the "Confirm signup" and "Reset password" templates left on `{{ .ConfirmationURL }}` (the app refuses `token_hash` links); custom SMTP (the built-in sender is heavily rate-limited); and automatic identity linking on, so an Apple or Google sign-in joins an existing account only through a *verified* email.
 
 ---
 

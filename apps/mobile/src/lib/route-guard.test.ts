@@ -1,0 +1,87 @@
+import { describe, expect, it } from 'vitest';
+
+import { linkExchangeFor, routeFor, type GuardState } from './route-guard';
+
+const base: GuardState = { isLoading: false, signedIn: false, isRecovering: false, segments: [] };
+const at = (...segments: string[]) => segments;
+
+describe('routeFor', () => {
+  it('decides nothing while the stored session is loading', () => {
+    expect(routeFor({ ...base, isLoading: true, segments: at('(app)') })).toBeNull();
+    expect(routeFor({ ...base, isLoading: true, signedIn: true, segments: at('(auth)', 'welcome') })).toBeNull();
+  });
+
+  describe('signed out', () => {
+    it('sends the app half to the welcome screen', () => {
+      expect(routeFor({ ...base, segments: at('(app)') })).toBe('/welcome');
+      expect(routeFor({ ...base, segments: at('(app)', 'add-flight') })).toBe('/welcome');
+      expect(routeFor({ ...base, segments: at() })).toBe('/welcome');
+    });
+
+    it.each(['welcome', 'sign-in', 'sign-up', 'forgot-password', 'check-inbox'])('leaves %s alone', (screen) => {
+      expect(routeFor({ ...base, segments: at('(auth)', screen) })).toBeNull();
+    });
+
+    it('lets an email link reach the callback', () => {
+      expect(routeFor({ ...base, segments: at('(auth)', 'auth', 'callback') })).toBeNull();
+    });
+
+    it('does not show set-password without a session', () => {
+      expect(routeFor({ ...base, segments: at('(auth)', 'set-password') })).toBe('/welcome');
+    });
+  });
+
+  describe('signed in', () => {
+    const signedIn = { ...base, signedIn: true };
+
+    it('stays in the app', () => {
+      expect(routeFor({ ...signedIn, segments: at('(app)') })).toBeNull();
+      expect(routeFor({ ...signedIn, segments: at('(app)', 'add-flight') })).toBeNull();
+    });
+
+    it.each(['welcome', 'sign-in', 'check-inbox', 'set-password'])('leaves %s for the dashboard', (screen) => {
+      expect(routeFor({ ...signedIn, segments: at('(auth)', screen) })).toBe('/');
+    });
+
+    it('moves on from the callback once the link produced a session (confirmation)', () => {
+      expect(routeFor({ ...signedIn, segments: at('(auth)', 'auth', 'callback') })).toBe('/');
+    });
+  });
+
+  describe('holding a password-reset session', () => {
+    const recovering = { ...base, signedIn: true, isRecovering: true };
+
+    it('goes from the callback to set-password, not the dashboard', () => {
+      expect(routeFor({ ...recovering, segments: at('(auth)', 'auth', 'callback') })).toBe('/set-password');
+    });
+
+    it('cannot reach the app', () => {
+      expect(routeFor({ ...recovering, segments: at('(app)') })).toBe('/set-password');
+      expect(routeFor({ ...recovering, segments: at('(app)', 'add-flight') })).toBe('/set-password');
+    });
+
+    it('stays on set-password', () => {
+      expect(routeFor({ ...recovering, segments: at('(auth)', 'set-password') })).toBeNull();
+    });
+
+    it('ignores a stale recovery flag once signed out', () => {
+      expect(routeFor({ ...base, isRecovering: true, segments: at('(auth)', 'welcome') })).toBeNull();
+    });
+  });
+});
+
+describe('linkExchangeFor (the email-link callback)', () => {
+  it('waits while the stored session is unknown, so a cold start cannot overwrite it', () => {
+    expect(linkExchangeFor({ isLoading: true, signedIn: false })).toBe('wait');
+    expect(linkExchangeFor({ isLoading: true, signedIn: true })).toBe('wait');
+  });
+
+  it('exchanges only when signed out', () => {
+    expect(linkExchangeFor({ isLoading: false, signedIn: false })).toBe('exchange');
+  });
+
+  it('never exchanges over a live session, which would swap accounts', () => {
+    expect(linkExchangeFor({ isLoading: false, signedIn: true })).toBe('skip');
+  });
+});
+

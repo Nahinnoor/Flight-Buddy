@@ -108,9 +108,30 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     autoRefreshToken: true,
     persistSession: true,
     /**
-     * There is no URL to detect a session in: sign-in is native (Apple / Google
-     * ID tokens), not a browser redirect. Leaving this on makes gotrue-js poke
-     * at `window.location`, which does not exist under Hermes.
+     * PKCE, set explicitly because the auth-js default is `'implicit'` and the
+     * default is invisible. This is deliberate — do not remove it.
+     *
+     * It only matters for the flows that leave the app and come back through
+     * an email link: sign-up confirmation, password reset, resend. Under
+     * implicit flow those links deliver the access and refresh tokens in the
+     * URL fragment, so the credential itself travels through a link that any
+     * app registered for the scheme could receive, and nothing ties it to the
+     * device that asked for it. Under PKCE the link carries a short-lived,
+     * single-use `code`; exchanging it needs the verifier this client wrote to
+     * the keychain when the flow started (`exchangeCodeForSession`, handled in
+     * `src/app/(auth)/auth/callback.tsx`). A code on its own is worthless.
+     *
+     * Apple and Google are untouched by this: they go through
+     * `signInWithIdToken`, which never consults `flowType` (no redirect, no
+     * verifier). Stored-session restore is untouched too — the session lives
+     * under the same storage key either way.
+     */
+    flowType: 'pkce',
+    /**
+     * Off on native. This is browser behaviour: it makes gotrue-js read
+     * `window.location` at start-up, which does not exist under Hermes. The
+     * incoming link is handled explicitly by the auth callback route instead,
+     * which is also where it can be validated before anything is exchanged.
      */
     detectSessionInUrl: false,
   },

@@ -1,10 +1,13 @@
 /**
- * Native sign-in, both providers, plus the one piece of bookkeeping around
- * Apple's naming quirk.
+ * Every way into the app.
  *
- * Both flows are the same shape: get an OIDC ID token from the platform, hand
- * it to `supabase.auth.signInWithIdToken`. No browser redirect, so no deep-link
- * handling and no PKCE state to lose.
+ * Apple and Google are the same shape: get an OIDC ID token from the platform,
+ * hand it to `supabase.auth.signInWithIdToken`. No browser redirect, so no
+ * deep link and no PKCE state to lose.
+ *
+ * Email and password (bottom of the file) is the one path that leaves the app
+ * and comes back: confirmation and reset links return through
+ * `flightbuddy://auth/callback` carrying a PKCE code (see `supabase.ts`).
  */
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -16,6 +19,8 @@ import {
 } from '@react-native-google-signin/google-signin';
 import type { Session } from '@supabase/supabase-js';
 
+import type { AuthLink } from './auth-links';
+import * as emailAuth from './email-auth';
 import { GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from './env';
 import { supabase } from './supabase';
 
@@ -223,4 +228,36 @@ export async function signOut(): Promise<void> {
 
   const { error } = await supabase.auth.signOut();
   if (error !== null) throw new SignInError(error.message);
+}
+
+// ----------------------------------------------------- email and password --
+//
+// The logic, and the enumeration-safe error mapping, live in `email-auth.ts`
+// so they can be tested without native modules. These bind the app's client.
+// Unlike the Apple and Google functions above, none of these throw on an auth
+// failure: each returns a result whose failure branch carries only neutral
+// copy from `components/auth/copy.ts`.
+
+export function signUpWithEmail(input: { name: string; email: string; password: string }) {
+  return emailAuth.signUpWithEmail(supabase.auth, input);
+}
+
+export function signInWithEmail(input: { email: string; password: string }) {
+  return emailAuth.signInWithEmail(supabase.auth, input);
+}
+
+export function requestPasswordReset(email: string) {
+  return emailAuth.requestPasswordReset(supabase.auth, email);
+}
+
+export function updatePassword(password: string) {
+  return emailAuth.updatePassword(supabase.auth, password);
+}
+
+export function resendConfirmation(email: string) {
+  return emailAuth.resendConfirmation(supabase.auth, email);
+}
+
+export function completeAuthLink(link: AuthLink) {
+  return emailAuth.completeAuthLink(supabase.auth, link);
 }
