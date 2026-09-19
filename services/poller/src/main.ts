@@ -222,6 +222,10 @@ async function main(): Promise<void> {
     logger,
     feedHealthCache,
     webhooksEnabled,
+    // The same backup cadence the poll pass uses (ADR 0004). Omitting it here
+    // silently took a flight off the ladder as soon as one delivery landed.
+    webhookBackupIntervalMs:
+      config.WEBHOOK_BACKUP_POLL_MS > 0 ? config.WEBHOOK_BACKUP_POLL_MS : undefined,
   });
 
   const boss = createBoss(config);

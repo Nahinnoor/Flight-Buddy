@@ -51,9 +51,14 @@ interface Options {
   /** What a verification poll sees. */
   poll?: FixtureProviderOptions;
   webhooksEnabled?: boolean;
+  /** ADR 0004's backup cadence, as `main.ts` passes it. `null` disables it. */
+  backupMs?: number | null;
   batchSize?: number;
   row?: Partial<FlightRow>;
 }
+
+/** What the deployed worker runs with (`WEBHOOK_BACKUP_POLL_MS` default). */
+const BACKUP_MS = 2 * 60 * 60_000;
 
 function harness(options: Options = {}) {
   const now = options.now ?? NOW;
@@ -77,6 +82,8 @@ function harness(options: Options = {}) {
     now: () => now,
     rng: () => 0.5,
     webhooksEnabled: options.webhooksEnabled ?? true,
+    webhookBackupIntervalMs:
+      options.backupMs === null ? undefined : (options.backupMs ?? BACKUP_MS),
     feedHealthCache: createFeedHealthCache(),
     ...(options.batchSize === undefined ? {} : { batchSize: options.batchSize }),
   };
@@ -102,8 +109,24 @@ describe('drainWebhookInbox — applying a delivery', () => {
       last_error: null,
       processed_at: NOW.toISOString(),
     });
-    // Still subscribed and still off the ladder; lease handed back.
-    expect(h.db.flight(FLIGHT)).toMatchObject({ next_poll_at: null, poll_lease_until: null });
+    // Still subscribed, and still on ADR 0004's backup cadence rather than off the
+    // ladder entirely: a later delivery lost to a cold start has to be noticed by
+    // something, and inside the window this poll is the only thing that looks.
+    // (`rng: () => 0.5` is the midpoint, so the jitter is zero.)
+    expect(h.db.flight(FLIGHT)).toMatchObject({
+      next_poll_at: new Date(NOW.getTime() + BACKUP_MS).toISOString(),
+      poll_lease_until: null,
+    });
+  });
+
+  it('takes the flight off the ladder only when the backup poll is disabled', async () => {
+    const h = harness({ backupMs: null });
+    const inboxId = h.deliver();
+
+    await h.drain();
+
+    expect(h.db.inbox.find((r) => r.id === inboxId)?.last_error).toBeNull();
+    expect(h.db.flight(FLIGHT).next_poll_at).toBeNull();
   });
 
   it('ingests a delay straight from the webhook: no verification poll for delays', async () => {

@@ -192,6 +192,15 @@ export interface WebhookIngestDeps {
   logger: Logger;
   /** Passed to the ladder for `next_poll_at`. Off: a delivered flight goes back on the ladder. */
   webhooksEnabled?: boolean;
+  /**
+   * Backup cadence for a subscribed flight inside the alert window (ADR 0004),
+   * the same value the poll pass uses. **It must be passed here too.** Without
+   * it the ladder falls back to §7.6's literal "no polling at all", so applying
+   * one delivery takes the flight off the ladder for good — and a later delivery
+   * lost to a cold start (the very case ADR 0004 added the backup poll for) would
+   * never be noticed, because nothing else looks at the flight again.
+   */
+  webhookBackupIntervalMs?: number | undefined;
   feedHealthCache?: FeedHealthCache;
   now?: () => Date;
   rng?: () => number;
@@ -361,10 +370,12 @@ async function applyLeg(
     await ingestFlight(fresh, deps.writer, { now: () => now });
     const eventIds = await insertFlightEvents(deps.pool, current.id, events);
 
-    // A subscribed `live` flight stays off the ladder (null); a landed one gets its
-    // landed + 30 min poll, which unsubscribes and archives it (§7.6).
+    // A subscribed `live` flight keeps the ADR 0004 backup cadence (null only when
+    // that is disabled); a landed one gets its landed + 30 min poll, which
+    // unsubscribes and archives it (§7.6).
     const next = nextPollAt(ladderViewOf(current, fresh), now, deps.rng ?? Math.random, {
       webhooksEnabled: deps.webhooksEnabled ?? false,
+      webhookBackupIntervalMs: deps.webhookBackupIntervalMs,
     });
     await deps.pool.query({
       text: WEBHOOK_APPLIED_SQL,
