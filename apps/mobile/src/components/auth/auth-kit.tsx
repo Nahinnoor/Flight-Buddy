@@ -5,10 +5,10 @@
  * Two house rules are enforced here rather than left to each screen:
  *
  * - **No hex values.** Everything resolves through `useTheme()`. The one
- *   non-obvious choice is the primary button's label: it is `theme.background`,
- *   not white. The dark palette's accent (`#67A8FF`) is a light blue, and white
- *   on it lands around 2.3:1 — unreadable. `theme.background` is white on the
- *   light accent and black on the dark one, which clears 6:1 both ways.
+ *   non-obvious choice is the primary button's label: it is `theme.onAccent`,
+ *   not white. The dark palette's accent is a light blue, and white on it lands
+ *   at 2.4:1 — unreadable. `onAccent` is white on the light accent (5.7:1) and
+ *   black on the dark one (8.6:1).
  * - **44pt touch targets.** Buttons are 50pt tall; text links are shorter than
  *   that by design, so they carry `hitSlop` to make up the difference.
  */
@@ -118,9 +118,9 @@ export function PrimaryButton({
         { backgroundColor: theme.accent, opacity: disabled ? 0.4 : pressed ? 0.8 : 1 },
       ]}>
       {busy ? (
-        <ActivityIndicator color={theme.background} />
+        <ActivityIndicator color={theme.onAccent} />
       ) : (
-        <ThemedText type="default" style={[styles.buttonLabel, { color: theme.background }]}>
+        <ThemedText type="default" style={[styles.buttonLabel, { color: theme.onAccent }]}>
           {label}
         </ThemedText>
       )}

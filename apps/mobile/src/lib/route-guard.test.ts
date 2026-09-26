@@ -18,6 +18,11 @@ describe('routeFor', () => {
       expect(routeFor({ ...base, segments: at() })).toBe('/welcome');
     });
 
+    it.each(['groups', 'profile', 'settings'])('sends the %s tab to the welcome screen', (tab) => {
+      expect(routeFor({ ...base, segments: at('(app)', '(tabs)') })).toBe('/welcome');
+      expect(routeFor({ ...base, segments: at('(app)', '(tabs)', tab) })).toBe('/welcome');
+    });
+
     it.each(['welcome', 'sign-in', 'sign-up', 'forgot-password', 'check-inbox'])('leaves %s alone', (screen) => {
       expect(routeFor({ ...base, segments: at('(auth)', screen) })).toBeNull();
     });
@@ -39,6 +44,12 @@ describe('routeFor', () => {
       expect(routeFor({ ...signedIn, segments: at('(app)', 'add-flight') })).toBeNull();
     });
 
+    it.each(['groups', 'profile', 'settings'])('stays on the %s tab', (tab) => {
+      // The dashboard is `(app)/(tabs)/index`: its segments stop at the group.
+      expect(routeFor({ ...signedIn, segments: at('(app)', '(tabs)') })).toBeNull();
+      expect(routeFor({ ...signedIn, segments: at('(app)', '(tabs)', tab) })).toBeNull();
+    });
+
     it.each(['welcome', 'sign-in', 'check-inbox', 'set-password'])('leaves %s for the dashboard', (screen) => {
       expect(routeFor({ ...signedIn, segments: at('(auth)', screen) })).toBe('/');
     });
@@ -57,6 +68,7 @@ describe('routeFor', () => {
 
     it('cannot reach the app', () => {
       expect(routeFor({ ...recovering, segments: at('(app)') })).toBe('/set-password');
+      expect(routeFor({ ...recovering, segments: at('(app)', '(tabs)', 'profile') })).toBe('/set-password');
       expect(routeFor({ ...recovering, segments: at('(app)', 'add-flight') })).toBe('/set-password');
     });
 

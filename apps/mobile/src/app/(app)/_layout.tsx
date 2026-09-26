@@ -1,14 +1,17 @@
 import { Stack } from 'expo-router';
 
 /**
- * No tab bar. Phase 1 is one screen plus a modal; a single-tab tab bar is
- * chrome that costs vertical space and says nothing. Groups (§3.2) get their
- * own tab when they land.
+ * The signed-in half: the tabs, with the add-flight sheet above them.
+ *
+ * add-flight lives here, in the stack, not inside `(tabs)`. That is what lets
+ * the tab bar's + open it over whichever tab is showing, and what brings the
+ * user back to that same tab when it closes: the tabs navigator underneath is
+ * never touched.
  */
 export default function AppLayout() {
   return (
     <Stack>
-      <Stack.Screen name="index" options={{ title: 'Your flights' }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="add-flight"
         options={{ title: 'Add a flight', presentation: 'modal' }}

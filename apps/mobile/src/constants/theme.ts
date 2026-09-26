@@ -24,6 +24,10 @@ export const Colors = {
     textSecondary: '#60646C',
     border: '#DDDEE3',
     accent: '#0B63CE',
+    /** Text and icons drawn on an `accent` fill. White on this blue is 5.7:1. */
+    onAccent: '#FFFFFF',
+    /** Drop shadow under raised controls (the tab bar's add button). */
+    shadow: '#000000',
     neutralText: '#3E4149',
     neutralSurface: '#ECEDF0',
     positiveText: '#11663D',
@@ -41,6 +45,12 @@ export const Colors = {
     textSecondary: '#B0B4BA',
     border: '#33353A',
     accent: '#67A8FF',
+    /**
+     * Black, not white: this accent is a light blue, and white on it is 2.4:1.
+     * Black on it is 8.6:1.
+     */
+    onAccent: '#000000',
+    shadow: '#000000',
     neutralText: '#C7CAD1',
     neutralSurface: '#25262A',
     positiveText: '#6FD79C',

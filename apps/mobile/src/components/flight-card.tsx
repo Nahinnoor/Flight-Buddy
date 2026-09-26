@@ -38,6 +38,7 @@ import { useCountdown } from '@/hooks/use-countdown';
 import { useTheme } from '@/hooks/use-theme';
 import {
   DELAY_HIGHLIGHT_MINUTES,
+  departureAnchor,
   flightNumbers,
   formatDelay,
   formatDuration,
@@ -47,7 +48,7 @@ import {
   statusTone,
   type StatusTone,
 } from '@/lib/flight-display';
-import type { SegmentView } from '@/lib/flights';
+import type { SegmentView } from '@/lib/dashboard-model';
 
 export interface FlightCardData {
   marketingCarrierIata: string | null;
@@ -228,8 +229,7 @@ function FlightCardComponent({ data, variant = 'listed', caption = null }: Fligh
   const isPinned = variant === 'pinned';
 
   const { primary, operatedBy } = flightNumbers(data);
-  const departure =
-    data.actualDepartureUtc ?? data.estimatedDepartureUtc ?? data.scheduledDepartureUtc;
+  const departure = departureAnchor(data);
   const arrival = data.actualArrivalUtc ?? data.estimatedArrivalUtc ?? data.scheduledArrivalUtc;
 
   const countdown = useCountdown(isPinned ? departure : null);

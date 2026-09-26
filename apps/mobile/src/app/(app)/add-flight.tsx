@@ -109,7 +109,11 @@ export default function AddFlightScreen() {
       setPhase({ kind: 'adding', candidate });
       try {
         await addFlight({ candidate });
-        router.back();
+        // `dismiss`, not `back`: `back` sends an untargeted GO_BACK that the tab
+        // navigator can claim, which landed on Dashboard instead of the tab the
+        // sheet was opened from. `dismiss` pops this modal from its own stack,
+        // the same action as the swipe-down that always worked.
+        router.dismiss();
       } catch (caught) {
         setError(describeError(caught));
         setPhase({ kind: 'confirm', candidate });
@@ -139,8 +143,12 @@ export default function AddFlightScreen() {
               <ThemedText type="smallBold" themeColor="textSecondary">
                 FLIGHT
               </ThemedText>
+              {/* Uncontrolled: the field owns its text and `query` only mirrors it.
+                  Feeding `value` back raced fast input — a burst of keystrokes could
+                  outrun the JS round-trip and drop characters ("DL1915 SEP 28" became
+                  "DL1915 SEP"). Nothing else ever sets this text, so there is no
+                  value to push back into the field. */}
               <TextInput
-                value={query}
                 onChangeText={setQuery}
                 placeholder="DL1234 Mar 12"
                 placeholderTextColor={theme.textSecondary}
@@ -216,9 +224,9 @@ export default function AddFlightScreen() {
                 },
               ]}>
               {phase.kind === 'searching' ? (
-                <ActivityIndicator color="#ffffff" />
+                <ActivityIndicator color={theme.onAccent} />
               ) : (
-                <ThemedText type="default" style={styles.primaryLabel}>
+                <ThemedText type="default" style={[styles.primaryLabel, { color: theme.onAccent }]}>
                   Find flight
                 </ThemedText>
               )}
@@ -279,9 +287,9 @@ export default function AddFlightScreen() {
                     },
                   ]}>
                   {phase.kind === 'adding' ? (
-                    <ActivityIndicator color="#ffffff" />
+                    <ActivityIndicator color={theme.onAccent} />
                   ) : (
-                    <ThemedText type="default" style={styles.primaryLabel}>
+                    <ThemedText type="default" style={[styles.primaryLabel, { color: theme.onAccent }]}>
                       Add to my flights
                     </ThemedText>
                   )}
@@ -373,7 +381,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryLabel: {
-    color: '#ffffff',
     fontWeight: '700',
   },
 });

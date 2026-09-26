@@ -1,38 +1,68 @@
 /**
- * In-memory stand-in for the `trips → trip_segments → flights` rows, for
- * `EXPO_PUBLIC_MOCK_API=1`.
+ * In-memory stand-in for the signed-in user's rows, for
+ * `EXPO_PUBLIC_MOCK_API=1`: their flights (upcoming and archived), their group
+ * memberships and their profile.
  *
  * Without this, mock mode can exercise the lookup and the disambiguation list
- * but never the dashboard — `addFlight` would return ids for rows that do not
- * exist, and the flight card, which is where most of §7.2, §7.3 and §8.8 live,
- * would be unreachable until `apps/api` ships.
+ * but never the dashboard, the Groups tab or Profile — and those are where
+ * most of the display rules live.
  *
- * It lives for the life of the JS context: a reload empties it. That is the
- * right trade — it is a fixture, not a cache, and persisting it would invite
- * someone to mistake it for real data.
+ * It lives for the life of the JS context: a reload goes back to the seeded
+ * scenario. That is the right trade — it is a fixture, not a cache, and
+ * persisting it would invite someone to mistake it for real data.
+ *
+ * Imports only the pure model, never `../flights`: the old
+ * `store.ts` ↔ `flights.ts` require cycle is gone.
  */
-import type { Database, FlightCandidate } from '@flightbuddy/shared';
+import type { FlightCandidate } from '@flightbuddy/shared';
 
-import { sortByScheduledDeparture, type SegmentView } from '../flights';
+import {
+  sortByScheduledDeparture,
+  type FlightRow,
+  type MembershipView,
+  type SegmentView,
+} from '../dashboard-model';
+import {
+  buildMockData,
+  MOCK_PROFILE,
+  mockUuid,
+  type MockData,
+  type MockProfile,
+  type MockScenario,
+} from './fixtures';
 
-type FlightRow = Database['public']['Tables']['flights']['Row'];
+export { mockUuid };
 
-const segments: SegmentView[] = [];
+let scenario: MockScenario = 'full';
+let seeded: MockData | null = null;
+const added: SegmentView[] = [];
 let sequence = 0;
+let profile: MockProfile = { ...MOCK_PROFILE };
 
-/** Deterministic, schema-valid v4-shaped UUID so responses parse like real ones. */
-export function mockUuid(kind: number, index: number): string {
-  return `00000000-0000-4000-8000-${(kind * 0x1000000 + index).toString(16).padStart(12, '0')}`;
+function data(): MockData {
+  seeded ??= buildMockData(scenario, new Date());
+  return seeded;
 }
 
-/** The single trip everything is appended to. Layovers get their own PR. */
-const MOCK_TRIP_ID = mockUuid(1, 1);
+export function getMockScenario(): MockScenario {
+  return scenario;
+}
+
+/** Replaces every mock row, including flights added through the mock lookup. */
+export function setMockScenario(next: MockScenario): void {
+  scenario = next;
+  seeded = null;
+  added.length = 0;
+}
+
+/** The single trip every added flight is appended to. */
+const MOCK_TRIP_ID = mockUuid(1, 1000);
 
 function flightRowFromCandidate(candidate: FlightCandidate, index: number): FlightRow {
   const now = new Date().toISOString();
 
   return {
-    id: mockUuid(3, index),
+    id: mockUuid(3, 1000 + index),
     operating_carrier_iata: candidate.operatingCarrierIata,
     operating_flight_number: candidate.operatingFlightNumber,
     departure_date_local: candidate.departureDateLocal,
@@ -80,8 +110,8 @@ export function addMockSegment(candidate: FlightCandidate): {
   sequence += 1;
   const flight = flightRowFromCandidate(candidate, sequence);
 
-  segments.push({
-    segmentId: mockUuid(2, sequence),
+  added.push({
+    segmentId: mockUuid(2, 1000 + sequence),
     sequenceNumber: sequence,
     tripId: MOCK_TRIP_ID,
     tripLabel: null,
@@ -93,13 +123,31 @@ export function addMockSegment(candidate: FlightCandidate): {
 
   return {
     tripId: MOCK_TRIP_ID,
-    segmentId: mockUuid(2, sequence),
+    segmentId: mockUuid(2, 1000 + sequence),
     flightId: flight.id,
     sequenceNumber: sequence,
   };
 }
 
-/** Everything added this session, ordered the way `fetchMySegments` orders. */
+/** Non-archived legs, ordered the way `fetchMySegments` orders them. */
 export function listMockSegments(): SegmentView[] {
-  return sortByScheduledDeparture(segments);
+  return sortByScheduledDeparture([...data().segments, ...added]);
+}
+
+/** Archived legs. */
+export function listMockPastSegments(): SegmentView[] {
+  return [...data().past];
+}
+
+export function listMockMemberships(): MembershipView[] {
+  return data().memberships.filter((m) => m.status !== 'removed');
+}
+
+export function getMockProfile(): MockProfile {
+  return { ...profile };
+}
+
+export function updateMockProfile(patch: Partial<MockProfile>): MockProfile {
+  profile = { ...profile, ...patch };
+  return { ...profile };
 }

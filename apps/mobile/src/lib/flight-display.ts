@@ -170,6 +170,22 @@ export function formatLocalDateShort(dateLocal: string): string {
   }).format(date);
 }
 
+/**
+ * The instant a departure countdown counts to: what actually happened if it
+ * has, else the latest estimate, else the schedule.
+ *
+ * The one definition used everywhere a countdown appears — the pinned flight
+ * card and every group card on the dashboard — so the two can never disagree
+ * about when the same flight leaves.
+ */
+export function departureAnchor(times: {
+  actualDepartureUtc: string | null;
+  estimatedDepartureUtc: string | null;
+  scheduledDepartureUtc: string | null;
+}): string | null {
+  return times.actualDepartureUtc ?? times.estimatedDepartureUtc ?? times.scheduledDepartureUtc;
+}
+
 export interface Countdown {
   label: string;
   /** True once the target instant has passed. */
