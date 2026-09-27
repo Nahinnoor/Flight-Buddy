@@ -166,3 +166,17 @@ describe('parseConfig', () => {
     });
   });
 });
+
+describe('CREDIT_DRILL_ZERO', () => {
+  it('is off unless set, and on only for exactly "1"', () => {
+    expect(parseConfig(env({})).CREDIT_DRILL_ZERO).toBeUndefined();
+    expect(parseConfig(env({ CREDIT_DRILL_ZERO: '' })).CREDIT_DRILL_ZERO).toBeUndefined();
+    expect(parseConfig(env({ CREDIT_DRILL_ZERO: '1' })).CREDIT_DRILL_ZERO).toBe('1');
+  });
+
+  it('refuses any other value, so a typo cannot quietly leave the drill on or off', () => {
+    for (const value of ['true', '0', 'yes', 'on', ' 1']) {
+      expect(() => parseConfig(env({ CREDIT_DRILL_ZERO: value }))).toThrow();
+    }
+  });
+});

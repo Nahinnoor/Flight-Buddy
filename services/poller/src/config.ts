@@ -82,6 +82,15 @@ export const configSchema = z.object({
   OPERATOR_USER_ID: z.uuid().optional(),
 
   /**
+   * The credit-failover drill: forces the hourly credit check to read 0 so the
+   * real zero-balance failover can be watched without draining the account
+   * (PHASE2_PLAN criterion 7). Exactly `1` turns it on; any other value is a
+   * startup error, so a typo cannot quietly leave it on or off. Remove it after
+   * the drill — while set, subscribed flights stay on the polling ladder.
+   */
+  CREDIT_DRILL_ZERO: z.literal('1').optional(),
+
+  /**
    * Expo access token for push sends (wave 5), sent as `Authorization: Bearer …`.
    * Optional, **recommended**: with "enhanced push security" turned on for the
    * Expo project, Expo refuses any send without it, so a leaked device push

@@ -287,6 +287,7 @@ async function main(): Promise<void> {
         webhooksEnabled,
         creditState,
         operatorUserId: config.OPERATOR_USER_ID,
+        drillZero: config.CREDIT_DRILL_ZERO === '1',
         onOperatorAlert: (alert) =>
           operatorAlerts.raise({
             kind: alert.kind,
@@ -360,9 +361,16 @@ async function main(): Promise<void> {
       // Booleans, never the values.
       operatorConfigured: config.OPERATOR_USER_ID !== undefined,
       expoAccessTokenConfigured: config.EXPO_ACCESS_TOKEN !== undefined,
+      creditDrill: config.CREDIT_DRILL_ZERO === '1',
     },
     'poller started',
   );
+  if (config.CREDIT_DRILL_ZERO === '1') {
+    logger.error(
+      { creditDrill: true },
+      'CREDIT DRILL MODE ON: the hourly credit check reads 0 and fails every subscribed flight over to polling; unset CREDIT_DRILL_ZERO when the drill is done',
+    );
+  }
   await runLoop(context, shutdown.signal);
 
   await stopQueue(boss);

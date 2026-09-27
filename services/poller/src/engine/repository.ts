@@ -33,11 +33,21 @@ import { ENGINE_TYPES } from './types';
 export const INT4_MAX = 2_147_483_647;
 export const INT4_MIN = -2_147_483_648;
 
-/** The `source` values the migration documents. `post_refill` is written by nobody yet (ADR 0003). */
+/**
+ * The `source` values written to `provider_credit_log.source` (plain `text`, no
+ * check constraint). The migration documents the first three; `drill` came later.
+ * `post_refill` is written by nobody yet (ADR 0003).
+ */
 export const CREDIT_LOG_SOURCES = {
   WEBHOOK_PAYLOAD: 'webhook_payload',
   BALANCE_CHECK: 'balance_check',
   POST_REFILL: 'post_refill',
+  /**
+   * A forced zero from the credit drill (`CREDIT_DRILL_ZERO`), never a real
+   * reading: kept apart so the drill's rows can be told from the account's
+   * real balance history, and removed after a drill.
+   */
+  DRILL: 'drill',
 } as const;
 
 export type CreditLogSource = (typeof CREDIT_LOG_SOURCES)[keyof typeof CREDIT_LOG_SOURCES];
@@ -46,14 +56,19 @@ export const INSERT_CREDIT_LOG_SQL = `insert into public.provider_credit_log (ba
 values ($1, $2)`;
 
 /**
- * The most recent reading, from any source, by `id` alone — the same order
+ * The most recent real reading, by `id` alone — the same order
  * `DISARMED_THRESHOLDS_SQL` uses. `observed_at` is `now()` at each insert and two
  * rows can tie or disagree with insertion order; ordering on it could seed the
  * worker's credit state at boot from an older, healthier row than the zero reading
  * that followed it.
+ *
+ * Drill rows are skipped: a forced zero is not the account's balance, and a
+ * restart between unsetting `CREDIT_DRILL_ZERO` and deleting the drill rows must
+ * not boot the worker into failover off it.
  */
 export const LATEST_CREDIT_BALANCE_SQL = `select balance
   from public.provider_credit_log
+ where source <> '${CREDIT_LOG_SOURCES.DRILL}'
  order by id desc
  limit 1`;
 

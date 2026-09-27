@@ -164,7 +164,7 @@ export const DISARMED_THRESHOLDS_SQL = `select t.mark
  where exists (
          select 1
            from public.provider_credit_log c
-          where c.source = $2
+          where c.source = any($2::text[])
             and c.balance <= t.mark
             and c.id > coalesce(
                   (select max(a.id) from public.provider_credit_log a where a.balance > t.mark),
@@ -245,7 +245,9 @@ export function crossedThreshold(
 export async function readDisarmedThresholds(pool: Pool): Promise<Set<number>> {
   const result = await pool.query<{ mark: number }>({
     text: DISARMED_THRESHOLDS_SQL,
-    values: [[...CREDIT_THRESHOLDS], CREDIT_LOG_SOURCES.BALANCE_CHECK],
+    // The job's own readings disarm a mark: real ones, and a drill's forced zero
+    // (otherwise a drill would re-alert every hour it ran).
+    values: [[...CREDIT_THRESHOLDS], [CREDIT_LOG_SOURCES.BALANCE_CHECK, CREDIT_LOG_SOURCES.DRILL]],
     types: ENGINE_TYPES,
   });
   return new Set(result.rows.map((row) => Number(row.mark)));
@@ -293,6 +295,15 @@ export interface CreditCheckDeps {
    * line already written, and a retry would find the mark disarmed.
    */
   onOperatorAlert?: (alert: OperatorAlert) => Promise<void>;
+  /**
+   * The credit-failover drill (PHASE2_PLAN criterion 7's manual half). When
+   * true, the balance reading is forced to 0 instead of asking the provider, so
+   * the real failover can be watched without spending the real balance.
+   * Everything downstream is unchanged: the sweep, the credit state, the
+   * operator alert. Recorded as source `drill`. Set only through
+   * `CREDIT_DRILL_ZERO=1`, and logged at error on every run while on.
+   */
+  drillZero?: boolean;
   now?: () => Date;
 }
 
@@ -334,8 +345,18 @@ export async function runCreditCheck(deps: CreditCheckDeps): Promise<CreditCheck
 
   let balance: number;
   try {
-    await deps.rateLimiter.acquire();
-    balance = await deps.provider.getCreditBalance();
+    if (deps.drillZero === true) {
+      // Loud on purpose: a drill left on would keep every subscribed flight on
+      // the polling ladder and keep alerting the owner.
+      logger.error(
+        { job: 'credit-check', creditDrill: true },
+        'CREDIT DRILL ACTIVE: balance reading forced to 0 (CREDIT_DRILL_ZERO); the provider was not asked',
+      );
+      balance = 0;
+    } else {
+      await deps.rateLimiter.acquire();
+      balance = await deps.provider.getCreditBalance();
+    }
   } catch (error) {
     // `error`, not `warn`: an unreadable balance hides exactly the outage this job
     // exists to catch, and it recurring every hour should be loud.
@@ -371,7 +392,11 @@ export async function runCreditCheck(deps: CreditCheckDeps): Promise<CreditCheck
   }
 
   if (isLoggableBalance(balance)) {
-    await insertCreditLog(deps.pool, balance, CREDIT_LOG_SOURCES.BALANCE_CHECK);
+    await insertCreditLog(
+      deps.pool,
+      balance,
+      deps.drillZero === true ? CREDIT_LOG_SOURCES.DRILL : CREDIT_LOG_SOURCES.BALANCE_CHECK,
+    );
     result.logged = true;
   } else {
     // A number the int column cannot hold is a provider bug; do not let it

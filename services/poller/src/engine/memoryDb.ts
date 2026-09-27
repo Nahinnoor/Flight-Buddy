@@ -42,6 +42,7 @@ import { DISARMED_THRESHOLDS_SQL, FAILOVER_SUBSCRIBED_FLIGHTS_SQL } from './cred
 import { CLAIM_DUE_FLIGHTS_SQL, RELEASE_LEASE_SQL } from './lease';
 import { ACTIVE_SUBSCRIPTIONS_SQL, DETACH_SUBSCRIPTION_SQL } from './reconcile';
 import {
+  CREDIT_LOG_SOURCES,
   INSERT_CREDIT_LOG_SQL,
   LATEST_CREDIT_BALANCE_SQL,
   RECORD_POLL_FAILURE_SQL,
@@ -505,12 +506,12 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
         return [];
 
       case LATEST_CREDIT_BALANCE_SQL: {
-        const last = creditLog.at(-1);
+        const last = creditLog.filter((row) => row.source !== CREDIT_LOG_SOURCES.DRILL).at(-1);
         return last === undefined ? [] : [{ balance: last.balance }];
       }
 
       case DISARMED_THRESHOLDS_SQL: {
-        const [marks, source] = values as [number[], string];
+        const [marks, sources] = values as [number[], string[]];
         return marks
           .filter((mark) => {
             let rearmedAt = -1;
@@ -518,7 +519,8 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
               if (row.balance > mark) rearmedAt = index;
             });
             return creditLog.some(
-              (row, index) => index > rearmedAt && row.source === source && row.balance <= mark,
+              (row, index) =>
+                index > rearmedAt && sources.includes(row.source) && row.balance <= mark,
             );
           })
           .map((mark) => ({ mark }));

@@ -18,7 +18,7 @@ import {
   type OperatorAlert,
 } from './creditMonitor';
 import { createMemoryDb } from './memoryDb';
-import { CREDIT_LOG_SOURCES } from './repository';
+import { CREDIT_LOG_SOURCES, readLatestCreditBalance } from './repository';
 import {
   DEFAULT_SUBSCRIPTION_ID as SUB,
   FAKE_WEBHOOK_TOKEN,
@@ -46,6 +46,7 @@ interface Options {
   seed?: { balance: number; source: string }[];
   onOperatorAlert?: (alert: OperatorAlert) => Promise<void>;
   operatorUserId?: string;
+  drillZero?: boolean;
 }
 
 function harness(options: Options = {}) {
@@ -67,6 +68,7 @@ function harness(options: Options = {}) {
     creditState,
     operatorUserId: options.operatorUserId,
     ...(options.onOperatorAlert === undefined ? {} : { onOperatorAlert: options.onOperatorAlert }),
+    ...(options.drillZero === undefined ? {} : { drillZero: options.drillZero }),
     now: () => NOW,
   };
   return { db, fx, count, log, creditState, deps, run: () => runCreditCheck(deps) };
@@ -442,6 +444,66 @@ describe('credit-check zero-balance failover (§7.7 step 3)', () => {
 
     expect(result.balance).toBe(0);
     expect(result.failedOverFlightIds).toEqual(['flight-b6']);
+  });
+});
+
+describe('credit drill (CREDIT_DRILL_ZERO, criterion 7 manual half)', () => {
+  it('reads 0 without asking the provider, records it as a drill, fails over and alerts once', async () => {
+    const h = harness({ drillZero: true, balance: 250, seed: [{ balance: 60, source: CHECK }] });
+    h.db.addFlight(b6FlightRow({ alert_subscription_id: SUB, next_poll_at: at(2 * HOUR) }));
+
+    const result = await h.run();
+
+    expect(h.count()).toBe(0);
+    expect(h.fx.requests).toHaveLength(0);
+    expect(result.balance).toBe(0);
+    expect(h.db.creditLog.at(-1)).toEqual({ balance: 0, source: CREDIT_LOG_SOURCES.DRILL });
+    expect(result.failedOverFlightIds).toEqual(['flight-b6']);
+    expect(result.alert).toMatchObject({ kind: 'credit_exhausted', threshold: 0 });
+    expect(h.creditState.exhausted()).toBe(true);
+    expect(h.log.records().some((r) => r.level === 'error' && r.creditDrill === true)).toBe(true);
+  });
+
+  it('a second drill hour does not alert again (the drill row disarms the zero mark)', async () => {
+    const h = harness({ drillZero: true, seed: [{ balance: 60, source: CHECK }] });
+
+    const first = await h.run();
+    const second = await h.run();
+
+    expect(first.alert?.kind).toBe('credit_exhausted');
+    expect(second.alert).toBeNull();
+  });
+
+  it('after the drill, a real reading above zero recovers and re-arms the mark', async () => {
+    const h = harness({ balance: 58, seed: [{ balance: 60, source: CHECK }] });
+    h.deps.drillZero = true;
+    await h.run();
+    expect(h.creditState.exhausted()).toBe(true);
+
+    h.deps.drillZero = false;
+    const recovered = await h.run();
+
+    expect(recovered.balance).toBe(58);
+    expect(h.creditState.exhausted()).toBe(false);
+    expect(h.db.creditLog.at(-1)).toEqual({ balance: 58, source: CHECK });
+  });
+
+  it('a restart after the drill seeds from the last real reading, not the forced zero', async () => {
+    const h = harness({ drillZero: true, seed: [{ balance: 60, source: CHECK }] });
+    await h.run();
+    expect(h.db.creditLog.at(-1)?.source).toBe(CREDIT_LOG_SOURCES.DRILL);
+
+    // What `main.ts` does at boot, with the drill switch already unset.
+    const reseeded = createCreditState(await readLatestCreditBalance(h.db.pool));
+
+    expect(reseeded.exhausted()).toBe(false);
+  });
+
+  it('off by default: the provider is asked and the reading is a real balance_check', async () => {
+    const h = harness({ balance: 250 });
+    const result = await h.run();
+    expect(result.balance).toBe(250);
+    expect(h.db.creditLog.at(-1)?.source).toBe(CHECK);
   });
 });
 
