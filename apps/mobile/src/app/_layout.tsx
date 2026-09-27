@@ -7,6 +7,11 @@
  * waits for `isLoading` to clear first — redirecting while the stored session
  * is still being read out of the keychain would flash the welcome screen at
  * every returning user, every cold start.
+ *
+ * Notification taps are handled here too (`use-notification-taps.ts`), under
+ * the same session state, so a tap can only ever lead somewhere the guard
+ * already allows: the Dashboard when signed in, nowhere (the guard's welcome
+ * screen) when not.
  */
 import { useEffect, useMemo } from 'react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, useSegments } from 'expo-router';
@@ -15,6 +20,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useNotificationTaps } from '@/hooks/use-notification-taps';
 import { configureNotificationHandler } from '@/lib/push';
 import { routeFor } from '@/lib/route-guard';
 import { AppearanceProvider, useAppearance } from '@/providers/appearance-provider';
@@ -29,6 +35,8 @@ function RootNavigator() {
   const segments = useSegments();
   const router = useRouter();
   const signedIn = session !== null;
+
+  useNotificationTaps({ isLoading, signedIn, isRecovering });
 
   useEffect(() => {
     // The decision itself lives in src/lib/route-guard.ts, where it is tested.

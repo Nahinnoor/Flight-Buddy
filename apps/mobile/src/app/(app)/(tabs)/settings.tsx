@@ -116,8 +116,8 @@ export default function SettingsScreen() {
               </View>
             ) : null}
             <ThemedText type="small" themeColor="textSecondary">
-              Notifications themselves arrive with the next update of FlightBuddy. This setting is
-              saved now and will apply then.
+              Alerts about your own flights always come through, quiet hours or not. Quiet hours
+              will apply to other members’ flights when group alerts arrive.
             </ThemedText>
           </Section>
 

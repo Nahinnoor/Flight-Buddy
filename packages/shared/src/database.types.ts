@@ -573,7 +573,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      register_push_token: { Args: { p_token: string }; Returns: undefined }
+      unregister_push_token: { Args: { p_token: string }; Returns: undefined }
     }
     Enums: {
       flight_status:

@@ -15,9 +15,24 @@
  *
  * Three queries, loaded side by side, each with its own loading and error
  * state. Every rule about what shows lives in `dashboard-model.ts`.
+ *
+ * Notifications (Phase 2, wave 5): a flight alert that arrives while the app
+ * is open reloads everything here, as does coming back from the background. A
+ * tap on a flight alert lands here (`use-notification-taps.ts`); after a
+ * reload, if that flight is the pinned card or one of the later rows it is
+ * scrolled into view and outlined for a few seconds. Anywhere else — archived,
+ * not the user's — the tap just leaves them on this screen.
  */
-import { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  AccessibilityInfo,
+  AppState,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
@@ -39,9 +54,18 @@ import { useNow } from '@/hooks/use-now';
 import { useRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import { buildDashboard, groupCountdownText, isAirborne } from '@/lib/dashboard-model';
+import {
+  clearFlightHighlight,
+  getFlightAlertState,
+  subscribeFlightAlerts,
+} from '@/lib/flight-alert-store';
 import { fetchMySegments, fetchPastSegments } from '@/lib/flights';
 import { fetchMyMemberships } from '@/lib/groups';
+import { highlightTargetFor, type HighlightTarget } from '@/lib/notification-tap';
 import { useSession } from '@/providers/session-provider';
+
+/** How long a notified flight stays outlined. */
+const HIGHLIGHT_MS = 3_000;
 
 export default function DashboardScreen() {
   const theme = useTheme();
@@ -87,18 +111,107 @@ export default function DashboardScreen() {
     setIsRefreshing(false);
   }, [reloadAll]);
 
-  const model = buildDashboard(
-    { segments: segments.data, memberships: memberships.data, past: past.data },
-    now,
+  // ---- notifications ----
+
+  const alerts = useSyncExternalStore(subscribeFlightAlerts, getFlightAlertState);
+
+  // A flight alert arrived with the app open: show the change.
+  const seenRefresh = useRef(alerts.refreshSeq);
+  useEffect(() => {
+    if (alerts.refreshSeq === seenRefresh.current) return;
+    seenRefresh.current = alerts.refreshSeq;
+    void reloadAll();
+  }, [alerts.refreshSeq, reloadAll]);
+
+  // Back from the background: alerts delivered while the app was suspended
+  // reached no listener, so the cards may be stale.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void reloadAll();
+    });
+    return () => subscription.remove();
+  }, [reloadAll]);
+
+  // A tapped flight alert: reload first, so the decision (and the card) is
+  // on fresh data, then outline the flight for a few seconds.
+  const [highlighted, setHighlighted] = useState<{ flightId: string; seq: number } | null>(null);
+  const highlightRequest = alerts.highlight;
+  useEffect(() => {
+    if (highlightRequest === null) return;
+    let cancelled = false;
+    void reloadAll().then(() => {
+      if (cancelled) return;
+      setHighlighted(highlightRequest);
+      clearFlightHighlight(highlightRequest.seq);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [highlightRequest, reloadAll]);
+
+  useEffect(() => {
+    if (highlighted === null) return;
+    const timer = setTimeout(() => setHighlighted(null), HIGHLIGHT_MS);
+    return () => clearTimeout(timer);
+  }, [highlighted]);
+
+  const model = useMemo(
+    () => buildDashboard({ segments: segments.data, memberships: memberships.data, past: past.data }, now),
+    [segments.data, memberships.data, past.data, now],
   );
 
   const segmentsState = sectionState(segments.data, segments.error);
+
+  const target = useMemo<HighlightTarget>(
+    () =>
+      segmentsState === 'ready'
+        ? highlightTargetFor(highlighted?.flightId ?? null, model.main, model.later)
+        : null,
+    [segmentsState, highlighted, model],
+  );
+  const highlightSeq = highlighted?.seq ?? null;
+
+  // Scrolling needs the row's position, which only exists after layout; so it
+  // is attempted when the target is known and again from each onLayout, once
+  // per highlight.
+  const scrollRef = useRef<ScrollView>(null);
+  const laterSectionY = useRef<number | null>(null);
+  const laterRowY = useRef(new Map<string, number>());
+  const scrolledFor = useRef<number | null>(null);
+
+  const scrollToTarget = useCallback((to: HighlightTarget, seq: number | null) => {
+    if (to === null || seq === null || scrolledFor.current === seq) return;
+    let y: number | null = 0;
+    if (to.where === 'later') {
+      const section = laterSectionY.current;
+      const row = laterRowY.current.get(to.segmentId);
+      y = section === null || row === undefined ? null : section + row;
+    }
+    if (y === null) return;
+    scrolledFor.current = seq;
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - Spacing.three), animated: true });
+    AccessibilityInfo.announceForAccessibility('Showing the flight from your notification.');
+  }, []);
+
+  useEffect(() => {
+    scrollToTarget(target, highlightSeq);
+  }, [target, highlightSeq, scrollToTarget]);
+
+  const onLaterSectionLayout = (event: LayoutChangeEvent) => {
+    laterSectionY.current = event.nativeEvent.layout.y;
+    scrollToTarget(target, highlightSeq);
+  };
+  const onLaterRowLayout = (segmentId: string) => (event: LayoutChangeEvent) => {
+    laterRowY.current.set(segmentId, event.nativeEvent.layout.y);
+    if (target?.segmentId === segmentId) scrollToTarget(target, highlightSeq);
+  };
   const membershipsState = sectionState(memberships.data, memberships.error);
   const pastState = sectionState(past.data, past.error);
 
   return (
     <ThemedView style={styles.screen}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl
@@ -123,11 +236,13 @@ export default function DashboardScreen() {
                   />
                 ) : null}
                 {segmentsState === 'ready' && model.main !== null ? (
-                  <FlightCard
-                    data={cardDataFromSegment(model.main)}
-                    variant="pinned"
-                    caption={model.main.tripLabel}
-                  />
+                  <HighlightFrame active={target?.where === 'main'}>
+                    <FlightCard
+                      data={cardDataFromSegment(model.main)}
+                      variant="pinned"
+                      caption={model.main.tripLabel}
+                    />
+                  </HighlightFrame>
                 ) : null}
                 {segmentsState === 'ready' && model.main === null ? (
                   <SectionEmpty>No upcoming flights. Tap + below to add one.</SectionEmpty>
@@ -187,17 +302,46 @@ export default function DashboardScreen() {
 
               {/* 3. Everything else still ahead. */}
               {model.later.length > 0 ? (
-                <Section title="Later flights">
-                  {model.later.map((segment) => (
-                    <UpcomingFlightRow key={segment.segmentId} segment={segment} />
-                  ))}
-                </Section>
+                <View onLayout={onLaterSectionLayout}>
+                  <Section title="Later flights">
+                    {model.later.map((segment) => (
+                      <HighlightFrame
+                        key={segment.segmentId}
+                        active={target?.where === 'later' && target.segmentId === segment.segmentId}
+                        onLayout={onLaterRowLayout(segment.segmentId)}>
+                        <UpcomingFlightRow segment={segment} />
+                      </HighlightFrame>
+                    ))}
+                  </Section>
+                </View>
               ) : null}
             </>
           )}
         </View>
       </ScrollView>
     </ThemedView>
+  );
+}
+
+/**
+ * An accent outline drawn over a card, for the flight a notification was
+ * about. Absolutely positioned, so switching it on moves nothing.
+ */
+function HighlightFrame({
+  active,
+  onLayout,
+  children,
+}: {
+  active: boolean;
+  onLayout?: (event: LayoutChangeEvent) => void;
+  children: ReactNode;
+}) {
+  const theme = useTheme();
+  return (
+    <View onLayout={onLayout}>
+      {children}
+      {active ? <View style={[styles.highlight, { borderColor: theme.accent }]} /> : null}
+    </View>
   );
 }
 
@@ -237,6 +381,16 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     padding: Spacing.three,
     gap: Spacing.four,
+  },
+  highlight: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: Spacing.three,
+    borderWidth: 2,
+    pointerEvents: 'none',
   },
   empty: {
     flexGrow: 1,

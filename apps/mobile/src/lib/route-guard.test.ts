@@ -82,6 +82,27 @@ describe('routeFor', () => {
   });
 });
 
+describe('a notification tap (use-notification-taps.ts navigates only to the dashboard)', () => {
+  const dashboard = at('(app)', '(tabs)');
+
+  it('keeps a signed-in user on the dashboard', () => {
+    expect(routeFor({ ...base, signedIn: true, segments: dashboard })).toBeNull();
+  });
+
+  it('sends a signed-out user to welcome, cold start included', () => {
+    // Cold start: nothing is decided until the keychain answers…
+    expect(routeFor({ ...base, isLoading: true, segments: dashboard })).toBeNull();
+    // …then signed out means welcome, whatever the tap wanted.
+    expect(routeFor({ ...base, segments: dashboard })).toBe('/welcome');
+  });
+
+  it('cannot take a recovery session past set-password', () => {
+    expect(routeFor({ ...base, signedIn: true, isRecovering: true, segments: dashboard })).toBe(
+      '/set-password',
+    );
+  });
+});
+
 describe('linkExchangeFor (the email-link callback)', () => {
   it('waits while the stored session is unknown, so a cold start cannot overwrite it', () => {
     expect(linkExchangeFor({ isLoading: true, signedIn: false })).toBe('wait');
