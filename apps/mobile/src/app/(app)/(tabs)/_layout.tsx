@@ -25,7 +25,8 @@ export default function TabsLayout() {
       screenOptions={{ headerTitleAllowFontScaling: false }}>
       <Tabs.Screen name="index" options={{ title: 'Your flights' }} />
       <Tabs.Screen name="groups" options={{ title: 'Groups' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+      {/* Profile draws its own large title, with the Edit button beside it. */}
+      <Tabs.Screen name="profile" options={{ title: 'Profile', headerShown: false }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
     </Tabs>
   );

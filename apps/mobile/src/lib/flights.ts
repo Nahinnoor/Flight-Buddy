@@ -16,7 +16,7 @@
  */
 import { sortByScheduledDeparture, sortPastFlights, type SegmentView } from './dashboard-model';
 import { MOCK_API } from './env';
-import { listMockPastSegments, listMockSegments } from './mock/store';
+import { listMockAllSegments, listMockPastSegments, listMockSegments } from './mock/store';
 import { supabase } from './supabase';
 
 export type { FlightRow, SegmentView } from './dashboard-model';
@@ -26,6 +26,13 @@ export type { FlightRow, SegmentView } from './dashboard-model';
  * pathological account, not a page size anyone should reach.
  */
 const PAST_FLIGHTS_LIMIT = 200;
+
+/**
+ * Backstop for the Profile's lifetime list: PostgREST's own default row cap,
+ * made explicit. Archived flights are purged after 90 days (§1), so an account
+ * reaching it is pathological, and it would undercount rather than fail.
+ */
+const ALL_FLIGHTS_LIMIT = 1000;
 
 /**
  * `flights!inner` matters twice: it drops segments whose flight is filtered
@@ -116,6 +123,31 @@ export async function fetchPastSegments(userId: string): Promise<SegmentView[]> 
       nullsFirst: false,
     })
     .limit(PAST_FLIGHTS_LIMIT);
+
+  if (error !== null) throw new Error(error.message);
+
+  return sortPastFlights((data ?? []).map(toView));
+}
+
+/**
+ * Every one of the user's own legs, archived or not, most recent departure
+ * first — the input to the Profile's totals and flight log. Same query and
+ * same `travelers.user_id` filter as above, without the archive filter.
+ * Which of these count as flights *taken* is `profile-stats.ts`'s call.
+ */
+export async function fetchAllMySegments(userId: string): Promise<SegmentView[]> {
+  if (MOCK_API) return sortPastFlights(listMockAllSegments());
+
+  const { data, error } = await supabase
+    .from('trip_segments')
+    .select(SEGMENT_SELECT)
+    .eq('trips.travelers.user_id', userId)
+    .order('scheduled_departure_utc', {
+      referencedTable: 'flights',
+      ascending: false,
+      nullsFirst: false,
+    })
+    .limit(ALL_FLIGHTS_LIMIT);
 
   if (error !== null) throw new Error(error.message);
 

@@ -16,6 +16,7 @@
  */
 import type { FlightCandidate } from '@flightbuddy/shared';
 
+import type { GroupTripInput } from '../profile-stats';
 import {
   sortByScheduledDeparture,
   type FlightRow,
@@ -94,6 +95,9 @@ function flightRowFromCandidate(candidate: FlightCandidate, index: number): Flig
     alert_subscription_id: null,
     alert_subscribed_at: null,
     raw_payload: null,
+    distance_km: candidate.distanceKm ?? null,
+    origin_country_code: candidate.originCountryCode ?? null,
+    destination_country_code: candidate.destinationCountryCode ?? null,
     archived_at: null,
     created_at: now,
     updated_at: now,
@@ -137,6 +141,15 @@ export function listMockSegments(): SegmentView[] {
 /** Archived legs. */
 export function listMockPastSegments(): SegmentView[] {
   return [...data().past];
+}
+
+/** Every own leg, upcoming, added and archived: the Profile's input. */
+export function listMockAllSegments(): SegmentView[] {
+  return [...data().segments, ...added, ...data().past];
+}
+
+export function listMockGroupTrips(): GroupTripInput[] {
+  return data().groupTrips;
 }
 
 export function listMockMemberships(): MembershipView[] {

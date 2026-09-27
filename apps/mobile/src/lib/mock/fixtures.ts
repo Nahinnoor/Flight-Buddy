@@ -12,11 +12,23 @@
  * - `no-groups`: one upcoming flight, a pending-only membership, and more
  *   archived flights than the dashboard's preview shows, so the past-flights
  *   section and its "See all" link both render.
- * - `empty`: nothing at all — the empty dashboard.
+ * - `empty`: nothing at all — the empty dashboard, and every empty state on
+ *   Profile (no flights taken, level 1, no group trips).
+ *
+ * `full` also carries a Profile's worth of history: twenty landed flights
+ * across six countries (one old row with no distance or country, as rows from
+ * before those columns existed are), a mix of early, on-time, delayed and
+ * diverted arrivals, and three group trips this year with made-up members
+ * chosen so every "flying with friends" row renders — including an
+ * unclaimed traveller, a member whose flight was cancelled, one who landed
+ * at another airport, and one who landed more than 12 hours later. The group
+ * trips sit 10–75 days before now, so from January to mid-March some of them
+ * fall in last year and the section shows fewer (or its empty state).
  *
  * Flight numbers are synthetic-looking on purpose and carry no real itinerary.
  */
 import type { MembershipView, SegmentView, FlightRow, LegTimes } from '../dashboard-model';
+import type { GroupMemberTrip, GroupTripInput } from '../profile-stats';
 
 export type MockScenario = 'full' | 'no-groups' | 'empty';
 
@@ -32,12 +44,14 @@ export interface MockProfile {
   displayName: string;
   email: string;
   quietHoursEnabled: boolean;
+  createdAt: string;
 }
 
 export interface MockData {
   segments: SegmentView[];
   past: SegmentView[];
   memberships: MembershipView[];
+  groupTrips: GroupTripInput[];
 }
 
 /** Deterministic, schema-valid v4-shaped UUID so responses parse like real ones. */
@@ -65,6 +79,11 @@ interface FlightSpec {
   departed?: boolean;
   landed?: boolean;
   archived?: boolean;
+  /** Minutes the actual times ran behind schedule; negative is early. */
+  lateMin?: number;
+  distanceKm?: number | null;
+  originCountry?: string | null;
+  destinationCountry?: string | null;
 }
 
 function localDate(instant: Date, timeZone: string): string {
@@ -76,6 +95,7 @@ function flightRow(spec: FlightSpec, now: Date): FlightRow {
   const departure = new Date(now.getTime() + spec.departsInHours * HOUR_MS);
   const arrival = new Date(departure.getTime() + spec.durationHours * HOUR_MS);
   const iso = (date: Date) => date.toISOString();
+  const late = (date: Date) => new Date(date.getTime() + (spec.lateMin ?? 0) * 60_000);
 
   return {
     id: mockUuid(3, spec.index),
@@ -92,10 +112,10 @@ function flightRow(spec: FlightSpec, now: Date): FlightRow {
     terminal: spec.terminal ?? null,
     scheduled_departure_utc: iso(departure),
     estimated_departure_utc: null,
-    actual_departure_utc: spec.departed === true ? iso(departure) : null,
+    actual_departure_utc: spec.departed === true ? iso(late(departure)) : null,
     scheduled_arrival_utc: iso(arrival),
     estimated_arrival_utc: null,
-    actual_arrival_utc: spec.landed === true ? iso(arrival) : null,
+    actual_arrival_utc: spec.landed === true ? iso(late(arrival)) : null,
     aircraft_reg: null,
     aircraft_model: null,
     next_poll_at: null,
@@ -105,7 +125,10 @@ function flightRow(spec: FlightSpec, now: Date): FlightRow {
     alert_subscription_id: null,
     alert_subscribed_at: null,
     raw_payload: null,
-    archived_at: spec.archived === true ? iso(new Date(arrival.getTime() + HOUR_MS / 2)) : null,
+    distance_km: spec.distanceKm ?? null,
+    origin_country_code: spec.originCountry ?? null,
+    destination_country_code: spec.destinationCountry ?? null,
+    archived_at: spec.archived === true ? iso(new Date(late(arrival).getTime() + HOUR_MS / 2)) : null,
     created_at: iso(now),
     updated_at: iso(now),
   };
@@ -151,18 +174,25 @@ const LISBON = 'Europe/Lisbon';
 const TOKYO = 'Asia/Tokyo';
 const LONDON = 'Europe/London';
 const CHICAGO = 'America/Chicago';
+const LOS_ANGELES = 'America/Los_Angeles';
+const MEXICO_CITY = 'America/Mexico_City';
+
+const COUNTRY: Record<string, string> = {
+  JFK: 'US', ORD: 'US', LAX: 'US', SFO: 'US', BOS: 'US', MIA: 'US',
+  LHR: 'GB', CDG: 'FR', LIS: 'PT', OPO: 'PT', HND: 'JP', NRT: 'JP', MEX: 'MX',
+};
 
 function pastFlights(count: number, now: Date): SegmentView[] {
-  const routes: [string, string, string, string, string, string][] = [
-    ['ZB', '410', 'JFK', 'ORD', NYC, CHICAGO],
-    ['ZB', '411', 'ORD', 'JFK', CHICAGO, NYC],
-    ['ZC', '72', 'JFK', 'LHR', NYC, LONDON],
-    ['ZC', '73', 'LHR', 'JFK', LONDON, NYC],
-    ['ZD', '908', 'JFK', 'CDG', NYC, PARIS],
-    ['ZD', '909', 'CDG', 'JFK', PARIS, NYC],
-    ['ZB', '520', 'JFK', 'ORD', NYC, CHICAGO],
+  const routes: [string, string, string, string, string, string, number][] = [
+    ['ZB', '410', 'JFK', 'ORD', NYC, CHICAGO, 1188],
+    ['ZB', '411', 'ORD', 'JFK', CHICAGO, NYC, 1188],
+    ['ZC', '72', 'JFK', 'LHR', NYC, LONDON, 5540],
+    ['ZC', '73', 'LHR', 'JFK', LONDON, NYC, 5540],
+    ['ZD', '908', 'JFK', 'CDG', NYC, PARIS, 5837],
+    ['ZD', '909', 'CDG', 'JFK', PARIS, NYC, 5837],
+    ['ZB', '520', 'JFK', 'ORD', NYC, CHICAGO, 1188],
   ];
-  return routes.slice(0, count).map(([carrier, number, origin, destination, originTz, destinationTz], i) =>
+  return routes.slice(0, count).map(([carrier, number, origin, destination, originTz, destinationTz, km], i) =>
     segment(
       {
         index: 100 + i,
@@ -178,6 +208,9 @@ function pastFlights(count: number, now: Date): SegmentView[] {
         departed: true,
         landed: true,
         archived: true,
+        distanceKm: km,
+        originCountry: COUNTRY[origin] ?? null,
+        destinationCountry: COUNTRY[destination] ?? null,
       },
       { id: mockUuid(1, 100 + i), label: null },
       1,
@@ -187,7 +220,7 @@ function pastFlights(count: number, now: Date): SegmentView[] {
 }
 
 export function buildMockData(scenario: MockScenario, now: Date): MockData {
-  if (scenario === 'empty') return { segments: [], past: [], memberships: [] };
+  if (scenario === 'empty') return { segments: [], past: [], memberships: [], groupTrips: [] };
 
   const pendingRequest: MembershipView = {
     membershipId: mockUuid(5, 4),
@@ -220,7 +253,7 @@ export function buildMockData(scenario: MockScenario, now: Date): MockData {
         now,
       ),
     ];
-    return { segments, past: pastFlights(7, now), memberships: [pendingRequest] };
+    return { segments, past: pastFlights(7, now), memberships: [pendingRequest], groupTrips: [] };
   }
 
   // ---- full ----
@@ -343,11 +376,173 @@ export function buildMockData(scenario: MockScenario, now: Date): MockData {
     },
   ];
 
-  return { segments, past: pastFlights(3, now), memberships };
+  const profileHistory = history(now);
+  return { segments, past: profileHistory.flights, memberships, groupTrips: profileHistory.groupTrips };
+}
+
+// ------------------------------------------------------ profile history ---
+
+interface HistorySpec {
+  carrier: string;
+  number: string;
+  origin: string;
+  destination: string;
+  originTz: string;
+  destinationTz: string;
+  durationHours: number;
+  km: number | null;
+  /** Hours before now that it landed. */
+  landedHoursAgo: number;
+  lateMin?: number;
+  status?: FlightRow['status'];
+}
+
+/** The three group trips: when you landed, relative to now. */
+const LA_LANDED = 10 * 24;
+const LISBON_LANDED = 40 * 24;
+const TOKYO_LANDED = 75 * 24;
+
+const HISTORY: readonly HistorySpec[] = [
+  { carrier: 'ZG', number: '1915', origin: 'JFK', destination: 'LAX', originTz: NYC, destinationTz: LOS_ANGELES, durationHours: 6, km: 3983, landedHoursAgo: LA_LANDED, lateMin: -12 },
+  { carrier: 'ZG', number: '1916', origin: 'LAX', destination: 'JFK', originTz: LOS_ANGELES, destinationTz: NYC, durationHours: 5.3, km: 3983, landedHoursAgo: LA_LANDED - 70 },
+  { carrier: 'ZF', number: '201', origin: 'JFK', destination: 'LIS', originTz: NYC, destinationTz: LISBON, durationHours: 6.75, km: 5418, landedHoursAgo: LISBON_LANDED, lateMin: 3 },
+  { carrier: 'ZF', number: '1944', origin: 'LIS', destination: 'OPO', originTz: LISBON, destinationTz: LISBON, durationHours: 1, km: 274, landedHoursAgo: LISBON_LANDED - 50, lateMin: 25 },
+  { carrier: 'ZF', number: '208', origin: 'OPO', destination: 'JFK', originTz: LISBON, destinationTz: NYC, durationHours: 8, km: 5300, landedHoursAgo: LISBON_LANDED - 120 },
+  { carrier: 'ZE', number: '9', origin: 'JFK', destination: 'HND', originTz: NYC, destinationTz: TOKYO, durationHours: 14, km: 10870, landedHoursAgo: TOKYO_LANDED, lateMin: -20 },
+  { carrier: 'ZE', number: '10', origin: 'HND', destination: 'JFK', originTz: TOKYO, destinationTz: NYC, durationHours: 13, km: 10870, landedHoursAgo: TOKYO_LANDED - 160, lateMin: 110 },
+  { carrier: 'ZC', number: '72', origin: 'JFK', destination: 'LHR', originTz: NYC, destinationTz: LONDON, durationHours: 7, km: 5540, landedHoursAgo: 100 * 24 },
+  { carrier: 'ZC', number: '331', origin: 'LHR', destination: 'CDG', originTz: LONDON, destinationTz: PARIS, durationHours: 1.25, km: 344, landedHoursAgo: 97 * 24, status: 'diverted' },
+  { carrier: 'ZD', number: '909', origin: 'CDG', destination: 'JFK', originTz: PARIS, destinationTz: NYC, durationHours: 8.5, km: 5837, landedHoursAgo: 93 * 24 },
+  { carrier: 'ZH', number: '415', origin: 'JFK', destination: 'SFO', originTz: NYC, destinationTz: LOS_ANGELES, durationHours: 6.3, km: 4152, landedHoursAgo: 120 * 24, lateMin: -7 },
+  { carrier: 'ZH', number: '88', origin: 'SFO', destination: 'LAX', originTz: LOS_ANGELES, destinationTz: LOS_ANGELES, durationHours: 1.5, km: 543, landedHoursAgo: 118 * 24 },
+  { carrier: 'ZG', number: '1916', origin: 'LAX', destination: 'JFK', originTz: LOS_ANGELES, destinationTz: NYC, durationHours: 5.3, km: 3983, landedHoursAgo: 115 * 24, lateMin: 40 },
+  { carrier: 'ZJ', number: '404', origin: 'JFK', destination: 'MEX', originTz: NYC, destinationTz: MEXICO_CITY, durationHours: 5.2, km: 3360, landedHoursAgo: 150 * 24 },
+  { carrier: 'ZJ', number: '405', origin: 'MEX', destination: 'JFK', originTz: MEXICO_CITY, destinationTz: NYC, durationHours: 4.8, km: 3360, landedHoursAgo: 144 * 24 },
+  { carrier: 'ZB', number: '410', origin: 'JFK', destination: 'ORD', originTz: NYC, destinationTz: CHICAGO, durationHours: 2.6, km: 1188, landedHoursAgo: 180 * 24 },
+  { carrier: 'ZB', number: '411', origin: 'ORD', destination: 'JFK', originTz: CHICAGO, destinationTz: NYC, durationHours: 2.2, km: 1188, landedHoursAgo: 178 * 24 },
+  // An old row from before distance and country were stored.
+  { carrier: 'ZK', number: '2100', origin: 'BOS', destination: 'JFK', originTz: NYC, destinationTz: NYC, durationHours: 1.2, km: null, landedHoursAgo: 240 * 24 },
+  { carrier: 'ZK', number: '2101', origin: 'JFK', destination: 'BOS', originTz: NYC, destinationTz: NYC, durationHours: 1.2, km: 301, landedHoursAgo: 236 * 24 },
+  { carrier: 'ZL', number: '1203', origin: 'JFK', destination: 'MIA', originTz: NYC, destinationTz: NYC, durationHours: 3, km: 1753, landedHoursAgo: 270 * 24 },
+];
+
+/** A made-up co-member's leg into a group trip's destination. */
+function memberLeg(
+  now: Date,
+  landedHoursAgo: number,
+  offsetMin: number | null,
+  destination: string,
+  sequenceNumber = 1,
+) {
+  const landing = new Date(now.getTime() - landedHoursAgo * HOUR_MS + (offsetMin ?? 0) * 60_000);
+  return {
+    sequenceNumber,
+    destinationIata: destination,
+    // A date at an origin somewhere west of the destination, hours earlier.
+    departureDateLocal: localDate(new Date(landing.getTime() - 8 * HOUR_MS), NYC),
+    actualArrivalUtc: offsetMin === null ? null : landing.toISOString(),
+  };
+}
+
+function history(now: Date): { flights: SegmentView[]; groupTrips: GroupTripInput[] } {
+  const flights = HISTORY.map((spec, i) => {
+    const late = spec.lateMin ?? 0;
+    return segment(
+      {
+        index: 200 + i,
+        carrier: spec.carrier,
+        number: spec.number,
+        origin: spec.origin,
+        destination: spec.destination,
+        originTz: spec.originTz,
+        destinationTz: spec.destinationTz,
+        // Scheduled so that the *actual* landing is `landedHoursAgo`.
+        departsInHours: -spec.landedHoursAgo - spec.durationHours - late / 60,
+        durationHours: spec.durationHours,
+        status: spec.status ?? 'landed',
+        departed: true,
+        landed: true,
+        archived: true,
+        lateMin: late,
+        distanceKm: spec.km,
+        originCountry: spec.km === null ? null : (COUNTRY[spec.origin] ?? null),
+        destinationCountry: spec.km === null ? null : (COUNTRY[spec.destination] ?? null),
+      },
+      { id: mockUuid(1, 200 + i), label: null },
+      1,
+      now,
+    );
+  });
+
+  const ownLeg = (index: number): GroupMemberTrip['legs'][number] => {
+    const flight = flights[index]?.flight;
+    return {
+      sequenceNumber: 1,
+      destinationIata: flight?.destination_iata ?? '',
+      departureDateLocal: flight?.departure_date_local ?? '',
+      actualArrivalUtc: flight?.actual_arrival_utc ?? null,
+    };
+  };
+  const self = (index: number): GroupMemberTrip => ({
+    travelerId: mockUuid(7, 0),
+    isSelf: true,
+    displayName: MOCK_PROFILE.displayName,
+    legs: [ownLeg(index)],
+  });
+  const person = (
+    n: number,
+    displayName: string,
+    legs: GroupMemberTrip['legs'],
+  ): GroupMemberTrip => ({ travelerId: mockUuid(7, n), isSelf: false, displayName, legs });
+
+  const groupTrips: GroupTripInput[] = [
+    {
+      groupId: mockUuid(6, 20),
+      destinationIata: 'LAX',
+      members: [
+        self(0),
+        person(1, 'Priya Shah', [memberLeg(now, LA_LANDED, 12, 'LAX')]),
+        person(2, 'Marcus Reed', [memberLeg(now, LA_LANDED, 100, 'LAX')]),
+        // Cancelled: never landed, so not a buddy on this trip.
+        person(3, 'Dev Kapoor', [memberLeg(now, LA_LANDED, null, 'LAX')]),
+      ],
+    },
+    {
+      groupId: mockUuid(6, 21),
+      destinationIata: 'LIS',
+      members: [
+        self(2),
+        person(1, 'Priya Shah', [memberLeg(now, LISBON_LANDED, -8, 'LIS')]),
+        // Two legs: the arrival leg is the first into LIS, not the last.
+        person(4, 'Sofia Alves', [
+          memberLeg(now, LISBON_LANDED, 35, 'LIS', 1),
+          memberLeg(now, LISBON_LANDED - 30, 0, 'OPO', 2),
+        ]),
+        // An unclaimed traveller the owner added: still a buddy.
+        person(5, 'Hana Mori', [memberLeg(now, LISBON_LANDED, 70, 'LIS')]),
+      ],
+    },
+    {
+      groupId: mockUuid(6, 22),
+      destinationIata: 'HND',
+      members: [
+        self(5),
+        person(1, 'Priya Shah', [memberLeg(now, TOKYO_LANDED, 15, 'HND')]),
+        person(6, 'Kenji Ito', [memberLeg(now, TOKYO_LANDED, 25, 'HND')]),
+        // Another airport: a buddy, but never "in sync" or "waited for".
+        person(7, 'Lena Fischer', [memberLeg(now, TOKYO_LANDED, 10, 'NRT')]),
+        // More than 12 hours later: a buddy, not a wait.
+        person(8, 'Omar Haddad', [memberLeg(now, TOKYO_LANDED, 14 * 60, 'HND')]),
+      ],
+    },
+  ];
+
+  return { flights, groupTrips };
 }
 
 export const MOCK_PROFILE: MockProfile = {
   displayName: 'Sam Rivera',
   email: 'sam@example.com',
   quietHoursEnabled: true,
+  createdAt: '2025-03-14T15:00:00.000Z',
 };

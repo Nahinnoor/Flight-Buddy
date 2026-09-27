@@ -36,6 +36,34 @@ export const Colors = {
     warningSurface: '#FDECD6',
     criticalText: '#9E2117',
     criticalSurface: '#FCE3E0',
+    /** A pale wash of `accent`: the level chip, the flight-log plane chip. */
+    accentSurface: '#E3EEFB',
+    /**
+     * Three decorative tints, each a `*Text` icon colour on its `*Surface`.
+     * They tell the Profile insight rows apart and mean nothing about a
+     * flight, so they are deliberately not the status tones above. Every
+     * pair clears 4.5:1 (teal was darkened from the design's #1D7A62, which
+     * measured 4.48:1).
+     */
+    orangeText: '#B24A22',
+    orangeSurface: '#FDE9E0',
+    tealText: '#1A735C',
+    tealSurface: '#DDF2EB',
+    yellowText: '#8A5A00',
+    yellowSurface: '#FBF0D4',
+    /**
+     * Avatar fills for people's initials, cycled in order; blue uses
+     * `accent` / `onAccent`. `onAvatar` is the initials colour on orange, teal
+     * and yellow: 5.7, 5.3 and 8.3:1 in light (near-black), 8.3, 9.2 and
+     * 12.2:1 in dark (black). Red takes `onAvatarRed`: white on #D8362A is
+     * 4.7:1 in light, black on #FF6A5C is 7.5:1 in dark.
+     */
+    avatarOrange: '#E8734A',
+    avatarTeal: '#37A085',
+    avatarYellow: '#E0AC33',
+    avatarRed: '#D8362A',
+    onAvatar: '#1B1B1F',
+    onAvatarRed: '#FFFFFF',
   },
   dark: {
     text: '#ffffff',
@@ -59,6 +87,19 @@ export const Colors = {
     warningSurface: '#2E2113',
     criticalText: '#FF8C80',
     criticalSurface: '#301715',
+    accentSurface: '#10223A',
+    orangeText: '#F5A07F',
+    orangeSurface: '#33201A',
+    tealText: '#6FD7B6',
+    tealSurface: '#12291F',
+    yellowText: '#EDBF52',
+    yellowSurface: '#2E2513',
+    avatarOrange: '#F0875C',
+    avatarTeal: '#4FBE9D',
+    avatarYellow: '#EDBF52',
+    avatarRed: '#FF6A5C',
+    onAvatar: '#000000',
+    onAvatarRed: '#000000',
   },
 } as const;
 
@@ -142,6 +183,42 @@ export type IllustrationColor = keyof typeof Illustration.light &
  * every value a literal type, and the dark palette would then fail to be one.
  */
 export type IllustrationPalette = Record<IllustrationColor, string>;
+
+/**
+ * The Profile passport cover. Like `Illustration`, these exist only inside
+ * one drawing — a navy booklet with gold lettering — and carry no meaning
+ * about a flight, so they live apart from `Colors`. The cover is dark in both
+ * schemes (it is a passport, not a surface), slightly deeper in dark mode so
+ * it does not glow against a black page. Contrast on `cover`: `coverInk`
+ * 12.4:1 / 15.6:1, `coverSub` 7.2:1 / 7.7:1, `gold` 7.7:1 / 9.1:1, and the
+ * initials (drawn in `cover` on `photo`) 11.1:1 / 12.7:1.
+ */
+export const Passport = {
+  light: {
+    cover: '#1F3553',
+    /** Primary text on the cover. */
+    coverInk: '#FFFFFF',
+    /** Field labels, the stat captions and the machine-readable lines. */
+    coverSub: '#B9C6D8',
+    /** The FLIGHTBUDDY … PASSPORT line and the dashed trail. */
+    gold: '#F1C65B',
+    /** Globe outline and the rule above the totals. Decorative, no contrast target. */
+    coverLine: '#34507A',
+    /** The photo tile behind the initials. */
+    photo: '#EAF3FE',
+  },
+  dark: {
+    cover: '#15243A',
+    coverInk: '#FFFFFF',
+    coverSub: '#A9B8CC',
+    gold: '#EDBF52',
+    coverLine: '#2A4262',
+    photo: '#DCE9F8',
+  },
+} as const;
+
+export type PassportColor = keyof typeof Passport.light & keyof typeof Passport.dark;
+export type PassportPalette = Record<PassportColor, string>;
 
 export const Fonts = Platform.select({
   ios: {

@@ -9,7 +9,7 @@
  * 2. **One compact card per active group**, soonest departure first, each with
  *    a countdown to the user's own first leg in that group — or, when the user
  *    is in no active group, **their most recent archived flights** in that same
- *    space, with a link to the full list on Profile.
+ *    space, with a link to the full Flight log.
  * 3. Any other upcoming legs, compactly, so nothing the user added drops out
  *    of sight.
  *
@@ -283,8 +283,8 @@ export default function DashboardScreen() {
                     pastState === 'ready' ? (
                       <TextButton
                         label="See all"
-                        accessibilityHint="Opens the full list on your profile"
-                        onPress={() => router.navigate('/profile')}
+                        accessibilityHint="Opens your flight log"
+                        onPress={() => router.push('/flight-log')}
                       />
                     ) : null
                   }>

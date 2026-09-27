@@ -29,6 +29,8 @@ export interface ProfileView {
   displayName: string;
   email: string | null;
   quietHoursEnabled: boolean;
+  /** When the account was created: the passport's "member since". */
+  createdAt: string;
 }
 
 export async function fetchProfile(userId: string): Promise<ProfileView> {
@@ -36,7 +38,7 @@ export async function fetchProfile(userId: string): Promise<ProfileView> {
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('display_name, email, quiet_hours_enabled')
+    .select('display_name, email, quiet_hours_enabled, created_at')
     .eq('id', userId)
     .maybeSingle();
 
@@ -48,6 +50,7 @@ export async function fetchProfile(userId: string): Promise<ProfileView> {
     displayName: data.display_name,
     email: data.email,
     quietHoursEnabled: data.quiet_hours_enabled,
+    createdAt: data.created_at,
   };
 }
 

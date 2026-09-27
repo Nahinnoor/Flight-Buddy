@@ -145,8 +145,8 @@ export default function AddFlightScreen() {
               </ThemedText>
               {/* Uncontrolled: the field owns its text and `query` only mirrors it.
                   Feeding `value` back raced fast input — a burst of keystrokes could
-                  outrun the JS round-trip and drop characters ("DL1915 SEP 28" became
-                  "DL1915 SEP"). Nothing else ever sets this text, so there is no
+                  outrun the JS round-trip and drop characters ("XY123 SEP 28" became
+                  "XY123 SEP"). Nothing else ever sets this text, so there is no
                   value to push back into the field. */}
               <TextInput
                 onChangeText={setQuery}
