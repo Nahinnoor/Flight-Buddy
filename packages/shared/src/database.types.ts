@@ -255,27 +255,51 @@ export type Database = {
       }
       notification_deliveries: {
         Row: {
+          attempts: number
+          claimed_until: string | null
+          created_at: string
           error: string | null
+          expo_ticket_id: string | null
           flight_event_id: string
           id: string
+          not_before: string | null
+          push_token_sha256: string | null
+          receipt_checked_at: string | null
+          recipient_reason: string
           sent_at: string | null
-          status: string | null
+          status: string
           user_id: string
         }
         Insert: {
+          attempts?: number
+          claimed_until?: string | null
+          created_at?: string
           error?: string | null
+          expo_ticket_id?: string | null
           flight_event_id: string
           id?: string
+          not_before?: string | null
+          push_token_sha256?: string | null
+          receipt_checked_at?: string | null
+          recipient_reason?: string
           sent_at?: string | null
-          status?: string | null
+          status?: string
           user_id: string
         }
         Update: {
+          attempts?: number
+          claimed_until?: string | null
+          created_at?: string
           error?: string | null
+          expo_ticket_id?: string | null
           flight_event_id?: string
           id?: string
+          not_before?: string | null
+          push_token_sha256?: string | null
+          receipt_checked_at?: string | null
+          recipient_reason?: string
           sent_at?: string | null
-          status?: string | null
+          status?: string
           user_id?: string
         }
         Relationships: [

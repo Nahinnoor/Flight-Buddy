@@ -109,6 +109,8 @@ export {
   buildInsertEventsSql,
   insertCreditLog,
   insertFlightEvents,
+  recordFlightEvents,
+  type RecordedEvents,
   isLoggableBalance,
   readLatestCreditBalance,
   type CreditLogSource,
@@ -187,3 +189,67 @@ export {
   type OperatorAlert,
 } from './engine/creditMonitor';
 export { ENGINE_TYPES, type FlightRow } from './engine/types';
+
+// --- wave 5: push notifications (§9, §8.10) -----------------------------------
+
+export {
+  ONCE_PER_FLIGHT_EVENT_TYPES,
+  notifyingEventTypes,
+  type PolicyState,
+} from './engine/notificationPolicy';
+export { recipientsCte } from './engine/recipients';
+export {
+  DELIVERY_ERRORS,
+  DELIVERY_STATUSES,
+  MAX_DELIVERY_AGE_MS,
+  MAX_SEND_ATTEMPTS,
+  RECEIPT_DELAY_MS,
+  RECEIPT_RETENTION_MS,
+  SEND_LEASE_MS,
+  retryDelayMs,
+  type DeliveryStatus,
+} from './push/deliveryStatus';
+export {
+  EXPO_ERROR_CODES,
+  EXPO_PUSH_RECEIPTS_URL,
+  EXPO_PUSH_SEND_URL,
+  ExpoRequestError,
+  MAX_MESSAGES_PER_REQUEST,
+  MAX_RECEIPT_IDS_PER_REQUEST,
+  createExpoPushClient,
+  sanitizeExpoCode,
+  type ExpoPushClient,
+  type ExpoPushMessage,
+  type ExpoReceipt,
+  type ExpoTicket,
+} from './push/expoClient';
+export { buildPushCopy, type MessageFacts, type PushCopy } from './push/messages';
+export {
+  OPERATOR_ALERT_QUEUE,
+  createOperatorAlertHandler,
+  createOperatorAlertSink,
+  operatorCopy,
+  sendOperatorAlert,
+  type OperatorAlertSink,
+  type OperatorNotice,
+} from './push/operatorAlerts';
+export {
+  CLAIM_DELIVERIES_SQL,
+  CLEAR_DEAD_TOKEN_SQL,
+  CLOSE_EXHAUSTED_SENDS_SQL,
+  FINALIZE_SENDS_SQL,
+  LOAD_DELIVERY_FACTS_SQL,
+  createPushSendHandler,
+  runPushSend,
+  type PushSendDeps,
+  type PushSendSummary,
+} from './push/pushSend';
+export {
+  FINALIZE_RECEIPTS_SQL,
+  SELECT_AWAITING_RECEIPTS_SQL,
+  createPushReceiptsHandler,
+  runPushReceipts,
+  type PushReceiptsDeps,
+  type PushReceiptsSummary,
+} from './push/pushReceipts';
+export { isExpoPushToken, pushTokenSha256 } from './push/tokens';

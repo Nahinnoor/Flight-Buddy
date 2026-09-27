@@ -6,7 +6,7 @@
  *            → match the leg on origin_iata
  *            → ingestFlight            (rule 7: the only writer of flight data)
  *            → detectChanges           (§8.2: against the last known value)
- *            → insert flight_events
+ *            → insert flight_events + notification_deliveries (one statement, wave 5)
  *            → (wave 3) subscribe at the window opening (ADR 0005), or unsubscribe at landed + 30 min
  *            → next_poll_at from the ladder, last_polled_at, failures reset
  * ```
@@ -54,7 +54,8 @@ import {
   nextPollAt,
   type LadderFlight,
 } from './ladder';
-import { insertFlightEvents, recordPollFailure, recordPollSuccess } from './repository';
+import { notifyingEventTypes } from './notificationPolicy';
+import { recordFlightEvents, recordPollFailure, recordPollSuccess } from './repository';
 import {
   isSubscribable,
   clampToWindowOpening,
@@ -94,6 +95,12 @@ export interface PollDependencies {
    */
   webhookBackupIntervalMs?: number | undefined;
   feedHealthCache?: FeedHealthCache;
+  /**
+   * Called when this poll created `notification_deliveries` rows, so the
+   * `push-send` job can run now rather than at its next minute (wave 5). Must
+   * not throw; the minute sweep is the backstop if the wake-up is lost.
+   */
+  onDeliveriesCreated?: (count: number) => void;
 }
 
 export type PollFailureReason =
@@ -291,7 +298,14 @@ export async function pollAndUpdate(
 
     // §8.2: against the last known value, so an unchanged flight yields nothing.
     events = detectChanges(flight, fresh);
-    eventIds = await insertFlightEvents(deps.pool, flight.id, events);
+    const recorded = await recordFlightEvents(
+      deps.pool,
+      flight.id,
+      events,
+      notifyingEventTypes(events, fresh),
+    );
+    eventIds = recorded.eventIds;
+    if (recorded.deliveries > 0) deps.onDeliveriesCreated?.(recorded.deliveries);
 
     // Landed + 30 min: stop and archive (§7.4, §7.6). Observed landing only — the
     // 6-hour backstop covers a flight that never reports one (§8.9).

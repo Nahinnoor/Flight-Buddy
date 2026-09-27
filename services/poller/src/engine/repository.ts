@@ -3,8 +3,9 @@
  *
  * Everything here is a parameterised statement against a table the
  * `flightbuddy_worker` role actually holds a grant on: `select, insert, update on
- * public.flights` and `select, insert on public.flight_events` (migration
- * `20260915021807_worker_role`). **There is no DELETE in this file**, because the
+ * public.flights`, `select, insert on public.flight_events`, `select, insert,
+ * update on public.notification_deliveries`, and column-level `select` on the
+ * trip tables the fan-out joins (migration `20260915021807_worker_role`). **There is no DELETE in this file**, because the
  * role has none anywhere — archiving is `archived_at = now()`, never a delete.
  *
  * The `flights` columns written here are the *scheduling* ones —
@@ -17,8 +18,10 @@
  * statement: the only thing built at runtime is the `($1, $2, …)` placeholder
  * list, and it is built from array indices.
  */
-import type { DetectedEvent } from './changeDetector';
+import type { DetectedEvent, FlightEventType } from './changeDetector';
 import type { Pool } from '../db';
+import { ONCE_PER_FLIGHT_EVENT_TYPES } from './notificationPolicy';
+import { recipientsCte } from './recipients';
 import { ENGINE_TYPES } from './types';
 
 // --- provider_credit_log (§7.6, §7.7) ----------------------------------------
@@ -138,11 +141,27 @@ export async function recordPollFailure(pool: Pool, update: PollFailureUpdate): 
 }
 
 /**
- * Build the multi-row insert for a batch of detected events.
+ * Build the statement that records a batch of detected events **and** fans each
+ * one out to its recipients (wave 5, §9).
+ *
+ * One statement, so it is atomic: an event is never committed without its
+ * `notification_deliveries` rows, and a crash cannot leave a change recorded but
+ * nobody told. The parts:
+ *
+ * 1. `inserted` — the `flight_events` rows, as before.
+ * 2. `recipients` — who is told (`recipients.ts`; own flights only in Phase 2).
+ * 3. `fanned` — one delivery per (event, user), `on conflict do nothing` on the
+ *    §9 unique key. A user who already had a delivery for a once-per-flight event
+ *    type on this flight (`ONCE_PER_FLIGHT_EVENT_TYPES`) is skipped, so a status
+ *    bounce cannot send a second "cancelled".
+ *
+ * Returns one row per event: its id, and the number of deliveries the whole
+ * statement created (the same on every row).
  *
  * Exported so a test can assert the statement's shape without a database. The
  * placeholder numbers come from the event's index in the array — never from any
- * value inside it.
+ * value inside it. The two trailing parameters are the notifying types and the
+ * once-per-flight types, both `text[]`.
  */
 export function buildInsertEventsSql(count: number): string {
   const rows: string[] = [];
@@ -152,23 +171,57 @@ export function buildInsertEventsSql(count: number): string {
       `($${base + 1}, $${base + 2}, $${base + 3}::jsonb, $${base + 4}::jsonb, $${base + 5})`,
     );
   }
-  return `insert into public.flight_events (flight_id, event_type, previous_value, new_value, source)
+  const notifyParam = `$${count * 5 + 1}`;
+  const onceParam = `$${count * 5 + 2}`;
+
+  return `with inserted as (
+insert into public.flight_events (flight_id, event_type, previous_value, new_value, source)
 values ${rows.join(', ')}
-returning id`;
+returning id, flight_id, event_type
+),
+${recipientsCte(notifyParam)},
+fanned as (
+  insert into public.notification_deliveries (flight_event_id, user_id, recipient_reason)
+  select r.flight_event_id, r.user_id, r.recipient_reason
+    from recipients r
+    join inserted i on i.id = r.flight_event_id
+   where not (
+           i.event_type = any(${onceParam}::text[])
+           and exists (
+                 select 1
+                   from public.notification_deliveries d
+                   join public.flight_events e on e.id = d.flight_event_id
+                  where d.user_id = r.user_id
+                    and e.flight_id = i.flight_id
+                    and e.event_type = i.event_type))
+  on conflict (flight_event_id, user_id) do nothing
+  returning id
+)
+select i.id, (select count(*) from fanned)::int as deliveries
+  from inserted i`;
+}
+
+export interface RecordedEvents {
+  eventIds: string[];
+  /** `notification_deliveries` rows created: > 0 means there is something to send. */
+  deliveries: number;
 }
 
 /**
- * Insert the events one poll detected, and return their ids.
+ * Insert the events one poll (or one delivery) detected, create their
+ * deliveries, and return both.
  *
- * One statement for the batch: the events of a single poll are one piece of news
- * about one flight, and wave 5 will fan them out to recipients together.
+ * @param notify The event types in this batch allowed to notify
+ *   (`notifyingEventTypes`). Events outside it are still recorded; they get no
+ *   delivery row.
  */
-export async function insertFlightEvents(
+export async function recordFlightEvents(
   pool: Pool,
   flightId: string,
   events: readonly DetectedEvent[],
-): Promise<string[]> {
-  if (events.length === 0) return [];
+  notify: readonly FlightEventType[],
+): Promise<RecordedEvents> {
+  if (events.length === 0) return { eventIds: [], deliveries: 0 };
 
   const values: unknown[] = [];
   for (const event of events) {
@@ -180,12 +233,26 @@ export async function insertFlightEvents(
       event.source,
     );
   }
+  values.push([...notify], [...ONCE_PER_FLIGHT_EVENT_TYPES]);
 
-  const result = await pool.query<{ id: string }>({
+  const result = await pool.query<{ id: string; deliveries: number | string }>({
     text: buildInsertEventsSql(events.length),
     values,
     types: ENGINE_TYPES,
   });
 
-  return result.rows.map((row) => row.id);
+  return {
+    eventIds: result.rows.map((row) => row.id),
+    deliveries: Number(result.rows[0]?.deliveries ?? 0),
+  };
+}
+
+/** `recordFlightEvents`, returning only the event ids. */
+export async function insertFlightEvents(
+  pool: Pool,
+  flightId: string,
+  events: readonly DetectedEvent[],
+  notify: readonly FlightEventType[],
+): Promise<string[]> {
+  return (await recordFlightEvents(pool, flightId, events, notify)).eventIds;
 }

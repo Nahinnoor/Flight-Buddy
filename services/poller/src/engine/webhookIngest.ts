@@ -15,7 +15,7 @@
  *   → detectChanges(current, webhook, source 'webhook')
  *   → gate_change / cancelled?  verification poll; the POLLED leg is what is
  *     ingested and diffed (ADR 0003 decision 1: if the poll disagrees, trust it)
- *   → ingestFlight (rule 7) → flight_events → next_poll_at from the ladder
+ *   → ingestFlight (rule 7) → flight_events + notification_deliveries → next_poll_at
  *   → balance → provider_credit_log ('webhook_payload')
  *   → mark the inbox row processed
  * ```
@@ -75,7 +75,13 @@ import { detectChanges, type FlightEventType } from './changeDetector';
 import { nextPollAt } from './ladder';
 import { DEFAULT_LEASE_MS, releaseLease } from './lease';
 import { ladderViewOf, operatingDesignator } from './poll';
-import { CREDIT_LOG_SOURCES, insertCreditLog, insertFlightEvents, isLoggableBalance } from './repository';
+import { notifyingEventTypes } from './notificationPolicy';
+import {
+  CREDIT_LOG_SOURCES,
+  insertCreditLog,
+  isLoggableBalance,
+  recordFlightEvents,
+} from './repository';
 import { ENGINE_TYPES, type FlightRow } from './types';
 
 /** Give up on a row after this many failed attempts (the brief: 5). */
@@ -202,6 +208,8 @@ export interface WebhookIngestDeps {
    */
   webhookBackupIntervalMs?: number | undefined;
   feedHealthCache?: FeedHealthCache;
+  /** As `PollDependencies.onDeliveriesCreated`: wake `push-send`. Must not throw. */
+  onDeliveriesCreated?: (count: number) => void;
   now?: () => Date;
   rng?: () => number;
   leaseMs?: number;
@@ -321,7 +329,10 @@ interface AppliedLeg {
  * ADR 0003 decision 1: one poll, through the limiter, matched on origin.
  * @throws VerificationLegMissingError, or whatever the provider throws.
  */
-async function verificationPoll(current: FlightRow, deps: WebhookIngestDeps): Promise<FlightCandidate> {
+async function verificationPoll(
+  current: FlightRow,
+  deps: WebhookIngestDeps,
+): Promise<FlightCandidate> {
   await deps.rateLimiter.acquire();
   const legs = await lookupCandidates(
     deps.provider,
@@ -368,7 +379,16 @@ async function applyLeg(
 
     // Rule 7 (§12.7): the only writer of flight data.
     await ingestFlight(fresh, deps.writer, { now: () => now });
-    const eventIds = await insertFlightEvents(deps.pool, current.id, events);
+    // The events and their deliveries in one statement. Verified gate and
+    // cancellation events notify from the POLLED leg, never the webhook's.
+    const recorded = await recordFlightEvents(
+      deps.pool,
+      current.id,
+      events,
+      notifyingEventTypes(events, fresh),
+    );
+    const eventIds = recorded.eventIds;
+    if (recorded.deliveries > 0) deps.onDeliveriesCreated?.(recorded.deliveries);
 
     // A subscribed `live` flight keeps the ADR 0004 backup cadence (null only when
     // that is disabled); a landed one gets its landed + 30 min poll, which
@@ -408,7 +428,10 @@ async function logDeliveryBalance(
   } else if (credits !== null) {
     // The delivery schema already requires an integer, so only an int4 overflow
     // reaches here. Say so, as `credit-check` does; the value itself is not logged.
-    deps.logger.warn({ inboxId }, 'delivery credit balance is not a loggable integer; not recorded');
+    deps.logger.warn(
+      { inboxId },
+      'delivery credit balance is not a loggable integer; not recorded',
+    );
   }
 }
 
@@ -416,7 +439,11 @@ async function markDone(client: PoolClient, inboxId: string, reason: string | nu
   await client.query({ text: MARK_INBOX_DONE_SQL, values: [inboxId, reason], types: ENGINE_TYPES });
 }
 
-function outcome(inboxId: string, kind: InboxOutcomeKind, extra: Partial<InboxOutcome> = {}): InboxOutcome {
+function outcome(
+  inboxId: string,
+  kind: InboxOutcomeKind,
+  extra: Partial<InboxOutcome> = {},
+): InboxOutcome {
   return { inboxId, kind, flightIds: [], events: [], eventIds: [], verifications: 0, ...extra };
 }
 
@@ -446,7 +473,10 @@ async function handleRow(
   } catch (error) {
     if (!(error instanceof ProviderDataError)) throw error;
     await markDone(client, row.id, INBOX_REASONS.INVALID_PAYLOAD);
-    logger.warn({ inboxId: row.id, errorName: error.name }, 'webhook delivery failed validation; closed, payload kept');
+    logger.warn(
+      { inboxId: row.id, errorName: error.name },
+      'webhook delivery failed validation; closed, payload kept',
+    );
     return outcome(row.id, 'invalid', { errorName: error.name });
   }
 
@@ -727,7 +757,10 @@ export function createInboxDrainer(deps: WebhookIngestDeps): InboxDrainer {
         if (key === lastFailure) {
           deps.logger.debug(fields, 'webhook inbox drain still failing');
         } else if (unavailable) {
-          deps.logger.warn(fields, 'webhook inbox unavailable (migration or grant not applied); drain skipped');
+          deps.logger.warn(
+            fields,
+            'webhook inbox unavailable (migration or grant not applied); drain skipped',
+          );
         } else {
           deps.logger.error(fields, 'webhook inbox drain failed');
         }

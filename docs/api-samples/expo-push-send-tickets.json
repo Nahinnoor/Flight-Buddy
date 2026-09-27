@@ -1,0 +1,23 @@
+{
+  "data": [
+    {
+      "status": "ok",
+      "id": "0f3a9d2c-1111-4c3e-9e2a-5b7c1d000001"
+    },
+    {
+      "status": "error",
+      "message": "\"ExponentPushToken[FAKE-test-dead-token-0002]\" is not a registered push notification recipient",
+      "details": {
+        "error": "DeviceNotRegistered",
+        "expoPushToken": "ExponentPushToken[FAKE-test-dead-token-0002]"
+      }
+    },
+    {
+      "status": "error",
+      "message": "Rate exceeded for this device",
+      "details": {
+        "error": "MessageRateExceeded"
+      }
+    }
+  ]
+}

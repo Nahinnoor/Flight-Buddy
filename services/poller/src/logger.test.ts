@@ -102,6 +102,24 @@ describe('createLogger', () => {
     expect(raw).not.toContain('not-a-real-token');
   });
 
+  it('redacts the Expo access token and anything shaped like a push message (wave 5)', () => {
+    const { raw } = logOnce({
+      EXPO_ACCESS_TOKEN: 'not-a-real-expo-access-token-0000',
+      accessToken: 'not-a-real-expo-access-token-0001',
+      message: {
+        to: 'ExponentPushToken[FAKE-log-test]',
+        title: 'DL 1 gate change: B12',
+        body: 'JFK → LAX',
+      },
+      messages: [{ to: 'ExponentPushToken[FAKE-log-test-2]' }],
+    });
+
+    expect(raw).not.toContain('not-a-real-expo-access-token');
+    expect(raw).not.toContain('ExponentPushToken');
+    expect(raw).not.toContain('gate change');
+    expect(raw).not.toContain('JFK');
+  });
+
   it('does not redact a secret pasted into the message string', () => {
     // Documenting the limit rather than pretending it away: pino redacts object
     // keys, not text. Every call site logs fields, never interpolated values.

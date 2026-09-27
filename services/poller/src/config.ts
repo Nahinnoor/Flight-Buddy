@@ -81,6 +81,25 @@ export const configSchema = z.object({
    */
   OPERATOR_USER_ID: z.uuid().optional(),
 
+  /**
+   * Expo access token for push sends (wave 5), sent as `Authorization: Bearer …`.
+   * Optional, **recommended**: with "enhanced push security" turned on for the
+   * Expo project, Expo refuses any send without it, so a leaked device push
+   * token alone cannot be used to push to that phone. Unset = sends carry no
+   * Authorization header (and fail with 401 if enhanced security is on).
+   *
+   * A secret: never logged (the logger redacts `EXPO_ACCESS_TOKEN`,
+   * `accessToken` and `authorization`), and a config error names the variable
+   * only. Visible ASCII, no spaces, so it cannot split a header.
+   */
+  EXPO_ACCESS_TOKEN: z
+    .string()
+    .refine(
+      (value) => /^[\x21-\x7E]{20,512}$/.test(value),
+      'must be 20–512 visible ASCII characters',
+    )
+    .optional(),
+
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
 
   /** Sleep between worker passes (§7.5). */

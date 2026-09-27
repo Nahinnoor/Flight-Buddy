@@ -4,7 +4,8 @@
  * `fakePool.ts` records statements and replays queued results, which proves what
  * SQL is sent but cannot prove what happens when two paths touch the same row —
  * and that is the whole of criterion 8 (poll/webhook race). This fake keeps real
- * state for `flights`, `flight_events`, `webhook_inbox` and `provider_credit_log`,
+ * state for `flights`, `flight_events`, `webhook_inbox`, `provider_credit_log`, and
+ * (wave 5) `notification_deliveries` with the recipient tables it joins,
  * and implements the engine's statements **by their exported constants**: any
  * statement it does not recognise throws, so a new query cannot slip past a test
  * unimplemented. The `FlightsWriter` it hands out is the real `pg` writer running
@@ -27,6 +28,16 @@ import {
 } from '@flightbuddy/flight-provider';
 
 import type { Pool } from '../db';
+import { pushTokenSha256 } from '../push/tokens';
+import { READ_OPERATOR_TOKEN_SQL } from '../push/operatorAlerts';
+import { FINALIZE_RECEIPTS_SQL, SELECT_AWAITING_RECEIPTS_SQL } from '../push/pushReceipts';
+import {
+  CLAIM_DELIVERIES_SQL,
+  CLEAR_DEAD_TOKEN_SQL,
+  CLOSE_EXHAUSTED_SENDS_SQL,
+  FINALIZE_SENDS_SQL,
+  LOAD_DELIVERY_FACTS_SQL,
+} from '../push/pushSend';
 import { DISARMED_THRESHOLDS_SQL, FAILOVER_SUBSCRIBED_FLIGHTS_SQL } from './creditMonitor';
 import { CLAIM_DUE_FLIGHTS_SQL, RELEASE_LEASE_SQL } from './lease';
 import { ACTIVE_SUBSCRIPTIONS_SQL, DETACH_SUBSCRIPTION_SQL } from './reconcile';
@@ -59,6 +70,33 @@ export interface MemoryEvent {
   previous_value: unknown;
   new_value: unknown;
   source: string;
+  detected_at: string;
+}
+
+/** A `notification_deliveries` row with the wave 5 columns. */
+export interface MemoryDelivery {
+  id: string;
+  flight_event_id: string;
+  user_id: string;
+  recipient_reason: string;
+  status: string;
+  error: string | null;
+  sent_at: string | null;
+  created_at: string;
+  attempts: number;
+  not_before: string | null;
+  claimed_until: string | null;
+  expo_ticket_id: string | null;
+  push_token_sha256: string | null;
+  receipt_checked_at: string | null;
+}
+
+export interface MemorySegment {
+  id: string;
+  trip_id: string;
+  flight_id: string;
+  marketing_carrier_iata: string | null;
+  marketing_flight_number: string | null;
 }
 
 export interface MemoryInboxRow {
@@ -84,10 +122,32 @@ export interface MemoryDb {
    */
   creditLog: { balance: number; source: string }[];
   statements: { text: string; values: readonly unknown[] }[];
+  /** `profiles(id, expo_push_token)`: the only profile columns the worker can see. */
+  profiles: Map<string, { id: string; expo_push_token: string | null }>;
+  travelers: Map<string, { id: string; user_id: string | null }>;
+  trips: Map<string, { id: string; traveler_id: string }>;
+  segments: MemorySegment[];
+  deliveries: MemoryDelivery[];
+  /**
+   * A traveller with one trip holding `flightIds`. `userId: null` is an unclaimed
+   * traveller (§3.4); otherwise a profile is created with `token`.
+   */
+  addTraveller(options: {
+    userId: string | null;
+    flightIds: string[];
+    token?: string | null;
+    marketing?: { carrier: string; number: string };
+  }): { travelerId: string; tripId: string };
   setNow(now: Date): void;
   addFlight(row: FlightRow): FlightRow;
   flight(id: string): FlightRow;
-  addInbox(row: { subscription_id: string; payload: unknown; id?: string; received_at?: string; attempts?: number }): string;
+  addInbox(row: {
+    subscription_id: string;
+    payload: unknown;
+    id?: string;
+    received_at?: string;
+    attempts?: number;
+  }): string;
   /** Make the next statement with exactly this text throw `error`. */
   failOn(text: string, error: Error): void;
 }
@@ -110,6 +170,11 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
   const events: MemoryEvent[] = [];
   const inbox: MemoryInboxRow[] = [];
   const creditLog: { balance: number; source: string }[] = [];
+  const profiles = new Map<string, { id: string; expo_push_token: string | null }>();
+  const travelers = new Map<string, { id: string; user_id: string | null }>();
+  const trips = new Map<string, { id: string; traveler_id: string }>();
+  const segments: MemorySegment[] = [];
+  const deliveries: MemoryDelivery[] = [];
   const statements: { text: string; values: readonly unknown[] }[] = [];
   const failures = new Map<string, Error>();
   /** inbox id → the client holding its row lock. */
@@ -162,6 +227,93 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
     return [{ id }];
   }
 
+  /** The owners (user ids) of every trip holding `flightId`, claimed travellers only. */
+  function ownRecipients(flightId: string): string[] {
+    const users = new Set<string>();
+    for (const segment of segments) {
+      if (segment.flight_id !== flightId) continue;
+      const trip = trips.get(segment.trip_id);
+      const traveler = trip === undefined ? undefined : travelers.get(trip.traveler_id);
+      if (traveler?.user_id) users.add(traveler.user_id);
+    }
+    return [...users];
+  }
+
+  /** `buildInsertEventsSql`: events, then the §9 fan-out, as the SQL does it. */
+  function insertEventsAndFanOut(values: readonly unknown[]): Row[] {
+    const eventValues = values.slice(0, values.length - 2);
+    const notify = values[values.length - 2] as string[];
+    const once = values[values.length - 1] as string[];
+    const inserted: MemoryEvent[] = [];
+    for (let i = 0; i < eventValues.length; i += 5) {
+      const event: MemoryEvent = {
+        id: randomUUID(),
+        flight_id: String(eventValues[i]),
+        event_type: String(eventValues[i + 1]),
+        previous_value: eventValues[i + 2] === null ? null : JSON.parse(String(eventValues[i + 2])),
+        new_value: JSON.parse(String(eventValues[i + 3])),
+        source: String(eventValues[i + 4]),
+        detected_at: now.toISOString(),
+      };
+      inserted.push(event);
+    }
+
+    // Snapshot semantics: the once-per-flight check sees deliveries from before
+    // this statement only, as a CTE does.
+    const before = [...deliveries];
+    const eventsBefore = [...events];
+    let created = 0;
+    for (const event of inserted) {
+      if (!notify.includes(event.event_type)) continue;
+      for (const userId of ownRecipients(event.flight_id)) {
+        if (once.includes(event.event_type)) {
+          const already = before.some((d) => {
+            const e = eventsBefore.find((candidate) => candidate.id === d.flight_event_id);
+            return (
+              d.user_id === userId &&
+              e !== undefined &&
+              e.flight_id === event.flight_id &&
+              e.event_type === event.event_type
+            );
+          });
+          if (already) continue;
+        }
+        if (deliveries.some((d) => d.flight_event_id === event.id && d.user_id === userId))
+          continue;
+        deliveries.push({
+          id: randomUUID(),
+          flight_event_id: event.id,
+          user_id: userId,
+          recipient_reason: 'own_flight',
+          status: 'pending',
+          error: null,
+          sent_at: null,
+          created_at: now.toISOString(),
+          attempts: 0,
+          not_before: null,
+          claimed_until: null,
+          expo_ticket_id: null,
+          push_token_sha256: null,
+          receipt_checked_at: null,
+        });
+        created += 1;
+      }
+    }
+    events.push(...inserted);
+    return inserted.map((event) => ({ id: event.id, deliveries: created }));
+  }
+
+  function unnestRows(values: readonly unknown[], names: readonly string[]): Row[] {
+    const columns = values.slice(0, names.length) as unknown[][];
+    return (columns[0] ?? []).map((_, index) => {
+      const row: Row = {};
+      names.forEach((name, column) => {
+        row[name] = columns[column]?.[index] ?? null;
+      });
+      return row;
+    });
+  }
+
   function run(clientId: number, text: string, values: readonly unknown[]): Row[] {
     statements.push({ text, values });
     const failure = failures.get(text);
@@ -177,21 +329,8 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
       return [];
     }
 
-    if (text.startsWith('insert into public.flight_events')) {
-      const ids: Row[] = [];
-      for (let i = 0; i < values.length; i += 5) {
-        const id = randomUUID();
-        events.push({
-          id,
-          flight_id: String(values[i]),
-          event_type: String(values[i + 1]),
-          previous_value: values[i + 2] === null ? null : JSON.parse(String(values[i + 2])),
-          new_value: JSON.parse(String(values[i + 3])),
-          source: String(values[i + 4]),
-        });
-        ids.push({ id });
-      }
-      return ids;
+    if (text.startsWith('with inserted as (\ninsert into public.flight_events')) {
+      return insertEventsAndFanOut(values);
     }
 
     switch (text) {
@@ -254,8 +393,14 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
               f.operating_flight_number.trim() === number &&
               f.id !== exclude,
           )
-          .sort((a, b) => (millis(a.alert_subscribed_at) ?? Infinity) - (millis(b.alert_subscribed_at) ?? Infinity))[0];
-        return holder === undefined ? [] : [{ alert_subscription_id: holder.alert_subscription_id }];
+          .sort(
+            (a, b) =>
+              (millis(a.alert_subscribed_at) ?? Infinity) -
+              (millis(b.alert_subscribed_at) ?? Infinity),
+          )[0];
+        return holder === undefined
+          ? []
+          : [{ alert_subscription_id: holder.alert_subscription_id }];
       }
 
       case STORE_SUBSCRIPTION_SQL: {
@@ -269,7 +414,10 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
       case COUNT_OTHER_HOLDERS_SQL: {
         const [subscriptionId, exclude] = values;
         const holders = [...flights.values()].filter(
-          (f) => f.alert_subscription_id === subscriptionId && f.archived_at === null && f.id !== exclude,
+          (f) =>
+            f.alert_subscription_id === subscriptionId &&
+            f.archived_at === null &&
+            f.id !== exclude,
         ).length;
         return [{ holders }];
       }
@@ -297,7 +445,12 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
         if (row === undefined) return [];
         inboxLocks.set(row.id, clientId);
         return [
-          { id: row.id, subscription_id: row.subscription_id, payload: row.payload, attempts: row.attempts },
+          {
+            id: row.id,
+            subscription_id: row.subscription_id,
+            payload: row.payload,
+            attempts: row.attempts,
+          },
         ];
       }
 
@@ -383,6 +536,173 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
         return swept.map((f) => ({ id: f.id }));
       }
 
+      case CLOSE_EXHAUSTED_SENDS_SQL: {
+        const closed = deliveries.filter(
+          (d) =>
+            d.status === 'sending' &&
+            d.claimed_until !== null &&
+            (millis(d.claimed_until) as number) < nowMs() &&
+            d.attempts >= Number(values[0]),
+        );
+        for (const d of closed) {
+          d.status = 'failed';
+          d.error = String(values[1]);
+          d.claimed_until = null;
+        }
+        return closed.map((d) => ({ id: d.id }));
+      }
+
+      case CLAIM_DELIVERIES_SQL: {
+        const [limit, leaseMs, maxAttempts] = values as [number, number, number];
+        const claimable = deliveries
+          .filter(
+            (d) =>
+              d.attempts < maxAttempts &&
+              ((d.status === 'pending' &&
+                (d.not_before === null || (millis(d.not_before) as number) <= nowMs())) ||
+                (d.status === 'sending' &&
+                  d.claimed_until !== null &&
+                  (millis(d.claimed_until) as number) < nowMs())),
+          )
+          .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+          .slice(0, limit);
+        for (const d of claimable) {
+          d.status = 'sending';
+          d.attempts += 1;
+          d.claimed_until = new Date(nowMs() + leaseMs).toISOString();
+        }
+        return claimable.map((d) => ({ id: d.id }));
+      }
+
+      case LOAD_DELIVERY_FACTS_SQL: {
+        const ids = values[0] as string[];
+        return deliveries
+          .filter((d) => ids.includes(d.id) && d.status === 'sending')
+          .flatMap((d) => {
+            const event = events.find((e) => e.id === d.flight_event_id);
+            const flight = event === undefined ? undefined : flights.get(event.flight_id);
+            if (event === undefined || flight === undefined) return [];
+            const profile = profiles.get(d.user_id);
+            const segment = segments
+              .filter((s) => {
+                if (s.flight_id !== flight.id) return false;
+                const trip = trips.get(s.trip_id);
+                const traveler = trip === undefined ? undefined : travelers.get(trip.traveler_id);
+                return traveler?.user_id === d.user_id;
+              })
+              .sort((a, b) => a.id.localeCompare(b.id))[0];
+            return [
+              {
+                delivery_id: d.id,
+                user_id: d.user_id,
+                attempts: d.attempts,
+                event_id: event.id,
+                event_type: event.event_type,
+                previous_value: event.previous_value,
+                new_value: event.new_value,
+                detected_at: event.detected_at,
+                flight_id: flight.id,
+                operating_carrier_iata: flight.operating_carrier_iata,
+                operating_flight_number: flight.operating_flight_number,
+                origin_iata: flight.origin_iata,
+                destination_iata: flight.destination_iata,
+                origin_tz: flight.origin_tz,
+                destination_tz: flight.destination_tz,
+                departure_date_local: flight.departure_date_local,
+                status: flight.status,
+                scheduled_departure_utc: flight.scheduled_departure_utc,
+                estimated_departure_utc: flight.estimated_departure_utc,
+                scheduled_arrival_utc: flight.scheduled_arrival_utc,
+                estimated_arrival_utc: flight.estimated_arrival_utc,
+                expo_push_token: profile?.expo_push_token ?? null,
+                marketing_carrier_iata: segment?.marketing_carrier_iata ?? null,
+                marketing_flight_number: segment?.marketing_flight_number ?? null,
+              },
+            ];
+          });
+      }
+
+      case FINALIZE_SENDS_SQL: {
+        for (const u of unnestRows(values, [
+          'id',
+          'status',
+          'ticket_id',
+          'token_sha256',
+          'error',
+          'not_before',
+        ])) {
+          const d = deliveries.find((row) => row.id === u.id);
+          if (d === undefined || d.status !== 'sending') continue;
+          d.status = String(u.status);
+          d.expo_ticket_id = (u.ticket_id as string | null) ?? null;
+          d.push_token_sha256 = (u.token_sha256 as string | null) ?? null;
+          d.error = (u.error as string | null) ?? null;
+          d.not_before = iso(u.not_before);
+          if (d.status === 'sent') d.sent_at = now.toISOString();
+          d.claimed_until = null;
+        }
+        return [];
+      }
+
+      case CLEAR_DEAD_TOKEN_SQL: {
+        const profile = profiles.get(String(values[0]));
+        if (
+          profile === undefined ||
+          profile.expo_push_token === null ||
+          pushTokenSha256(profile.expo_push_token) !== values[1]
+        ) {
+          return [];
+        }
+        profile.expo_push_token = null;
+        return [{ id: profile.id }];
+      }
+
+      case SELECT_AWAITING_RECEIPTS_SQL: {
+        const [delayMs, limit] = values as [number, number];
+        return deliveries
+          .filter(
+            (d) =>
+              d.status === 'sent' &&
+              d.expo_ticket_id !== null &&
+              d.sent_at !== null &&
+              (millis(d.sent_at) as number) <= nowMs() - delayMs &&
+              (d.receipt_checked_at === null ||
+                (millis(d.receipt_checked_at) as number) <= nowMs() - delayMs),
+          )
+          .sort(
+            (a, b) => (a.sent_at ?? '').localeCompare(b.sent_at ?? '') || a.id.localeCompare(b.id),
+          )
+          .slice(0, limit)
+          .map((d) => ({
+            id: d.id,
+            user_id: d.user_id,
+            expo_ticket_id: d.expo_ticket_id,
+            push_token_sha256: d.push_token_sha256,
+            sent_at: d.sent_at,
+            attempts: d.attempts,
+            detected_at:
+              events.find((e) => e.id === d.flight_event_id)?.detected_at ?? now.toISOString(),
+          }));
+      }
+
+      case FINALIZE_RECEIPTS_SQL: {
+        for (const u of unnestRows(values, ['id', 'status', 'error', 'not_before'])) {
+          const d = deliveries.find((row) => row.id === u.id);
+          if (d === undefined || d.status !== 'sent') continue;
+          d.status = String(u.status);
+          d.error = (u.error as string | null) ?? null;
+          d.not_before = iso(u.not_before);
+          if (d.status === 'pending') d.expo_ticket_id = null;
+          d.receipt_checked_at = now.toISOString();
+        }
+        return [];
+      }
+
+      case READ_OPERATOR_TOKEN_SQL: {
+        const profile = profiles.get(String(values[0]));
+        return profile === undefined ? [] : [{ expo_push_token: profile.expo_push_token }];
+      }
+
       case ACTIVE_SUBSCRIPTIONS_SQL:
         return [...flights.values()]
           .filter((f) => f.archived_at === null && f.alert_subscription_id !== null)
@@ -406,7 +726,10 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
   }
 
   function queryFor(clientId: number) {
-    return async (config: unknown, maybeValues?: unknown): Promise<{ rows: Row[]; rowCount: number }> => {
+    return async (
+      config: unknown,
+      maybeValues?: unknown,
+    ): Promise<{ rows: Row[]; rowCount: number }> => {
       const text = typeof config === 'string' ? config : (config as { text: string }).text;
       const values =
         typeof config === 'string'
@@ -440,6 +763,30 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
     inbox,
     creditLog,
     statements,
+    profiles,
+    travelers,
+    trips,
+    segments,
+    deliveries,
+    addTraveller({ userId, flightIds, token = null, marketing }) {
+      if (userId !== null && !profiles.has(userId)) {
+        profiles.set(userId, { id: userId, expo_push_token: token });
+      }
+      const travelerId = randomUUID();
+      travelers.set(travelerId, { id: travelerId, user_id: userId });
+      const tripId = randomUUID();
+      trips.set(tripId, { id: tripId, traveler_id: travelerId });
+      for (const flightId of flightIds) {
+        segments.push({
+          id: randomUUID(),
+          trip_id: tripId,
+          flight_id: flightId,
+          marketing_carrier_iata: marketing?.carrier ?? null,
+          marketing_flight_number: marketing?.number ?? null,
+        });
+      }
+      return { travelerId, tripId };
+    },
     setNow(next) {
       now = next;
     },

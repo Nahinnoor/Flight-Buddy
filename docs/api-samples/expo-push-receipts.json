@@ -1,0 +1,43 @@
+{
+  "data": {
+    "0f3a9d2c-1111-4c3e-9e2a-5b7c1d000001": {
+      "status": "ok"
+    },
+    "0f3a9d2c-1111-4c3e-9e2a-5b7c1d000002": {
+      "status": "error",
+      "message": "\"ExponentPushToken[FAKE-test-dead-token-0002]\" is not a registered push notification recipient",
+      "details": {
+        "error": "DeviceNotRegistered",
+        "expoPushToken": "ExponentPushToken[FAKE-test-dead-token-0002]"
+      }
+    },
+    "0f3a9d2c-1111-4c3e-9e2a-5b7c1d000003": {
+      "status": "error",
+      "message": "The Apple Push Notification service credentials for this app are invalid",
+      "details": {
+        "error": "InvalidCredentials"
+      }
+    },
+    "0f3a9d2c-1111-4c3e-9e2a-5b7c1d000004": {
+      "status": "error",
+      "message": "The message was too big",
+      "details": {
+        "error": "MessageTooBig"
+      }
+    },
+    "0f3a9d2c-1111-4c3e-9e2a-5b7c1d000005": {
+      "status": "error",
+      "message": "Rate exceeded for this device",
+      "details": {
+        "error": "MessageRateExceeded"
+      }
+    },
+    "0f3a9d2c-1111-4c3e-9e2a-5b7c1d000006": {
+      "status": "error",
+      "message": "The sender id does not match",
+      "details": {
+        "error": "MismatchSenderId"
+      }
+    }
+  }
+}

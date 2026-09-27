@@ -88,6 +88,10 @@ services:
       # phone (PHASE2_PLAN §8.4). Not a secret, but it is an id, so it is prompted.
       - key: OPERATOR_USER_ID
         sync: false
+      # Wave 5, recommended. Expo access token for push sends (enhanced push
+      # security: a leaked device token alone cannot push). A secret.
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
       # Not a secret: the API's /healthz. Keeps a free web service awake
       # (ADR 0004). Set it once the API service has an address.
       - key: KEEPALIVE_URL

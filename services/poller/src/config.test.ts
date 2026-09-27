@@ -60,6 +60,25 @@ describe('parseConfig', () => {
     expect(config.OPERATOR_USER_ID).toBe('0f2b9b4e-4a1d-4f4e-9a3f-1c2d3e4f5a6b');
   });
 
+  it('accepts an optional EXPO_ACCESS_TOKEN, and never echoes a bad one', () => {
+    const token = 'not-a-real-expo-access-token-0000000';
+    expect(parseConfig(env()).EXPO_ACCESS_TOKEN).toBeUndefined();
+    expect(parseConfig(env({ EXPO_ACCESS_TOKEN: token })).EXPO_ACCESS_TOKEN).toBe(token);
+
+    // A space or newline could split the Authorization header; too short is a paste error.
+    for (const bad of [`${token} x`, `${token}\r\nX-Evil: 1`, 'short']) {
+      let caught: unknown;
+      try {
+        parseConfig(env({ EXPO_ACCESS_TOKEN: bad }));
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(ConfigError);
+      expect((caught as ConfigError).variables).toEqual(['EXPO_ACCESS_TOKEN']);
+      expect((caught as Error).message).not.toContain(token);
+    }
+  });
+
   it('requires WEBHOOK_URL to be https, and never echoes it', () => {
     const plain = 'http://api.example.invalid/webhooks/aerodatabox/FAKE-TEST-TOKEN-not-a-secret';
     for (const bad of [plain, 'not a url', 'ftp://example.invalid/x']) {

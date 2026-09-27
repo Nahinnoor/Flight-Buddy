@@ -32,7 +32,15 @@ import {
 import { readLatestCreditBalance } from './engine/repository';
 import { createReconcileHandler } from './engine/reconcile';
 import { createInboxDrainer, type InboxDrainer } from './engine/webhookIngest';
-import { createBoss, startQueue, stopQueue, type PgBoss } from './queue';
+import { createExpoPushClient } from './push/expoClient';
+import {
+  OPERATOR_ALERT_RETRY,
+  createOperatorAlertHandler,
+  createOperatorAlertSink,
+} from './push/operatorAlerts';
+import { createPushReceiptsHandler } from './push/pushReceipts';
+import { createPushSendHandler } from './push/pushSend';
+import { QUEUE_NAMES, createBoss, startQueue, stopQueue, type PgBoss } from './queue';
 
 /** Everything a pass needs. Passed explicitly so `tick` stays testable. */
 export interface WorkerContext {
@@ -50,6 +58,8 @@ export interface WorkerContext {
   readonly inboxDrainer: InboxDrainer;
   /** Written by the hourly `credit-check`; read by every pass (§7.7). */
   readonly creditState: CreditState;
+  /** Wakes `push-send` when a pass created deliveries (wave 5). Never throws. */
+  readonly onDeliveriesCreated?: (count: number) => void;
 }
 
 /**
@@ -80,6 +90,9 @@ export async function tick(context: WorkerContext): Promise<void> {
     webhookBackupIntervalMs:
       context.config.WEBHOOK_BACKUP_POLL_MS > 0 ? context.config.WEBHOOK_BACKUP_POLL_MS : undefined,
     batchSize: context.config.POLL_BATCH_SIZE,
+    ...(context.onDeliveriesCreated === undefined
+      ? {}
+      : { onDeliveriesCreated: context.onDeliveriesCreated }),
   });
 }
 
@@ -211,6 +224,27 @@ async function main(): Promise<void> {
     );
   }
 
+  const boss = createBoss(config);
+
+  // --- wave 5: Expo push ------------------------------------------------------
+  // The access token is optional (enhanced push security); never logged.
+  const expo = createExpoPushClient({ accessToken: config.EXPO_ACCESS_TOKEN });
+  const operatorAlerts = createOperatorAlertSink({
+    operatorUserId: config.OPERATOR_USER_ID,
+    logger,
+    enqueue: (notice) => boss.send(QUEUE_NAMES.OPERATOR_ALERT, notice, OPERATOR_ALERT_RETRY),
+  });
+  // An event committed with deliveries wakes the sender now; the every-minute
+  // `push-send` sweep is the backstop if this wake-up is ever lost.
+  const onDeliveriesCreated = (count: number): void => {
+    boss.send(QUEUE_NAMES.PUSH_SEND, { reason: 'deliveries_created' }).catch((error: unknown) => {
+      logger.warn(
+        { count, errorName: error instanceof Error ? error.name : 'UnknownError' },
+        'could not wake push-send; the minute sweep will send these',
+      );
+    });
+  };
+
   // Deliveries only arrive while credits remain, so the drain keeps the boot-time
   // setting; a straggler scheduled onto the backup cadence during an outage is
   // pulled back by the next hourly sweep.
@@ -226,9 +260,9 @@ async function main(): Promise<void> {
     // silently took a flight off the ladder as soon as one delivery landed.
     webhookBackupIntervalMs:
       config.WEBHOOK_BACKUP_POLL_MS > 0 ? config.WEBHOOK_BACKUP_POLL_MS : undefined,
+    onDeliveriesCreated,
   });
 
-  const boss = createBoss(config);
   await startQueue({
     boss,
     logger,
@@ -243,8 +277,8 @@ async function main(): Promise<void> {
         logger,
         webhooksEnabled,
       }),
-      // §7.7. Wave 5 adds `onOperatorAlert` here (the Expo push to
-      // OPERATOR_USER_ID); until then the job's log line is the operator alert.
+      // §7.7. The job logs every crossing first; the sink then queues a push to
+      // OPERATOR_USER_ID (or, unset, says the log line is the alert).
       'credit-check': createCreditCheckHandler({
         pool,
         provider,
@@ -252,6 +286,24 @@ async function main(): Promise<void> {
         logger,
         webhooksEnabled,
         creditState,
+        operatorUserId: config.OPERATOR_USER_ID,
+        onOperatorAlert: (alert) =>
+          operatorAlerts.raise({
+            kind: alert.kind,
+            threshold: alert.threshold,
+            balance: alert.balance,
+            failedOver: alert.failedOverFlightIds.length,
+          }),
+      }),
+      'push-send': createPushSendHandler({ pool, expo, logger, operatorAlerts }),
+      'push-receipts': createPushReceiptsHandler({ pool, expo, logger, operatorAlerts }),
+    },
+    consumers: {
+      // Never raises another operator alert, whatever happens (no loops).
+      [QUEUE_NAMES.OPERATOR_ALERT]: createOperatorAlertHandler({
+        pool,
+        expo,
+        logger,
         operatorUserId: config.OPERATOR_USER_ID,
       }),
     },
@@ -268,6 +320,7 @@ async function main(): Promise<void> {
     feedHealthCache,
     inboxDrainer,
     creditState,
+    onDeliveriesCreated,
   };
   const shutdown = new AbortController();
 
@@ -304,6 +357,9 @@ async function main(): Promise<void> {
       batchSize: config.POLL_BATCH_SIZE,
       webhooksEnabled,
       webhookBackupPollMs: config.WEBHOOK_BACKUP_POLL_MS,
+      // Booleans, never the values.
+      operatorConfigured: config.OPERATOR_USER_ID !== undefined,
+      expoAccessTokenConfigured: config.EXPO_ACCESS_TOKEN !== undefined,
     },
     'poller started',
   );

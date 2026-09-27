@@ -11,6 +11,8 @@
 import { createFeedHealthCache, type FlightDataProvider } from '@flightbuddy/flight-provider';
 import { describe, expect, it } from 'vitest';
 
+import { FAKE_TOKEN_A, fakeExpo } from '../push/fakeExpo';
+import { runPushSend } from '../push/pushSend';
 import { claimDueFlights } from './lease';
 import { createMemoryDb } from './memoryDb';
 import { pollAndUpdate } from './poll';
@@ -29,6 +31,7 @@ import {
 
 const NOW = new Date('2026-09-11T20:00:00.000Z');
 const FLIGHT = 'flight-b6';
+const USER = '11111111-1111-4111-8111-111111111111';
 
 /** Gate B24 → B99 as seen by both paths: the poll and the webhook agree. */
 function scenario(options: { wrapProvider?: (p: FlightDataProvider) => FlightDataProvider } = {}) {
@@ -60,7 +63,10 @@ function scenario(options: { wrapProvider?: (p: FlightDataProvider) => FlightDat
   };
 
   const deliver = () =>
-    db.addInbox({ subscription_id: SUB, payload: alertEnvelope({ mutate: withDepartureGate('B99') }) });
+    db.addInbox({
+      subscription_id: SUB,
+      payload: alertEnvelope({ mutate: withDepartureGate('B99') }),
+    });
   const drain = () => drainWebhookInbox(common);
   /** Make the flight due, the way the landed+30 poll or a failover would. */
   const makeDue = () => {
@@ -69,7 +75,13 @@ function scenario(options: { wrapProvider?: (p: FlightDataProvider) => FlightDat
   const pollPass = () => runPollPass({ ...common, webhookUrl: FAKE_WEBHOOK_URL, batchSize: 25 });
   const gateEvents = () => db.events.filter((e) => e.event_type === 'gate_change');
 
-  return { db, fx, deliver, drain, makeDue, pollPass, gateEvents, common };
+  // Wave 5: the flight is on one user's own trip, with a push token.
+  db.addTraveller({ userId: USER, flightIds: [FLIGHT], token: FAKE_TOKEN_A });
+  const expo = fakeExpo();
+  const wakeUps: number[] = [];
+  const pushSend = () => runPushSend({ pool: db.pool, expo: expo.client, logger, now: () => NOW });
+
+  return { db, fx, deliver, drain, makeDue, pollPass, gateEvents, common, expo, pushSend, wakeUps };
 }
 
 describe('criterion 8: one change, one flight_events row', () => {
@@ -159,5 +171,48 @@ describe('criterion 8: one change, one flight_events row', () => {
     const pass = await s.pollPass();
     expect(pass.events).toBe(0);
     expect(s.db.events).toHaveLength(1);
+  });
+
+  it('one change seen by both paths gives one delivery and one push (criterion 8)', async () => {
+    const s = scenario();
+    const wake = (count: number) => void s.wakeUps.push(count);
+
+    // Webhook first (it wakes push-send), then a poll of the same data.
+    s.deliver();
+    await drainWebhookInbox({ ...s.common, onDeliveriesCreated: wake });
+    s.makeDue();
+    await runPollPass({
+      ...s.common,
+      webhookUrl: FAKE_WEBHOOK_URL,
+      batchSize: 25,
+      onDeliveriesCreated: wake,
+    });
+
+    // And the sweep runs as well as the wake-up: two send runs.
+    await s.pushSend();
+    await s.pushSend();
+
+    expect(s.db.events).toHaveLength(1);
+    expect(s.db.deliveries).toHaveLength(1);
+    expect(s.wakeUps).toEqual([1]);
+    expect(s.expo.messages()).toHaveLength(1);
+    expect(s.expo.messages()[0]).toMatchObject({
+      to: FAKE_TOKEN_A,
+      data: { eventType: 'gate_change' },
+    });
+    expect(s.db.deliveries[0]?.status).toBe('sent');
+  });
+
+  it('poll first, then the webhook: still one push', async () => {
+    const s = scenario();
+    s.makeDue();
+    await s.pollPass();
+    s.deliver();
+    await s.drain();
+
+    await s.pushSend();
+
+    expect(s.db.deliveries).toHaveLength(1);
+    expect(s.expo.messages()).toHaveLength(1);
   });
 });

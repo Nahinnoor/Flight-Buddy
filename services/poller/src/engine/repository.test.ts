@@ -121,8 +121,9 @@ describe('buildInsertEventsSql', () => {
     );
   });
 
-  it('inlines no literal at all', () => {
-    const sql = buildInsertEventsSql(3);
+  it('inlines no literal but the fixed recipient reason', () => {
+    // `'own_flight'` is our own constant (recipients.ts), never a value.
+    const sql = buildInsertEventsSql(3).replaceAll("'own_flight'", '');
     expect(sql).not.toContain("'");
     expect(sql).not.toContain(';');
   });
@@ -131,7 +132,7 @@ describe('buildInsertEventsSql', () => {
 describe('insertFlightEvents', () => {
   it('writes nothing, and asks nothing, for an empty batch', async () => {
     const fake = createFakePool();
-    await expect(insertFlightEvents(fake.pool, 'flight-1', [])).resolves.toEqual([]);
+    await expect(insertFlightEvents(fake.pool, 'flight-1', [], ['delay'])).resolves.toEqual([]);
     expect(fake.statements).toHaveLength(0);
   });
 
@@ -139,7 +140,12 @@ describe('insertFlightEvents', () => {
     const fake = createFakePool();
     fake.queue([{ id: 'event-1' }, { id: 'event-2' }]);
 
-    const ids = await insertFlightEvents(fake.pool, 'flight-1', [DELAY, GATE_CHANGE]);
+    const ids = await insertFlightEvents(
+      fake.pool,
+      'flight-1',
+      [DELAY, GATE_CHANGE],
+      ['gate_change'],
+    );
 
     expect(ids).toEqual(['event-1', 'event-2']);
     expect(fake.statements).toHaveLength(1);
@@ -154,6 +160,9 @@ describe('insertFlightEvents', () => {
       JSON.stringify(GATE_CHANGE.previousValue),
       JSON.stringify(GATE_CHANGE.newValue),
       'poll',
+      // The notifying types, then the once-per-flight types (§9 fan-out).
+      ['gate_change'],
+      ['departed', 'landed'],
     ]);
   });
 
@@ -170,7 +179,7 @@ describe('insertFlightEvents', () => {
       source: 'poll',
     };
 
-    await insertFlightEvents(fake.pool, 'flight-1', [hostile]);
+    await insertFlightEvents(fake.pool, 'flight-1', [hostile], ['gate_change']);
 
     expect(fake.statements[0]?.text).not.toContain('drop table');
     expect(fake.statements[0]?.text).toBe(buildInsertEventsSql(1));

@@ -126,6 +126,7 @@ Only what the code actually reads goes into Render. Each service gets only its o
 | `WEBHOOK_URL` | worker | Wave 3 | Full public receiver URL including the secret token; the worker registers it with AeroDataBox. |
 | `WEBHOOK_TOKEN` | API web service | Wave 3 | The same secret, so the receiver can check it. |
 | `OPERATOR_USER_ID` | worker | Wave 4 | Your profile id, so low-credit and failover alerts go to your phone. Not a secret. |
+| `EXPO_ACCESS_TOKEN` | worker | Wave 5 | Recommended. Expo access token for push sends; pair it with *enhanced push security* in the Expo project. A secret. |
 
 Deliberately **not** on the worker: `SUPABASE_SERVICE_ROLE_KEY` (the worker talks to Postgres directly, so it has no use for the REST admin key), the anon key, the Google client IDs, and the owner's `postgres` password. The API web service keeps the Supabase variables it already has (`apps/api/README.md`).
 

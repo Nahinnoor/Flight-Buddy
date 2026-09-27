@@ -178,7 +178,9 @@ A **scheduled job** wakes on a schedule inside the worker process (pg-boss's sch
 |---|---|---|
 | Flight poller (and the webhook inbox drain) | Background worker | Continuous loop |
 | Webhook receiver | Web service route, writes `webhook_inbox` | On delivery |
-| Notification sends | pg-boss queue | On demand, with retries |
+| Notification sends (`push-send`) | pg-boss queue in the worker | On demand when deliveries are created, plus a sweep every minute (retries with back-off) |
+| Push receipts, dead-token clearing (`push-receipts`) | pg-boss scheduled job in the worker | Every 5 minutes (asks about sends ≥ 15 min old) |
+| Operator alerts (`operator-alert`) | pg-boss queue in the worker | On demand, 5 retries with back-off |
 | Webhook payload processing | pg-boss queue | On demand |
 | Archive backstop (completed trips) | pg-boss scheduled job in the worker | Daily |
 | Purge past 90-day retention | pg-boss scheduled job in the worker (Phase 4) | Daily |
@@ -566,7 +568,7 @@ Required behaviour:
 1. An hourly scheduled job in the worker calls `GET /subscriptions/balance` (free).
 2. **No automatic refill (ADR 0003).** Credits are not drawn from the plan automatically; the balance only grows through `POST /subscriptions/balance/refill` (1 credit = 1 API unit), which the owner calls by hand. Below the low-water mark (300, then 100, then 0 credits) the job alerts the owner. It alerts **once per downward crossing**, not on every hourly reading below a mark: a mark is disarmed by the job's own `balance_check` reading at or below it, and re-armed by any later reading above it (webhook payload, refill or check). Webhook payloads never disarm a mark, so a delivery that logs a low balance first cannot swallow the alert. On the very first reading every mark is armed.
 3. **On zero balance, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken. The flight **keeps** its `alert_subscription_id` (the provider pauses subscriptions and resumes them on refill; detaching would let the hourly reconcile delete them). While the last reading is at or below zero, the poll pass runs as if webhooks were off: subscribed flights are polled on the failover ladder rather than the backup cadence, and **no new subscription is opened** at the window opening against an empty balance. When a reading returns above zero, the ordinary poll path puts subscribed flights back on the backup cadence and subscribes the rest; there is no separate recovery path.
-4. Alert the operator: a push notification to the owner's own phone through the Expo pipeline (`OPERATOR_USER_ID`). No Sentry or email for now (ADR 0003). Wave 4 detects and returns a typed operator alert and logs it (`warn`, `error` at zero); wave 5 connects the push.
+4. Alert the operator: a push notification to the owner's own phone through the Expo pipeline (`OPERATOR_USER_ID`). No Sentry or email for now (ADR 0003). Wave 4 detects and returns a typed operator alert and logs it (`warn`, `error` at zero); wave 5 queues it as an `operator-alert` pg-boss job (retried with back-off) that pushes to `OPERATOR_USER_ID`'s token. With no operator id or no token, the log line is the alert.
 
 Write an integration test that drains a dev balance to zero and asserts the poller takes over. Note the unit quota is per calendar month on RapidAPI; the owner is the only one who refills.
 
@@ -631,7 +633,9 @@ The poller closes the subscription whenever a flight stops being subscribable.
 
 **Quiet hours:** suppressed until the 24–48 hour window before the relevant flight. Inside that window, group notifications flow normally subject to mutes. Cancellations always break through.
 
-Every send writes a `notification_deliveries` row. The unique constraint on `(flight_event_id, user_id)` makes double-sending structurally impossible.
+Every send writes a `notification_deliveries` row. The unique constraint on `(flight_event_id, user_id)` makes a second, independent delivery of one event to one person structurally impossible. The one remaining duplicate is deliberate: sending is at-least-once, so a crash after Expo accepts a message but before its ticket is recorded re-sends that same row once — and because every push carries `collapseId` = the event id, iOS replaces the first notification instead of showing two. A dropped cancellation is worse than a duplicate buzz.
+
+Cancellations and diversions always notify, even a second time for the same flight (cancelled, reinstated, cancelled again), and are still sent up to two days late after an outage; `departed` and `landed` notify once per flight, and other news expires after three hours rather than arriving stale.
 
 ---
 
@@ -661,7 +665,7 @@ Policy shape:
 | AeroDataBox | Pro, $8/mo via RapidAPI | 5,000 units, 2 req/s (ADR 0003). Separate dev and prod apps/keys. |
 | Supabase | US region | Region fixed at creation. |
 | Render | Web service + background worker | Worker is paid-only; scheduled jobs run inside it (ADR 0003). `render.yaml` Blueprint. |
-| Expo / EAS | — | Push + TestFlight builds |
+| Expo / EAS | — | Push + TestFlight builds. Worker env: `OPERATOR_USER_ID` (operator alerts go to that profile's phone) and `EXPO_ACCESS_TOKEN` (**recommended**: with the Expo project's *enhanced push security* on, Expo refuses sends without it, so a leaked device push token is useless alone; never logged). The APNs key lives on EAS (`eas credentials`); a broken one shows up as `InvalidCredentials` receipts and raises an operator alert. |
 | Apple Developer | $99/yr | Already held |
 | Sentry | Deferred | Not used in Phase 2 (ADR 0003); Render logs and failure emails instead. |
 

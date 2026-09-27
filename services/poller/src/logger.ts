@@ -41,6 +41,16 @@ const SENSITIVE_KEYS = [
   'WEBHOOK_TOKEN',
   'WEBHOOK_URL',
   'webhookUrl',
+  // Expo push (wave 5): the project access token, and anything shaped like a
+  // push message — `to` is a device token, `title`/`body` are lock-screen copy.
+  'EXPO_ACCESS_TOKEN',
+  'expoAccessToken',
+  'accessToken',
+  'pushToken',
+  'to',
+  'title',
+  'body',
+  'messages',
   // Webhook payloads (wave 3): provider free text and the whole stored body.
   // Never logged on purpose; redacted in case a future line does it by accident.
   'payload',

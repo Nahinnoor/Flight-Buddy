@@ -96,3 +96,19 @@ Every row in `calls.tsv` is one real provider call and the quota it spent (§12.
   balance, tracking the owner's own flight — whose body is deliberately **not** captured: it is one
   person's itinerary, not a fixture, and §10 keeps user data out of the repo. Nothing builds against
   these; they are here so the quota is accounted for.
+
+## Expo Push response shapes (wave 5)
+
+**Not captured live.** Wave 5 was built with no live Expo call and no push to a real token (its brief
+forbids both), so these three files are Expo's **documented** response shapes
+(`docs.expo.dev/push-notifications/sending-notifications`, read 2026-09-26), filled with synthetic ids
+and obviously fake tokens (`ExponentPushToken[FAKE-…]`). `services/poller/src/push/*.test.ts` run
+against them. They are not AeroDataBox calls and are not in `calls.tsv`. **Confirm or replace them
+with a real capture during the physical-device proof** (PHASE2_PLAN criterion 6, wave 6): one send
+ticket and one receipt, with the token replaced by a fake before saving.
+
+| File | Endpoint | What it shows |
+|---|---|---|
+| `expo-push-send-tickets.json` | `POST https://exp.host/--/api/v2/push/send` (3 messages) | One `ok` ticket with an id; a `DeviceNotRegistered` ticket whose `message` **and** `details.expoPushToken` both repeat the push token (why the worker keeps only the error code); a `MessageRateExceeded` ticket. |
+| `expo-push-send-too-many-requests.json` | the same, HTTP 429 | A request-level error: `errors[].code = TOO_MANY_REQUESTS`. |
+| `expo-push-receipts.json` | `POST https://exp.host/--/api/v2/push/getReceipts` | Receipts keyed by ticket id: `ok`, `DeviceNotRegistered` (criterion 10), `InvalidCredentials`, `MessageTooBig`, `MessageRateExceeded`, `MismatchSenderId`. |

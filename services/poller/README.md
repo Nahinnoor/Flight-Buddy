@@ -55,7 +55,8 @@ process before it connects and reports variable **names** and zod's issue code, 
 | `RAPIDAPI_KEY` | **yes** | — | Development key only in a development context (§12.3). |
 | `AERODATABOX_HOST` | no | `aerodatabox.p.rapidapi.com` | |
 | `WEBHOOK_URL` | no | — | Wave 3. Full public receiver URL including its secret path segment; the worker registers it with AeroDataBox. |
-| `OPERATOR_USER_ID` | no | — | Wave 4. The owner's profile id, so low-credit and failover alerts reach a phone. A uuid. |
+| `OPERATOR_USER_ID` | no | — | Wave 4/5. The owner's profile id, so low-credit, failover and push-credential alerts reach a phone (`operator-alert` job). A uuid. Unset: the log line is the alert. |
+| `EXPO_ACCESS_TOKEN` | no, **recommended** | — | Wave 5. Expo access token, sent as `Authorization: Bearer` on every push request. Turn on **enhanced push security** in the Expo project and set this: a leaked device push token is then useless without it. A secret: never logged. 20–512 visible ASCII characters. |
 | `LOG_LEVEL` | no | `info` | A pino level. |
 | `POLL_INTERVAL_MS` | no | `30000` | Sleep between passes (§7.5). 1 000–600 000. |
 | `POLL_BATCH_SIZE` | no | `25` | Flights claimed per pass (§7.5). 1–100. |
@@ -119,7 +120,7 @@ key with `sync: false` — Render prompts once, in its own UI, and no value is e
 | Build | `npm ci` |
 | Start | `npm start -w @flightbuddy/poller` |
 | Node | `22`, from the root `.node-version` and `NODE_VERSION` |
-| Env vars | `DATABASE_URL`, `RAPIDAPI_KEY`, `WEBHOOK_URL` (wave 3), `OPERATOR_USER_ID` (wave 4), `LOG_LEVEL` |
+| Env vars | `DATABASE_URL`, `RAPIDAPI_KEY`, `WEBHOOK_URL` (wave 3), `OPERATOR_USER_ID` (wave 4), `EXPO_ACCESS_TOKEN` (wave 5, recommended), `LOG_LEVEL` |
 
 **No cron services.** The hourly credit check, hourly subscription reconcile and daily archive
 backstop run as pg-boss schedules inside this process (owner decision, PHASE2_PLAN §8.8).
