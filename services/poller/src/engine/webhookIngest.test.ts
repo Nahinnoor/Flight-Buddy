@@ -760,3 +760,57 @@ describe('the real capture: webhook-delivery-real-enroute.json (DL1915, 2026-09-
     expect(h.db.flight(TRACKED).status).toBe('en_route');
   });
 });
+
+describe('drainWebhookInbox — route columns never erased (distance, countries)', () => {
+  const withoutDistance: Legs = (legs) =>
+    legs.map(({ greatCircleDistance: _gcd, ...leg }) => ({
+      ...leg,
+      departure: {
+        ...(leg.departure as Record<string, unknown>),
+        airport: {
+          ...((leg.departure as Record<string, unknown>).airport as Record<string, unknown>),
+          countryCode: 'not-a-code',
+        },
+      },
+    }));
+  const pascalDistance: Legs = (legs) =>
+    legs.map((leg) => ({ ...leg, greatCircleDistance: { Km: 3700.4, Mile: 2299.4 } }));
+
+  it('keeps the stored distance and country when a delivery lacks them', async () => {
+    const h = harness();
+    h.deliver({ mutate: withoutDistance });
+
+    const summary = await h.drain();
+
+    expect(summary).toMatchObject({ claimed: 1, processed: 1 });
+    expect(h.db.flight(FLIGHT)).toMatchObject({
+      distance_km: 3618,
+      origin_country_code: 'US',
+      destination_country_code: 'US',
+    });
+  });
+
+  it('replaces the stored distance with a new non-null one (PascalCase webhook keys)', async () => {
+    const h = harness();
+    h.deliver({ mutate: pascalDistance });
+
+    await h.drain();
+
+    expect(h.db.flight(FLIGHT).distance_km).toBe(3700);
+  });
+
+  it('fills a row that had none, e.g. one ingested before the columns existed', async () => {
+    const h = harness({
+      row: { distance_km: null, origin_country_code: null, destination_country_code: null },
+    });
+    h.deliver();
+
+    await h.drain();
+
+    expect(h.db.flight(FLIGHT)).toMatchObject({
+      distance_km: 3618,
+      origin_country_code: 'US',
+      destination_country_code: 'US',
+    });
+  });
+});

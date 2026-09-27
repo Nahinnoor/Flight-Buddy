@@ -22,6 +22,7 @@ import { randomUUID } from 'node:crypto';
 import {
   FLIGHTS_CONFLICT_COLUMNS,
   FLIGHTS_UPSERT_SQL,
+  FLIGHT_COALESCE_COLUMNS,
   FLIGHT_UPSERT_COLUMNS,
   createPgFlightsWriter,
   type FlightsWriter,
@@ -206,8 +207,13 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
       key.every((column) => (flight as unknown as Row)[column] === row[column]),
     );
     if (existing !== undefined) {
+      const coalesce = FLIGHT_COALESCE_COLUMNS as readonly string[];
       for (const column of FLIGHT_UPSERT_COLUMNS) {
-        if (!key.includes(column)) (existing as unknown as Row)[column] = row[column];
+        if (key.includes(column)) continue;
+        // `coalesce(excluded.col, flights.col)` for the route columns (pgWriter).
+        if (coalesce.includes(column) && (row[column] === null || row[column] === undefined))
+          continue;
+        (existing as unknown as Row)[column] = row[column];
       }
       return [{ id: existing.id }];
     }

@@ -31,6 +31,7 @@ export {
 export {
   FLIGHTS_CONFLICT_COLUMNS,
   FLIGHTS_CONFLICT_TARGET,
+  FLIGHT_COALESCE_COLUMNS,
   FLIGHT_UPSERT_COLUMNS,
   FlightIngestError,
   createSupabaseFlightsWriter,

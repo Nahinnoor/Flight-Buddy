@@ -1,7 +1,12 @@
 import type { FlightCandidate } from '@flightbuddy/shared';
 import { describe, expect, it } from 'vitest';
 
-import { FLIGHTS_CONFLICT_COLUMNS, FLIGHT_UPSERT_COLUMNS, ingestFlight } from './ingest';
+import {
+  FLIGHTS_CONFLICT_COLUMNS,
+  FLIGHT_COALESCE_COLUMNS,
+  FLIGHT_UPSERT_COLUMNS,
+  ingestFlight,
+} from './ingest';
 import { FLIGHTS_UPSERT_SQL, createPgFlightsWriter, type QueryFn } from './pgWriter';
 
 interface RecordedQuery {
@@ -173,5 +178,64 @@ describe('createPgFlightsWriter', () => {
     expect((error as Error).message).not.toContain('permission denied');
     expect((error as Error).message).toContain(': Error');
     expect(((error as Error).cause as Error).message).toBe('permission denied for table flights');
+  });
+});
+
+describe('route columns: distance and countries', () => {
+  const ROUTE = {
+    distanceKm: 399,
+    originCountryCode: 'NL',
+    destinationCountryCode: 'FR',
+  } as const;
+
+  it('are written by the upsert', () => {
+    for (const column of ['distance_km', 'origin_country_code', 'destination_country_code']) {
+      expect(FLIGHT_UPSERT_COLUMNS).toContain(column);
+    }
+    expect([...FLIGHT_COALESCE_COLUMNS].sort()).toEqual([
+      'destination_country_code',
+      'distance_km',
+      'origin_country_code',
+    ]);
+  });
+
+  it('update as coalesce(excluded, stored) so a null never erases a known value', () => {
+    const updateList = /do update set (.+)\nreturning id/s.exec(FLIGHTS_UPSERT_SQL)?.[1] ?? '';
+    for (const column of FLIGHT_COALESCE_COLUMNS) {
+      expect(updateList).toContain(
+        `"${column}" = coalesce(excluded."${column}", flights."${column}")`,
+      );
+      expect(updateList).not.toContain(`"${column}" = excluded."${column}"`);
+    }
+  });
+
+  it('leave every other column a plain overwrite (a null gate is real news)', () => {
+    const updateList = /do update set (.+)\nreturning id/s.exec(FLIGHTS_UPSERT_SQL)?.[1] ?? '';
+    expect(updateList.match(/coalesce\(/g)).toHaveLength(FLIGHT_COALESCE_COLUMNS.length);
+    expect(updateList).toContain('"gate" = excluded."gate"');
+    expect(updateList).toContain('"estimated_departure_utc" = excluded."estimated_departure_utc"');
+  });
+
+  it('send the candidate values as parameters', async () => {
+    const { query, queries } = fakeQuery();
+    await ingestFlight({ ...CANDIDATE, ...ROUTE }, createPgFlightsWriter(query), { now: NOW });
+
+    const values = queries[0]?.values ?? [];
+    const byColumn = new Map(FLIGHT_UPSERT_COLUMNS.map((column, i) => [column, values[i]]));
+    expect(byColumn.get('distance_km')).toBe(399);
+    expect(byColumn.get('origin_country_code')).toBe('NL');
+    expect(byColumn.get('destination_country_code')).toBe('FR');
+  });
+
+  it('send null (for coalesce to keep the stored value) when the candidate has none', async () => {
+    const { query, queries } = fakeQuery();
+    // CANDIDATE predates the fields: they are absent, as on a mobile mock candidate.
+    await ingestFlight(CANDIDATE, createPgFlightsWriter(query), { now: NOW });
+
+    const values = queries[0]?.values ?? [];
+    expect(values).toHaveLength(FLIGHT_UPSERT_COLUMNS.length);
+    for (const column of FLIGHT_COALESCE_COLUMNS) {
+      expect(values[FLIGHT_UPSERT_COLUMNS.indexOf(column)]).toBeNull();
+    }
   });
 });

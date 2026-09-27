@@ -63,8 +63,10 @@ export type Database = {
           archived_at: string | null
           created_at: string
           departure_date_local: string
+          destination_country_code: string | null
           destination_iata: string
           destination_tz: string
+          distance_km: number | null
           estimated_arrival_utc: string | null
           estimated_departure_utc: string | null
           gate: string | null
@@ -73,6 +75,7 @@ export type Database = {
           next_poll_at: string | null
           operating_carrier_iata: string
           operating_flight_number: string
+          origin_country_code: string | null
           origin_iata: string
           origin_tz: string
           poll_failure_count: number
@@ -95,8 +98,10 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           departure_date_local: string
+          destination_country_code?: string | null
           destination_iata: string
           destination_tz: string
+          distance_km?: number | null
           estimated_arrival_utc?: string | null
           estimated_departure_utc?: string | null
           gate?: string | null
@@ -105,6 +110,7 @@ export type Database = {
           next_poll_at?: string | null
           operating_carrier_iata: string
           operating_flight_number: string
+          origin_country_code?: string | null
           origin_iata: string
           origin_tz: string
           poll_failure_count?: number
@@ -127,8 +133,10 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           departure_date_local?: string
+          destination_country_code?: string | null
           destination_iata?: string
           destination_tz?: string
+          distance_km?: number | null
           estimated_arrival_utc?: string | null
           estimated_departure_utc?: string | null
           gate?: string | null
@@ -137,6 +145,7 @@ export type Database = {
           next_poll_at?: string | null
           operating_carrier_iata?: string
           operating_flight_number?: string
+          origin_country_code?: string | null
           origin_iata?: string
           origin_tz?: string
           poll_failure_count?: number

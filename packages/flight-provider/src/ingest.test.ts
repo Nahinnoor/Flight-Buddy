@@ -2,7 +2,14 @@ import type { Database, FlightCandidate } from '@flightbuddy/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { describe, expect, it } from 'vitest';
 
-import { FLIGHTS_CONFLICT_TARGET, FlightIngestError, ingestFlight } from './ingest';
+import {
+  FLIGHTS_CONFLICT_TARGET,
+  FLIGHT_COALESCE_COLUMNS,
+  FlightIngestError,
+  ingestFlight,
+  withoutNullCoalesceColumns,
+  type FlightUpsertRow,
+} from './ingest';
 
 type FlightRow = Database['public']['Tables']['flights']['Insert'];
 
@@ -185,5 +192,74 @@ describe('ingestFlight', () => {
     await expect(ingestFlight(CANDIDATE, client, { now: NOW })).rejects.toBeInstanceOf(
       FlightIngestError,
     );
+  });
+});
+
+describe('ingestFlight: distance and countries (supabase-js writer)', () => {
+  it('writes all three when the candidate has them', async () => {
+    const { client, upserts } = fakeSupabase();
+
+    await ingestFlight(
+      { ...CANDIDATE, distanceKm: 399, originCountryCode: 'NL', destinationCountryCode: 'FR' },
+      client,
+      { now: NOW },
+    );
+
+    expect(upserts[0]?.row).toMatchObject({
+      distance_km: 399,
+      origin_country_code: 'NL',
+      destination_country_code: 'FR',
+    });
+  });
+
+  it('leaves a null value out of the payload, so PostgREST keeps the stored one', async () => {
+    const { client, upserts } = fakeSupabase();
+
+    await ingestFlight(
+      { ...CANDIDATE, distanceKm: null, originCountryCode: 'NL', destinationCountryCode: null },
+      client,
+      { now: NOW },
+    );
+
+    const row = upserts[0]?.row ?? {};
+    expect(row).not.toHaveProperty('distance_km');
+    expect(row).not.toHaveProperty('destination_country_code');
+    expect(row).toHaveProperty('origin_country_code', 'NL');
+    // Only the coalesce columns are ever dropped: a null gate is still sent.
+    expect(row).toHaveProperty('actual_departure_utc', null);
+  });
+
+  it('leaves them out when the candidate predates the fields', async () => {
+    const { client, upserts } = fakeSupabase();
+
+    await ingestFlight(CANDIDATE, client, { now: NOW });
+
+    const columns = Object.keys(upserts[0]?.row ?? {});
+    for (const column of FLIGHT_COALESCE_COLUMNS) expect(columns).not.toContain(column);
+  });
+});
+
+describe('withoutNullCoalesceColumns', () => {
+  const base = {
+    operating_carrier_iata: 'KL',
+    gate: null,
+    distance_km: 399,
+    origin_country_code: null,
+    destination_country_code: 'FR',
+  } as unknown as FlightUpsertRow;
+
+  it('drops null coalesce columns and nothing else', () => {
+    const payload = withoutNullCoalesceColumns(base);
+    expect(payload).toEqual({
+      operating_carrier_iata: 'KL',
+      gate: null,
+      distance_km: 399,
+      destination_country_code: 'FR',
+    });
+  });
+
+  it('does not mutate its input', () => {
+    withoutNullCoalesceColumns(base);
+    expect(base).toHaveProperty('origin_country_code', null);
   });
 });

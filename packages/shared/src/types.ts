@@ -80,4 +80,22 @@ export interface FlightCandidate {
 
   aircraftReg: string | null;
   aircraftModel: string | null;
+
+  /**
+   * Great-circle distance origin → destination, whole kilometres, 0–20100.
+   * `null` or absent when the provider gave no usable value; always absent for
+   * candidates that did not come from the provider (e.g. manual-tier flights).
+   * Stored as `flights.distance_km`.
+   */
+  distanceKm?: number | null;
+  /**
+   * ISO 3166-1 alpha-2 country of the origin airport, UPPERCASE (e.g. "GB").
+   * `null` or absent when unknown. Stored as `flights.origin_country_code`.
+   */
+  originCountryCode?: string | null;
+  /** As `originCountryCode`, for the destination. `flights.destination_country_code`. */
+  destinationCountryCode?: string | null;
 }
+
+/** Upper bound for `distanceKm`: half the Earth's circumference (~20,038 km) plus margin. */
+export const MAX_GREAT_CIRCLE_KM = 20_100;

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ProviderDataError } from '../errors';
 import { fixtureJson } from '../fixtures';
-import { mapStatus, toFlightCandidate, toUtcIso } from './mapper';
+import { countryCodeOrNull, greatCircleKm, mapStatus, toFlightCandidate, toUtcIso } from './mapper';
 import { flightListSchema, type AeroDataBoxFlight } from './schemas';
 
 function legs(fixture: string): AeroDataBoxFlight[] {
@@ -187,5 +187,152 @@ describe('toFlightCandidate', () => {
         'AA1',
       ),
     ).toThrow(/time zone/);
+  });
+});
+
+describe('greatCircleKm', () => {
+  it("reads the lookup API's lowercase key and rounds to whole km", () => {
+    expect(greatCircleKm({ meter: 3617691.31, km: 3617.69, mile: 2247.93 })).toBe(3618);
+    expect(greatCircleKm({ km: 398.4 })).toBe(398);
+  });
+
+  it("reads the webhook serializer's PascalCase key", () => {
+    expect(greatCircleKm({ Km: 3982.94, Mile: 2474.88 })).toBe(3983);
+  });
+
+  it('prefers the lowercase key when both casings are present', () => {
+    expect(greatCircleKm({ km: 100.2, Km: 999 })).toBe(100);
+  });
+
+  it('accepts the boundaries 0 and 20100', () => {
+    expect(greatCircleKm({ km: 0 })).toBe(0);
+    expect(greatCircleKm({ km: 20100 })).toBe(20100);
+  });
+
+  it('turns every invalid value into null rather than throwing', () => {
+    for (const bad of [
+      undefined,
+      null,
+      42,
+      'km',
+      [],
+      [3617.69],
+      {},
+      { mile: 2247.93 },
+      { km: null },
+      { km: '3617.69' },
+      { km: Number.NaN },
+      { Km: Number.NaN },
+      { km: Number.POSITIVE_INFINITY },
+      { km: Number.NEGATIVE_INFINITY },
+      { km: -1 },
+      { km: -0.4 },
+      { Km: -5 },
+      { km: 20100.01 },
+      { km: 40075 },
+      { km: 1e308 },
+      { km: true },
+      { km: { value: 1 } },
+    ]) {
+      expect(greatCircleKm(bad)).toBeNull();
+    }
+  });
+
+  it('ignores an inherited key: only own properties count', () => {
+    const inherited = Object.create({ km: 500 }) as object;
+    expect(greatCircleKm(inherited)).toBeNull();
+  });
+});
+
+describe('countryCodeOrNull', () => {
+  it('uppercases a two-letter code', () => {
+    expect(countryCodeOrNull('gb')).toBe('GB');
+    expect(countryCodeOrNull('Us')).toBe('US');
+    expect(countryCodeOrNull('NL')).toBe('NL');
+  });
+
+  it('rejects anything that is not exactly two ASCII letters', () => {
+    for (const bad of [
+      undefined,
+      null,
+      '',
+      'g',
+      'gbr',
+      'USA',
+      ' gb',
+      'gb ',
+      'g1',
+      '12',
+      'é1',
+      'ÄÖ',
+      'g\n',
+      "'; drop table flights; --",
+    ]) {
+      expect(countryCodeOrNull(bad)).toBeNull();
+    }
+  });
+});
+
+describe('toFlightCandidate: distance and countries', () => {
+  it("carries the real lookup fixture's distance and countries", () => {
+    const candidate = toFlightCandidate(firstLeg('flights-number-codeshare-marketing'), 'DL9659');
+    expect(candidate.distanceKm).toBe(399);
+    expect(candidate.originCountryCode).toBe('NL');
+    expect(candidate.destinationCountryCode).toBe('FR');
+  });
+
+  it('maps every leg of a multi-leg number with its own distance', () => {
+    const distances = legs('flights-number-multileg').map(
+      (leg) => toFlightCandidate(leg, 'AS65').distanceKm,
+    );
+    expect(distances).toEqual([1094, 132, 50, 199, 919]);
+  });
+
+  it('uppercases a lowercase provider country code', () => {
+    const leg = firstLeg('flights-number-live-today');
+    const lowered: AeroDataBoxFlight = {
+      ...leg,
+      departure: { ...leg.departure, airport: { ...leg.departure?.airport, countryCode: 'gb' } },
+      arrival: { ...leg.arrival, airport: { ...leg.arrival?.airport, countryCode: 'fr' } },
+    };
+    const candidate = toFlightCandidate(lowered, 'B61411');
+    expect(candidate.originCountryCode).toBe('GB');
+    expect(candidate.destinationCountryCode).toBe('FR');
+  });
+
+  it('reads the PascalCase distance a webhook item carries', () => {
+    const leg = { ...firstLeg('flights-number-live-today'), greatCircleDistance: { Km: 3982.94 } };
+    expect(toFlightCandidate(leg, 'B61411').distanceKm).toBe(3983);
+  });
+
+  it('degrades junk to null without losing the leg', () => {
+    const leg = firstLeg('flights-number-live-today');
+    const junk: AeroDataBoxFlight = {
+      ...leg,
+      greatCircleDistance: { km: -12 },
+      departure: { ...leg.departure, airport: { ...leg.departure?.airport, countryCode: 'USA' } },
+      arrival: { ...leg.arrival, airport: { ...leg.arrival?.airport, countryCode: null } },
+    };
+    const candidate = toFlightCandidate(junk, 'B61411');
+    expect(candidate.distanceKm).toBeNull();
+    expect(candidate.originCountryCode).toBeNull();
+    expect(candidate.destinationCountryCode).toBeNull();
+    expect(candidate.originIata).toBe('JFK');
+    expect(() => flightCandidateSchema.parse(candidate)).not.toThrow();
+  });
+
+  it('sets the three fields to null, not absent, when the provider omits them', () => {
+    const { greatCircleDistance: _gcd, ...leg } = firstLeg('flights-number-live-today');
+    const bare: AeroDataBoxFlight = {
+      ...leg,
+      departure: {
+        ...leg.departure,
+        airport: { ...leg.departure?.airport, countryCode: undefined },
+      },
+    };
+    const candidate = toFlightCandidate(bare, 'B61411');
+    expect(candidate).toHaveProperty('distanceKm', null);
+    expect(candidate).toHaveProperty('originCountryCode', null);
+    expect(candidate.destinationCountryCode).toBe('US');
   });
 });

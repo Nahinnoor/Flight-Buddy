@@ -10,7 +10,7 @@ import {
   flightStatusSchema,
   trackingTierSchema,
 } from './schemas';
-import type { FlightCandidate } from './types';
+import { MAX_GREAT_CIRCLE_KM, type FlightCandidate } from './types';
 
 /** The §7.2 codeshare example: DL 8517 sold, AF 3612 operated. */
 const candidate: FlightCandidate = {
@@ -91,6 +91,42 @@ describe('flightCandidateSchema', () => {
     expect(
       flightCandidateSchema.safeParse({ ...candidate, marketingCarrierIata: 'DAL' }).success,
     ).toBe(false);
+  });
+});
+
+describe('flightCandidateSchema: distance and countries', () => {
+  it('accepts them present, null, or absent', () => {
+    const route = { distanceKm: 3618, originCountryCode: 'US', destinationCountryCode: 'GB' };
+    expect(flightCandidateSchema.parse({ ...candidate, ...route })).toMatchObject(route);
+    expect(() =>
+      flightCandidateSchema.parse({
+        ...candidate,
+        distanceKm: null,
+        originCountryCode: null,
+        destinationCountryCode: null,
+      }),
+    ).not.toThrow();
+    expect(() => flightCandidateSchema.parse(candidate)).not.toThrow();
+    expect(() => flightCandidateSchema.parse({ ...candidate, distanceKm: 0 })).not.toThrow();
+    expect(() =>
+      flightCandidateSchema.parse({ ...candidate, distanceKm: MAX_GREAT_CIRCLE_KM }),
+    ).not.toThrow();
+  });
+
+  it('rejects an impossible distance or a malformed country code', () => {
+    for (const bad of [
+      { distanceKm: -1 },
+      { distanceKm: MAX_GREAT_CIRCLE_KM + 1 },
+      { distanceKm: 12.5 },
+      { distanceKm: Number.NaN },
+      { distanceKm: '3618' },
+      { originCountryCode: 'gb' },
+      { originCountryCode: 'GBR' },
+      { destinationCountryCode: 'G' },
+      { destinationCountryCode: '12' },
+    ]) {
+      expect(flightCandidateSchema.safeParse({ ...candidate, ...bad }).success).toBe(false);
+    }
   });
 });
 

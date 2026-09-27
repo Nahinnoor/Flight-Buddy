@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import {
   FLIGHT_STATUSES,
+  MAX_GREAT_CIRCLE_KM,
   MEMBERSHIP_STATUSES,
   TRACKING_TIERS,
   type FlightCandidate,
@@ -39,6 +40,11 @@ export const airportIataSchema = z
 export const airportIcaoSchema = z
   .string()
   .regex(/^[A-Z]{4}$/, 'expected a 4-letter ICAO airport code');
+
+/** ISO 3166-1 alpha-2 country code, uppercase, e.g. "GB". */
+export const countryCodeSchema = z
+  .string()
+  .regex(/^[A-Z]{2}$/, 'expected a 2-letter uppercase ISO country code');
 
 /** IANA zone name, validated against the runtime's own ICU data. */
 export const ianaTimeZoneSchema = z
@@ -91,6 +97,10 @@ export const flightCandidateSchema = z.object({
 
   aircraftReg: z.string().nullable(),
   aircraftModel: z.string().nullable(),
+
+  distanceKm: z.number().int().min(0).max(MAX_GREAT_CIRCLE_KM).nullable().optional(),
+  originCountryCode: countryCodeSchema.nullable().optional(),
+  destinationCountryCode: countryCodeSchema.nullable().optional(),
 });
 
 /**

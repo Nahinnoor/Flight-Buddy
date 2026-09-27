@@ -72,6 +72,12 @@ export const flightSchema = z.looseObject({
   aircraft: aircraftSchema.nullish(),
   airline: airlineSchema.nullish(),
   lastUpdatedUtc: z.string().nullish(),
+  /**
+   * `{ meter, km, mile, nm, feet }` on the lookup API. Left `unknown` on purpose:
+   * the mapper validates it field by field (`greatCircleKm`) and degrades a bad
+   * value to `null`, so a malformed distance can never fail a whole lookup.
+   */
+  greatCircleDistance: z.unknown().optional(),
 });
 
 /** `GET /flights/number/{number}/{dateLocal}` answers with an array (§8.12). */
@@ -178,7 +184,8 @@ export const deliveryMovementSchema = movementSchema.extend({
  * `notification.ts` turns them back into names before the lookup mapper sees them.
  *
  * `greatCircleDistance` arrives as an object with PascalCase keys (`Km`, `Mile`,
- * ...), unlike the lookup's lowercase; nothing reads it, so it stays `unknown`.
+ * ...), unlike the lookup's lowercase. It stays `unknown` here; the shared mapper
+ * (`greatCircleKm`) reads either casing and validates the value itself.
  */
 export const notificationItemSchema = z.strictObject({
   number: z.string(),

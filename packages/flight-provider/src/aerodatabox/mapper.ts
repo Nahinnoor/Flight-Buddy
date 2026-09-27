@@ -25,6 +25,7 @@
  * available and both pairs are set from it. Never silently invent one.
  */
 import {
+  MAX_GREAT_CIRCLE_KM,
   localDateAtAirport,
   parseFlightDesignator,
   type FlightCandidate,
@@ -116,6 +117,37 @@ function textOrNull(value: string | null | undefined): string | null {
 }
 
 /**
+ * The great-circle distance in whole kilometres, or `null`.
+ *
+ * The lookup API writes `greatCircleDistance.km`; the webhook serializer writes
+ * the same object with PascalCase keys (`Km`). Lowercase wins when both exist.
+ * Provider data is untrusted input, so anything that is not a finite number in
+ * `[0, MAX_GREAT_CIRCLE_KM]` — a string, NaN, a negative, a distance longer than
+ * half the planet — is `null`, never a thrown error: a bad distance must not
+ * cost the user their flight.
+ */
+export function greatCircleKm(value: unknown): number | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const own = (key: string): boolean => Object.prototype.hasOwnProperty.call(record, key);
+  const km = own('km') ? record.km : own('Km') ? record.Km : null;
+  if (typeof km !== 'number' || !Number.isFinite(km)) return null;
+  if (km < 0 || km > MAX_GREAT_CIRCLE_KM) return null;
+  return Math.round(km);
+}
+
+/**
+ * An ISO 3166-1 alpha-2 code, uppercased (`"gb"` → `"GB"`), or `null`.
+ *
+ * Exactly two ASCII letters or nothing: no trimming, no longer codes, no
+ * guessing. The column's check constraint enforces the same shape.
+ */
+export function countryCodeOrNull(value: string | null | undefined): string | null {
+  if (typeof value !== 'string' || !/^[A-Za-z]{2}$/.test(value)) return null;
+  return value.toUpperCase();
+}
+
+/**
  * The origin-local departure date (§6.3).
  *
  * Read from the provider's own local string rather than derived from the UTC
@@ -144,6 +176,7 @@ interface ResolvedAirport {
   icao: string | undefined;
   tz: string;
   name: string | undefined;
+  countryCode: string | null;
 }
 
 function resolveAirport(
@@ -168,6 +201,7 @@ function resolveAirport(
     icao: icao !== null && /^[A-Z]{4}$/.test(icao) ? icao : undefined,
     tz,
     name: textOrNull(airport?.name) ?? undefined,
+    countryCode: countryCodeOrNull(airport?.countryCode),
   };
 }
 
@@ -247,5 +281,9 @@ export function toFlightCandidate(raw: AeroDataBoxFlight, typedNumber: string): 
 
     aircraftReg: upperOrNull(raw.aircraft?.reg),
     aircraftModel: textOrNull(raw.aircraft?.model),
+
+    distanceKm: greatCircleKm(raw.greatCircleDistance),
+    originCountryCode: origin.countryCode,
+    destinationCountryCode: destination.countryCode,
   };
 }

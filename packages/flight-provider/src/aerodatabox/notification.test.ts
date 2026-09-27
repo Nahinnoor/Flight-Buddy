@@ -349,3 +349,29 @@ describe('the real capture: webhook-delivery-real-enroute.json (2026-09-18)', ()
     });
   });
 });
+
+describe('distance and countries on a delivery', () => {
+  it("reads the real capture's PascalCase distance and its country codes", () => {
+    const delivery = parseAlertDelivery(fixtureJson<Json>('webhook-delivery-real-enroute'));
+    expect(delivery.legs[0]).toMatchObject({
+      distanceKm: 3983,
+      originCountryCode: 'US',
+      destinationCountryCode: 'US',
+    });
+  });
+
+  it('maps a delivery with no distance to null, not a failed leg', () => {
+    const { greatCircleDistance: _gcd, ...leg } = item();
+    const delivery = parseAlertDelivery(envelope({ flights: [leg] }));
+    expect(delivery.unmappedCount).toBe(0);
+    expect(delivery.legs[0]?.distanceKm).toBeNull();
+  });
+
+  it('degrades a junk distance to null and keeps the leg', () => {
+    const delivery = parseAlertDelivery(
+      envelope({ flights: [item({ greatCircleDistance: { Km: 'far' } })] }),
+    );
+    expect(delivery.unmappedCount).toBe(0);
+    expect(delivery.legs[0]?.distanceKm).toBeNull();
+  });
+});
