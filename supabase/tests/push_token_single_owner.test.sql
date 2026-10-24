@@ -1,4 +1,5 @@
--- Contract test for migration 20260926130000_push_token_single_owner.
+-- Contract test for migration 20260926130000_push_token_single_owner, as
+-- amended by 20261024222935_push_tokens_per_device (see push_tokens_per_device.test.sql).
 --
 -- Runs as the database owner inside one transaction that is always rolled back,
 -- so it leaves nothing behind. It creates two throwaway auth users (the
@@ -59,10 +60,12 @@ select pg_temp.check(
   (select p.prosecdef and p.proconfig @> array['search_path=""']
      from pg_proc p where p.oid = 'public.register_push_token(text)'::regprocedure),
   'register_push_token is security definer with an empty search_path');
+-- Security definer since 20261024222935_push_tokens_per_device (ADR 0006): it
+-- must delete from `push_tokens`, which no client role can touch.
 select pg_temp.check(
-  (select not p.prosecdef and p.proconfig @> array['search_path=""']
+  (select p.prosecdef and p.proconfig @> array['search_path=""']
      from pg_proc p where p.oid = 'public.unregister_push_token(text)'::regprocedure),
-  'unregister_push_token is security invoker with an empty search_path');
+  'unregister_push_token is security definer with an empty search_path');
 
 -- ------------------------------------------------------ register: move token --
 

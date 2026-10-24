@@ -422,6 +422,79 @@ export type Database = {
         }
         Relationships: []
       }
+      push_token_events: {
+        Row: {
+          at: string
+          event: string
+          id: number
+          token_sha256: string
+          user_id: string
+        }
+        Insert: {
+          at?: string
+          event: string
+          id?: never
+          token_sha256: string
+          user_id: string
+        }
+        Update: {
+          at?: string
+          event?: string
+          id?: never
+          token_sha256?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_token_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          invalidated_at: string | null
+          invalidated_reason: string | null
+          last_registered_at: string
+          token: string
+          token_sha256: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invalidated_at?: string | null
+          invalidated_reason?: string | null
+          last_registered_at?: string
+          token: string
+          token_sha256?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invalidated_at?: string | null
+          invalidated_reason?: string | null
+          last_registered_at?: string
+          token?: string
+          token_sha256?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       travelers: {
         Row: {
           claimed_at: string | null
