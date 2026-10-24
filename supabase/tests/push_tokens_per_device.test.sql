@@ -302,9 +302,11 @@ update public.profiles
    and encode(sha256(convert_to(expo_push_token, 'UTF8')), 'hex')
        = encode(sha256(convert_to('ExponentPushToken[c-old-phone]', 'UTF8')), 'hex');
 reset role;
+-- Since 20261024224009_push_tokens_hardening the bridge re-points the column
+-- to the newest remaining active device (push_tokens_hardening.test.sql).
 select pg_temp.check(
-  pg_temp.column_of('00000000-0000-4000-8000-0000000000c1') is null,
-  'the worker''s clear still leaves the column NULL, as today');
+  pg_temp.column_of('00000000-0000-4000-8000-0000000000c1') = 'ExponentPushToken[c-new-phone]',
+  'the worker''s clear re-points the column to the remaining active device');
 select pg_temp.check(
   (select invalidated_reason from public.push_tokens where token = 'ExponentPushToken[c-old-phone]')
     = 'device_not_registered'

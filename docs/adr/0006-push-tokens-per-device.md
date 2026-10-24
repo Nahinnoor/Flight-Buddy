@@ -145,3 +145,35 @@ removes the interim trigger and drops `profiles.expo_push_token` and its index.
   `register_push_token` under `authenticated_security_definer_function_executable`. Intentional.
 - Invalidated rows and trace events are never purged yet. Both are small and bounded by device
   history; the Phase 4 retention job should purge invalidated rows and events older than 90 days.
+
+## Hardening (2026-10-24, migration `push_tokens_hardening`, after review)
+
+Amends the decision above; where they differ, this section wins.
+
+- **Bounded trace.** Every call that adds a trace row for a user then keeps only that user's newest
+  200 rows (by `id`, i.e. insertion order) via `private.trim_push_token_events`. The worker never
+  deletes, so the bridge trigger does not trim; its rows are bounded by registrations, which do.
+- **Bridge re-points the column.** When the deployed worker's dead-token clear NULLs the column and
+  the user still has another active device, the trigger sets the column to the newest one (no other
+  profile may hold it). It runs in a subtransaction, so a unique-index conflict leaves the column
+  NULL and can never fail the worker's own `update`. Until (ii), an account with two devices keeps
+  getting alerts when one dies.
+- **`service_role` has no EXECUTE** on either function (nothing server-side calls them).
+- **No deadlock between cross-moves.** The case: B registers A's device X while A registers B's
+  device Y. Before, each call held its own token's advisory lock, wrote one profile, then waited for
+  the other's profile row: a cycle. Now the lock order is fixed, and every path follows it:
+  1. a call takes **exactly one** advisory lock (its token), before any row lock;
+  2. it then locks **every `profiles` row it will write** — caller, the token's current owner, any
+     column holder — in one `select … order by id for update`. Rows are locked in sorted order;
+  3. only then does it lock `push_tokens` rows, and only rows owned by users whose profile it holds
+     (the owner of a token cannot change without that token's advisory lock);
+  4. `unregister` locks only the caller's profile, then its row; the worker's clear locks one profile
+     row (the one it updates), and its trigger touches only that user's `push_tokens` rows and the
+     same profile row.
+
+  A waits-for cycle needs some transaction to wait on a lock while holding one that comes later in
+  this order. Advisory locks come first and no call takes a second one; profile locks are taken in
+  ascending `id` in one statement; `push_tokens` locks are only taken while holding the owner's profile
+  lock, so any two transactions contending on a `push_tokens` row already met at that profile row.
+  So no cycle can form: cross-moves now queue on the lower profile id. (Single-session tests check
+  the outcome of cross-moves; the ordering itself is this argument.)
