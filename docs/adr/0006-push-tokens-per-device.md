@@ -177,3 +177,18 @@ Amends the decision above; where they differ, this section wins.
   lock, so any two transactions contending on a `push_tokens` row already met at that profile row.
   So no cycle can form: cross-moves now queue on the lower profile id. (Single-session tests check
   the outcome of cross-moves; the ordering itself is this argument.)
+
+  Scope and edge cases of that argument (migration `push_tokens_lock_strength`):
+  - The profile-row lock is **`for no key update`**, the lock the worker's own `update profiles`
+    takes. It still serialises every profile writer, but no longer conflicts with the `key share`
+    locks that foreign-key checks take, so inserts referencing a profile are not blocked.
+  - The lock set covers **only writers of profile rows and these two functions** (and the worker's
+    clear with its trigger). Readers and FK checks are outside it and cannot join a cycle with it.
+  - An over-cap retire inside **another token's** register can delete this token's row without
+    holding this token's advisory lock (it holds the owner's profile lock instead, so this call waits
+    for it). Benign: after the wait, the `for update` re-select finds nothing and the call takes the
+    insert path; no `moved_to_other_account` row is written for the retired owner, whose trace already
+    has `retired_over_cap`.
+  - A legacy direct `update profiles` by `authenticated` that lands after the lock query is a plain
+    wait on that one row (or on the unique index), never a cycle: it takes no advisory lock and no
+    second row lock.

@@ -1,4 +1,5 @@
--- Contract test for migration 20261024224009_push_tokens_hardening (ADR 0006,
+-- Contract test for migrations 20261024224009_push_tokens_hardening and
+-- 20261024224515_push_tokens_lock_strength (ADR 0006,
 -- "Hardening"). Same harness as push_tokens_per_device.test.sql: one
 -- transaction, always rolled back; throwaway users; PostgREST-style
 -- impersonation. Every token is a fabricated test value.
@@ -58,8 +59,26 @@ select pg_temp.check(
   and has_function_privilege('authenticated', 'public.register_push_token(text)', 'execute')
   and has_function_privilege('authenticated', 'public.unregister_push_token(text)', 'execute'),
   'service_role cannot execute either function; authenticated still can');
+select pg_temp.check(
+  (select bool_and(p.prosecdef and p.proconfig @> array['search_path=""']
+                   and p.prosrc ~ 'order by p\.id\s+for no key update'
+                   or p.proname = 'unregister_push_token'
+                      and p.prosecdef and p.proconfig @> array['search_path=""']
+                      and p.prosrc ~ 'where id = v_uid\s+for no key update')
+     from pg_proc p
+    where p.oid in ('public.register_push_token(text)'::regprocedure,
+                    'public.unregister_push_token(text)'::regprocedure)),
+  'both lock profile rows with for no key update; still definer with an empty search_path');
 
 -- ------------------------------------------------ 1. the trace is bounded --
+
+-- G has a trace of its own before F floods.
+select pg_temp.act_as('00000000-0000-4000-8000-0000000000f2');
+select public.register_push_token('ExponentPushToken[g-before-flood]');
+select public.unregister_push_token('ExponentPushToken[g-before-flood]');  -- trace stays, device goes
+reset role;
+create temp table g_before as
+  select pg_temp.events_count('00000000-0000-4000-8000-0000000000f2') as n;
 
 select pg_temp.act_as('00000000-0000-4000-8000-0000000000f1');
 do $$
@@ -83,6 +102,10 @@ select pg_temp.check(
     where user_id = '00000000-0000-4000-8000-0000000000f1'
     order by id desc limit 1) = 'signed_out',
   'the newest row survives the trim');
+select pg_temp.check(
+  pg_temp.events_count('00000000-0000-4000-8000-0000000000f2') = (select n from g_before)
+  and (select n from g_before) > 0,
+  'another user''s trace is untouched by one user''s flood');
 
 -- ---------------------------------- 3. the bridge re-points the column --
 
@@ -144,6 +167,11 @@ select pg_temp.check(
       and token_sha256 = encode(sha256(convert_to('ExponentPushToken[flood-150]', 'UTF8')), 'hex')
     order by id desc limit 1) = 'moved_to_other_account',
   'the move is traced against the old account');
+-- F was at 200, gained device_not_registered from the worker (the bridge never
+-- trims), then moved_to_other_account: the move's trim brings it back to 200.
+select pg_temp.check(
+  pg_temp.events_count('00000000-0000-4000-8000-0000000000f1') = 200,
+  'the trim also applies to the account that lost the device');
 
 -- -------------------- 2. cross-moves (outcome; locking argued in the ADR) --
 
