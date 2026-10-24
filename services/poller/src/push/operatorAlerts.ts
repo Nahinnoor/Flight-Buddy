@@ -14,12 +14,14 @@
  *   (5 retries, exponential back-off from one minute), durable across a restart.
  *   The credit monitor's crossing logic has already de-duplicated it; a
  *   `credit-check` retry would find the mark disarmed and never re-send.
- * - The handler reads the operator's token at send time and sends one message.
- *   Its ticket is **not** stored and no receipt is fetched.
+ * - The handler reads the operator's **active devices** (`push_tokens`, ADR 0006)
+ *   at send time and sends one message to each, in one request (at most 10
+ *   devices, so far under Expo's 100). Tickets are **not** stored and no receipt
+ *   is fetched. A `DeviceNotRegistered` ticket invalidates that device only.
  *
  * ## Degrading, never throwing
  *
- * No `OPERATOR_USER_ID`, no profile, or no token: one log line says so, and the
+ * No `OPERATOR_USER_ID`, or no active device: one log line says so, and the
  * existing `warn`/`error` line from the raising job stands as the alert (it is
  * written before the sink is called). `raise` never throws; an enqueue failure is
  * logged.
@@ -39,8 +41,9 @@ import { z } from 'zod';
 import type { Pool } from '../db';
 import { ENGINE_TYPES } from '../engine/types';
 import type { Logger } from '../logger';
+import { MAX_DEVICES_PER_RECIPIENT, invalidateDeadDevice } from './deviceSends';
 import { EXPO_ERROR_CODES, ExpoRequestError, type ExpoPushClient } from './expoClient';
-import { clearDeadToken, toExpoMessage } from './pushSend';
+import { countCodes, toExpoMessage } from './pushSend';
 import { isExpoPushToken, pushTokenSha256 } from './tokens';
 
 export const OPERATOR_ALERT_QUEUE = 'operator-alert';
@@ -75,9 +78,19 @@ export interface OperatorAlertSink {
   raise(notice: OperatorNotice): Promise<void>;
 }
 
-export const READ_OPERATOR_TOKEN_SQL = `select expo_push_token
-  from public.profiles
- where id = $1`;
+/**
+ * The operator's active devices, newest first, and the database time of the
+ * read: a device that registers again after it cannot be invalidated by this
+ * send. `$2` = `MAX_DEVICES_PER_RECIPIENT`.
+ */
+export const READ_OPERATOR_DEVICES_SQL = `select token,
+       token_sha256,
+       now() as read_at
+  from public.push_tokens
+ where user_id = $1
+   and invalidated_at is null
+ order by last_registered_at desc, id desc
+ limit $2`;
 
 /** Lock-screen copy for the owner. Numbers and fixed words only. */
 export function operatorCopy(notice: OperatorNotice): { title: string; body: string } {
@@ -167,11 +180,14 @@ export interface OperatorPushDeps {
 export type OperatorPushResult = 'sent' | 'no_operator' | 'no_token' | 'failed';
 
 /**
- * Send one operator alert.
+ * Send one operator alert to every active device of the operator.
+ *
+ * Resolves `'sent'` when at least one device got a ticket.
  *
  * @throws ExpoRequestError when Expo is unavailable (429/5xx/401) or the outcome
- *   is unknown, so pg-boss retries the job. A definitive failure (a rejected
- *   request, an error ticket) resolves `'failed'` and is not retried.
+ *   is unknown, so pg-boss retries the job (every device again: none of them
+ *   is known to have it). A definitive failure (a rejected request, an error
+ *   ticket on every device) resolves `'failed'` and is not retried.
  */
 export async function sendOperatorAlert(
   notice: OperatorNotice,
@@ -186,16 +202,16 @@ export async function sendOperatorAlert(
     return 'no_operator';
   }
 
-  const result = await deps.pool.query<{ expo_push_token: string | null }>({
-    text: READ_OPERATOR_TOKEN_SQL,
-    values: [deps.operatorUserId],
+  const result = await deps.pool.query<{ token: string; token_sha256: string; read_at: string }>({
+    text: READ_OPERATOR_DEVICES_SQL,
+    values: [deps.operatorUserId, MAX_DEVICES_PER_RECIPIENT],
     types: ENGINE_TYPES,
   });
-  const token = result.rows[0]?.expo_push_token ?? null;
-  if (!isExpoPushToken(token)) {
+  const devices = result.rows.filter((row) => isExpoPushToken(row.token));
+  if (devices.length === 0) {
     logger.warn(
       { operatorAlert: notice.kind },
-      'the operator profile has no usable push token; the log line is the operator alert',
+      'the operator has no active push device; the log line is the operator alert',
     );
     return 'no_token';
   }
@@ -203,9 +219,11 @@ export async function sendOperatorAlert(
   const copy = operatorCopy(notice);
   let tickets;
   try {
-    tickets = await deps.expo.send([
-      toExpoMessage(token, { ...copy, data: { kind: notice.kind } }),
-    ]);
+    tickets = await deps.expo.send(
+      devices.map((device) =>
+        toExpoMessage(device.token, { ...copy, data: { kind: notice.kind } }),
+      ),
+    );
   } catch (error) {
     if (error instanceof ExpoRequestError && error.kind === 'rejected') {
       logger.error(
@@ -226,15 +244,35 @@ export async function sendOperatorAlert(
     throw error;
   }
 
-  const ticket = tickets[0];
-  if (ticket?.status === 'ok') {
-    logger.info({ operatorAlert: notice.kind }, 'operator push sent');
-    return 'sent';
+  let sent = 0;
+  const codes: string[] = [];
+  for (const [index, device] of devices.entries()) {
+    const ticket = tickets[index];
+    if (ticket?.status === 'ok') {
+      sent += 1;
+      continue;
+    }
+    const code = ticket?.status === 'error' ? ticket.errorCode : 'UnreadableTicket';
+    codes.push(code);
+    if (code === EXPO_ERROR_CODES.DEVICE_NOT_REGISTERED) {
+      await invalidateDeadDevice(
+        deps.pool,
+        deps.operatorUserId,
+        pushTokenSha256(device.token),
+        device.read_at,
+      );
+    }
   }
-  const code = ticket?.status === 'error' ? ticket.errorCode : 'UnreadableTicket';
-  logger.error({ operatorAlert: notice.kind, code }, 'operator push refused by Expo; not retried');
-  if (code === EXPO_ERROR_CODES.DEVICE_NOT_REGISTERED) {
-    await clearDeadToken(deps.pool, deps.operatorUserId, pushTokenSha256(token));
+
+  if (codes.length > 0) {
+    logger.error(
+      { operatorAlert: notice.kind, codes: countCodes(codes) },
+      'operator push refused by Expo on some devices; not retried',
+    );
+  }
+  if (sent > 0) {
+    logger.info({ operatorAlert: notice.kind, devices: sent }, 'operator push sent');
+    return 'sent';
   }
   return 'failed';
 }

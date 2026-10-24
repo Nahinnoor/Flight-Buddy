@@ -1,32 +1,43 @@
 /**
- * `push-receipts`: confirm what Expo accepted, and clear dead tokens
- * (overview §8.10, PHASE2_PLAN criterion 10).
+ * `push-receipts`: confirm what Expo accepted, per device, and invalidate dead
+ * devices (overview §8.10, PHASE2_PLAN criterion 10; ADR 0006 sub-step ii).
  *
  * A ticket only says Expo took the message; the receipt says whether Apple (or
  * Google) did. Expo recommends asking about 15 minutes after sending and keeps
- * receipts for 24 hours. So every five minutes this job asks about `sent` rows at
- * least `RECEIPT_DELAY_MS` old, at most 1,000 ids per request, and re-asks a row
- * whose receipt is not there yet no more than once per `RECEIPT_DELAY_MS`.
+ * receipts for 24 hours. So every five minutes this job asks about `sent`
+ * **device** rows (`notification_device_sends`) at least `RECEIPT_DELAY_MS` old,
+ * at most 1,000 tickets per request, and re-asks one whose receipt is not there
+ * yet no more than once per `RECEIPT_DELAY_MS`. Then each touched delivery's
+ * status is re-derived from its devices (`deliveryStatus.ts`, "Parent status").
  *
- * | Receipt | Row | Also |
+ * | Receipt | Device row | Also |
  * |---|---|---|
  * | ok | `delivered` | |
- * | `DeviceNotRegistered` | `failed` | clear the profile's token **only if it is still the one that failed** |
+ * | `DeviceNotRegistered` | `failed` | invalidate **that device only**, and only if it has not registered again since the send |
  * | `MessageTooBig` | `failed` | `error` log: our copy is far under 4 KB, so this is a bug in this module's caller |
- * | `MessageRateExceeded` | `pending` with back-off | re-sent by `push-send` (APNs said "slow down", not "no") |
+ * | `MessageRateExceeded` | `pending` (re-sent to this device only, with back-off) | |
  * | `MismatchSenderId` | `failed` | `error` log: an Android FCM configuration fault (iOS-only today) |
  * | `InvalidCredentials` | `failed` | **operator alert**: the APNs key on EAS is broken, every user is affected |
  * | anything else | `failed` | the sanitised code |
  * | none after 24 h | `unconfirmed` | |
  *
- * ## "Only if it is still the one that failed"
+ * ## "Only that device, and only if it has not registered since"
  *
  * Between the send and the receipt the user may reinstall, sign in again, and
- * register a **new** token. Clearing by user id alone would delete that new,
- * working token and silence them. So the row carries the SHA-256 of the token it
- * was sent to, and the clear is conditional on the profile's current token having
- * the same hash (`CLEAR_DEAD_TOKEN_SQL`). The token itself is never stored on the
- * delivery, never logged.
+ * register a **new** token (a different `push_tokens` row), or the same device
+ * may register again (a newer `last_registered_at`). Either way only the device
+ * that failed, as it was when the message went out, is invalidated
+ * (`INVALIDATE_DEVICE_SQL`); the person's other devices stay active. The worker
+ * no longer writes `profiles.expo_push_token` (legacy, dual-written by the app's
+ * functions until a later sub-step drops it).
+ *
+ * ## Deliveries sent by the previous build
+ *
+ * A delivery the single-device worker sent carries its ticket and token hash on
+ * the parent and has no device row. Each run first **adopts** such rows (one
+ * device row from the parent's own columns, `ADOPT_LEGACY_SENDS_SQL`), so they
+ * get receipts and dead-device handling like any other. Expo forgets tickets
+ * after 24 hours, so after a day there is nothing left to adopt.
  *
  * ## No loops
  *
@@ -44,8 +55,8 @@ import {
   RECEIPT_DELAY_MS,
   RECEIPT_RETENTION_MS,
   retryDelayMs,
-  type DeliveryStatus,
 } from './deliveryStatus';
+import { SETTLE_DELIVERIES_SQL, invalidateDeadDevice, type DeviceSendStatus } from './deviceSends';
 import {
   EXPO_ERROR_CODES,
   ExpoRequestError,
@@ -53,60 +64,93 @@ import {
   type ExpoPushClient,
 } from './expoClient';
 import type { OperatorAlertSink } from './operatorAlerts';
-import { clearDeadToken, countCodes } from './pushSend';
+import { countCodes } from './pushSend';
+
+export { SETTLE_DELIVERIES_SQL } from './deviceSends';
 
 /** Receipt requests per run. */
 export const MAX_RECEIPT_BATCHES_PER_RUN = 5;
 
-/** `sent` rows old enough to ask about, and not asked about recently. `$1` = delay ms, `$2` = limit. */
-export const SELECT_AWAITING_RECEIPTS_SQL = `select d.id,
-       d.user_id,
-       d.expo_ticket_id,
-       d.push_token_sha256,
-       d.sent_at,
-       d.attempts,
-       e.detected_at
+/** Legacy deliveries adopted per run (see "Deliveries sent by the previous build"). */
+export const MAX_LEGACY_ADOPTIONS_PER_RUN = 1000;
+
+/**
+ * One device row for each `sent` delivery that has none: a delivery the
+ * previous, single-device build sent. Its ticket, token hash and send time come
+ * from the parent. `$1` = limit. Deliveries this build sends always have a
+ * device row before they can be `sent`, so only legacy rows match.
+ */
+export const ADOPT_LEGACY_SENDS_SQL = `insert into public.notification_device_sends
+       (delivery_id, token_sha256, status, expo_ticket_id, sent_at)
+select d.id, d.push_token_sha256, 'sent', d.expo_ticket_id, d.sent_at
   from public.notification_deliveries d
-  join public.flight_events e on e.id = d.flight_event_id
  where d.status = 'sent'
    and d.expo_ticket_id is not null
-   and d.sent_at <= now() - ($1::double precision * interval '1 millisecond')
-   and (d.receipt_checked_at is null
-        or d.receipt_checked_at <= now() - ($1::double precision * interval '1 millisecond'))
+   and d.push_token_sha256 is not null
+   and d.sent_at is not null
+   and not exists (select 1
+                     from public.notification_device_sends s
+                    where s.delivery_id = d.id)
  order by d.sent_at, d.id
+ limit $1
+on conflict (delivery_id, token_sha256) do nothing`;
+
+/**
+ * `sent` device rows old enough to ask about, and not asked about recently.
+ * `$1` = delay ms, `$2` = limit. The delivery's status, attempts and event time
+ * decide whether a MessageRateExceeded device may be re-sent.
+ */
+export const SELECT_AWAITING_RECEIPTS_SQL = `select s.delivery_id,
+       s.token_sha256,
+       s.expo_ticket_id,
+       s.sent_at,
+       d.user_id,
+       d.status as delivery_status,
+       d.attempts,
+       e.detected_at
+  from public.notification_device_sends s
+  join public.notification_deliveries d on d.id = s.delivery_id
+  join public.flight_events e on e.id = d.flight_event_id
+ where s.status = 'sent'
+   and s.expo_ticket_id is not null
+   and s.sent_at <= now() - ($1::double precision * interval '1 millisecond')
+   and (s.receipt_checked_at is null
+        or s.receipt_checked_at <= now() - ($1::double precision * interval '1 millisecond'))
+ order by s.sent_at, s.delivery_id, s.token_sha256
  limit $2`;
 
 /**
- * Record what each receipt said. `status = 'sent'` rows only, so a second worker
- * reading the same receipt changes nothing. A row going back to `pending` loses
- * its ticket (a new send gets a new one).
+ * Record what each receipt said, per device. `status = 'sent'` rows only, so a
+ * second worker reading the same receipt changes nothing. A device going back
+ * to `pending` loses its ticket (its re-send gets a new one).
  */
-export const FINALIZE_RECEIPTS_SQL = `update public.notification_deliveries d
+export const FINALIZE_RECEIPTS_SQL = `update public.notification_device_sends s
    set status = u.status,
        error = u.error,
-       not_before = u.not_before,
-       expo_ticket_id = case when u.status = 'pending' then null else d.expo_ticket_id end,
+       expo_ticket_id = case when u.status = 'pending' then null else s.expo_ticket_id end,
        receipt_checked_at = now()
-  from unnest($1::uuid[], $2::text[], $3::text[], $4::timestamptz[])
-       as u(id, status, error, not_before)
- where d.id = u.id
-   and d.status = 'sent'`;
+  from unnest($1::uuid[], $2::text[], $3::text[], $4::text[])
+       as u(delivery_id, token_sha256, status, error)
+ where s.delivery_id = u.delivery_id
+   and s.token_sha256 = u.token_sha256
+   and s.status = 'sent'`;
 
 interface AwaitingRow {
-  id: string;
-  user_id: string;
+  delivery_id: string;
+  token_sha256: string;
   expo_ticket_id: string;
-  push_token_sha256: string | null;
   sent_at: string;
+  user_id: string;
+  delivery_status: string;
   attempts: number;
   detected_at: string;
 }
 
 interface ReceiptOutcome {
-  id: string;
-  status: DeliveryStatus;
+  deliveryId: string;
+  tokenSha256: string;
+  status: DeviceSendStatus;
   error: string | null;
-  notBefore: Date | null;
 }
 
 export interface PushReceiptsDeps {
@@ -119,28 +163,40 @@ export interface PushReceiptsDeps {
   maxBatches?: number;
 }
 
+/** Counts are per device, except `adopted` (legacy deliveries). */
 export interface PushReceiptsSummary {
+  adopted: number;
   checked: number;
   delivered: number;
   failed: number;
   requeued: number;
   waiting: number;
   unconfirmed: number;
-  tokensCleared: number;
-  /** Tokens NOT cleared because the profile holds a newer one (criterion 10). */
-  tokensKept: number;
+  devicesInvalidated: number;
+  /** Dead devices NOT invalidated: registered again since the send, or already gone. */
+  devicesKept: number;
 }
 
-async function finalize(pool: Pool, outcomes: readonly ReceiptOutcome[]): Promise<void> {
+async function finalize(
+  pool: Pool,
+  outcomes: readonly ReceiptOutcome[],
+  requeue: ReadonlyMap<string, Date>,
+): Promise<void> {
   if (outcomes.length === 0) return;
   await pool.query({
     text: FINALIZE_RECEIPTS_SQL,
     values: [
-      outcomes.map((o) => o.id),
+      outcomes.map((o) => o.deliveryId),
+      outcomes.map((o) => o.tokenSha256),
       outcomes.map((o) => o.status),
       outcomes.map((o) => o.error),
-      outcomes.map((o) => o.notBefore),
     ],
+    types: ENGINE_TYPES,
+  });
+  const deliveryIds = [...new Set(outcomes.map((o) => o.deliveryId))];
+  await pool.query({
+    text: SETTLE_DELIVERIES_SQL,
+    values: [deliveryIds, deliveryIds.map((id) => requeue.get(id) ?? null)],
     types: ENGINE_TYPES,
   });
 }
@@ -160,17 +216,25 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
   );
   const maxBatches = deps.maxBatches ?? MAX_RECEIPT_BATCHES_PER_RUN;
   const summary: PushReceiptsSummary = {
+    adopted: 0,
     checked: 0,
     delivered: 0,
     failed: 0,
     requeued: 0,
     waiting: 0,
     unconfirmed: 0,
-    tokensCleared: 0,
-    tokensKept: 0,
+    devicesInvalidated: 0,
+    devicesKept: 0,
   };
   const codes: string[] = [];
   let invalidCredentials = 0;
+
+  const adopted = await deps.pool.query({
+    text: ADOPT_LEGACY_SENDS_SQL,
+    values: [MAX_LEGACY_ADOPTIONS_PER_RUN],
+    types: ENGINE_TYPES,
+  });
+  summary.adopted = adopted.rowCount ?? 0;
 
   for (let batch = 0; batch < maxBatches; batch += 1) {
     const selected = await deps.pool.query<AwaitingRow>({
@@ -182,15 +246,16 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
     if (rows.length === 0) break;
 
     const outcomes: ReceiptOutcome[] = [];
+    const requeue = new Map<string, Date>();
     const ask: AwaitingRow[] = [];
     for (const row of rows) {
       // Past Expo's retention there is nothing to ask for.
       if (now.getTime() - Date.parse(row.sent_at) > RECEIPT_RETENTION_MS) {
         outcomes.push({
-          id: row.id,
+          deliveryId: row.delivery_id,
+          tokenSha256: row.token_sha256,
           status: 'unconfirmed',
           error: DELIVERY_ERRORS.RECEIPT_UNAVAILABLE,
-          notBefore: null,
         });
         summary.unconfirmed += 1;
       } else {
@@ -203,7 +268,7 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
       receipts = await deps.expo.getReceipts(ask.map((row) => row.expo_ticket_id));
     } catch (error) {
       if (!(error instanceof ExpoRequestError)) throw error;
-      await finalize(deps.pool, outcomes);
+      await finalize(deps.pool, outcomes, requeue);
       logger.warn(
         { kind: error.kind, status: error.status, code: error.code, ids: ask.length },
         'Expo receipts request failed; rows will be asked about again',
@@ -216,15 +281,16 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
     for (const row of ask) {
       summary.checked += 1;
       const receipt = receipts.get(row.expo_ticket_id);
+      const base = { deliveryId: row.delivery_id, tokenSha256: row.token_sha256 };
 
       if (receipt === undefined) {
         // Not ready yet. Stays `sent`; `receipt_checked_at` spaces the next ask.
-        outcomes.push({ id: row.id, status: 'sent', error: null, notBefore: null });
+        outcomes.push({ ...base, status: 'sent', error: null });
         summary.waiting += 1;
         continue;
       }
       if (receipt.status === 'ok') {
-        outcomes.push({ id: row.id, status: 'delivered', error: null, notBefore: null });
+        outcomes.push({ ...base, status: 'delivered', error: null });
         summary.delivered += 1;
         continue;
       }
@@ -234,26 +300,31 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
 
       if (code === EXPO_ERROR_CODES.MESSAGE_RATE_EXCEEDED) {
         const age = now.getTime() - Date.parse(row.detected_at);
-        if (row.attempts < MAX_SEND_ATTEMPTS && age < MAX_DELIVERY_AGE_MS) {
-          outcomes.push({
-            id: row.id,
-            status: 'pending',
-            error: null,
-            notBefore: new Date(now.getTime() + retryDelayMs(row.attempts)),
-          });
+        // A `sent` delivery goes back to `pending`; one already being retried
+        // (`pending`/`sending`) picks this device up on its own. A `delivered`
+        // one has reached the person already.
+        const retryable =
+          ['sent', 'pending', 'sending'].includes(row.delivery_status) &&
+          row.attempts < MAX_SEND_ATTEMPTS &&
+          age < MAX_DELIVERY_AGE_MS;
+        if (retryable) {
+          outcomes.push({ ...base, status: 'pending', error: null });
+          if (row.delivery_status === 'sent') {
+            requeue.set(row.delivery_id, new Date(now.getTime() + retryDelayMs(row.attempts)));
+          }
           summary.requeued += 1;
           continue;
         }
       }
 
-      outcomes.push({ id: row.id, status: 'failed', error: code, notBefore: null });
+      outcomes.push({ ...base, status: 'failed', error: code });
       summary.failed += 1;
 
-      if (code === EXPO_ERROR_CODES.DEVICE_NOT_REGISTERED && row.push_token_sha256 !== null) {
-        if (await clearDeadToken(deps.pool, row.user_id, row.push_token_sha256)) {
-          summary.tokensCleared += 1;
+      if (code === EXPO_ERROR_CODES.DEVICE_NOT_REGISTERED) {
+        if (await invalidateDeadDevice(deps.pool, row.user_id, row.token_sha256, row.sent_at)) {
+          summary.devicesInvalidated += 1;
         } else {
-          summary.tokensKept += 1;
+          summary.devicesKept += 1;
         }
       } else if (code === EXPO_ERROR_CODES.INVALID_CREDENTIALS) {
         invalidCredentials += 1;
@@ -262,13 +333,13 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
         code === EXPO_ERROR_CODES.MISMATCH_SENDER_ID
       ) {
         logger.error(
-          { deliveryId: row.id, code },
+          { deliveryId: row.delivery_id, code },
           'Expo receipt reports a configuration or payload fault',
         );
       }
     }
 
-    await finalize(deps.pool, outcomes);
+    await finalize(deps.pool, outcomes, requeue);
     if (rows.length < batchSize) break;
   }
 
@@ -283,7 +354,7 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
       count: invalidCredentials,
     });
   }
-  if (summary.checked > 0 || summary.unconfirmed > 0) {
+  if (summary.checked > 0 || summary.unconfirmed > 0 || summary.adopted > 0) {
     logger.info({ ...summary }, 'push receipts checked');
   }
   return summary;

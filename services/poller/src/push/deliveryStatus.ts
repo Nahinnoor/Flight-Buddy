@@ -34,6 +34,32 @@
  * The unique key `(flight_event_id, user_id)` still makes a second *row* — and so
  * a second, independent send — structurally impossible (§9). What at-least-once
  * allows is the same row sent twice, never two rows.
+ *
+ * ## One person, several devices (ADR 0006, sub-step ii)
+ *
+ * A delivery is still one row per person. Its message goes to each of that
+ * person's active devices (`push_tokens`, at most 10), and each device's outcome
+ * is a `notification_device_sends` row (`deviceSends.ts`). A device with a row
+ * other than `pending` is never sent to again for that delivery, so a re-claim
+ * (crash, lease overrun, or a retry of one device) re-sends only to devices with
+ * no recorded outcome — the crash window above shrinks to "Expo accepted, the
+ * device row was not yet written", per request of at most 100 messages.
+ *
+ * **Parent status**, derived in SQL from the device rows each time it is written:
+ *
+ * 1. `pending` (with back-off) while some device's send failed retryably
+ *    (429/5xx/401, network, timeout, MessageRateExceeded) and attempts remain —
+ *    even if another device already got a ticket;
+ * 2. otherwise the best device outcome: `delivered` > `sent` > `unconfirmed` >
+ *    `failed`. So `sent` means "at least one device got a ticket", `delivered`
+ *    "at least one device confirmed";
+ * 3. with no device row at all: `skipped` / `NoPushToken` when the person had no
+ *    active device, `expired`, or `failed` with our code (`UnbuildableMessage`,
+ *    retries exhausted).
+ *
+ * `error` is NULL for `sent`/`delivered`; a `failed` parent carries our own code
+ * when retries ran out, else the first failed device's code. The parent keeps one
+ * representative ticket and token hash (its earliest `sent`/`delivered` device's).
  */
 
 export const DELIVERY_STATUSES = [
@@ -54,6 +80,7 @@ export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
  * (`DeviceNotRegistered`, …) are written as Expo sends them, after sanitising.
  */
 export const DELIVERY_ERRORS = {
+  /** The person had no active device (`push_tokens`) at send time. */
   NO_PUSH_TOKEN: 'NoPushToken',
   INVALID_PUSH_TOKEN: 'InvalidPushToken',
   EXPIRED: 'Expired',

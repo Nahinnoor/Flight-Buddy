@@ -1,7 +1,8 @@
 /**
  * Wave 5 end to end over the stateful memory database: flight event → recipients
- * → `notification_deliveries` → Expo (a fake `fetch` answering documented shapes)
- * → receipts → dead-token clearing (PHASE2_PLAN criteria 8 and 10, §8.10, §9).
+ * → `notification_deliveries` → every active device (ADR 0006) → Expo (a fake
+ * `fetch` answering documented shapes) → receipts per device → dead-device
+ * invalidation (PHASE2_PLAN criteria 8 and 10, §8.10, §9). Tokens are synthetic.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -30,6 +31,7 @@ import {
 } from './fakeExpo';
 import type { OperatorNotice } from './operatorAlerts';
 import { runPushReceipts } from './pushReceipts';
+import { MAX_DEVICES_PER_RECIPIENT, recordDeviceSends } from './deviceSends';
 import { CLAIM_DELIVERIES_SQL, runPushSend } from './pushSend';
 import { pushTokenSha256 } from './tokens';
 
@@ -246,6 +248,26 @@ describe('push-send', () => {
     expect(s.expo.sent.map((batch) => batch.length)).toEqual([100, 50]);
   });
 
+  it('a recipient whose only device is invalidated is skipped as NoPushToken', async () => {
+    const s = setup();
+    s.db.addTraveller({ userId: USER_A, flightIds: [FLIGHT], token: FAKE_TOKEN_A });
+    const dead = s.db.device(FAKE_TOKEN_A);
+    if (dead) {
+      dead.invalidated_at = NOW.toISOString();
+      dead.invalidated_reason = 'device_not_registered';
+    }
+    await s.record();
+
+    await s.send();
+
+    expect(s.expo.sent).toHaveLength(0);
+    expect(s.db.deviceSends).toHaveLength(0);
+    expect(s.db.deliveries[0]).toMatchObject({
+      status: 'skipped',
+      error: DELIVERY_ERRORS.NO_PUSH_TOKEN,
+    });
+  });
+
   it('a recipient with no token is skipped, not sent', async () => {
     const s = setup();
     s.db.addTraveller({ userId: USER_A, flightIds: [FLIGHT], token: null });
@@ -311,16 +333,28 @@ describe('push-send', () => {
     expect(s.db.deliveries[0]).toMatchObject({ status: 'expired', error: DELIVERY_ERRORS.EXPIRED });
   });
 
-  it('DeviceNotRegistered on the ticket fails the row and clears the token', async () => {
+  it('DeviceNotRegistered on the ticket fails the row and invalidates that device', async () => {
     const s = setup({ send: { tickets: (m) => errorTicket('DeviceNotRegistered', m.to) } });
     s.db.addTraveller({ userId: USER_A, flightIds: [FLIGHT], token: FAKE_TOKEN_A });
     await s.record();
 
     const summary = await s.send();
 
-    expect(summary.tokensCleared).toBe(1);
+    expect(summary.devicesInvalidated).toBe(1);
     expect(s.db.deliveries[0]).toMatchObject({ status: 'failed', error: 'DeviceNotRegistered' });
-    expect(s.db.profiles.get(USER_A)?.expo_push_token).toBeNull();
+    expect(s.db.device(FAKE_TOKEN_A)).toMatchObject({
+      invalidated_at: NOW.toISOString(),
+      invalidated_reason: 'device_not_registered',
+    });
+    expect(s.db.pushTokenEvents).toEqual([
+      expect.objectContaining({
+        user_id: USER_A,
+        token_sha256: pushTokenSha256(FAKE_TOKEN_A),
+        event: 'device_not_registered',
+      }),
+    ]);
+    // The legacy column is no longer the worker's to write (ADR 0006).
+    expect(s.db.profiles.get(USER_A)?.expo_push_token).toBe(FAKE_TOKEN_A);
   });
 
   it('429 puts the row back to pending with a back-off, then it is sent', async () => {
@@ -451,6 +485,356 @@ describe('push-send', () => {
   });
 });
 
+describe('every active device (ADR 0006, sub-step ii)', () => {
+  const at = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);
+
+  /** USER_A with a phone (registered earlier) and a tablet (registered later). */
+  function twoDevices(expoOptions: FakeExpoOptions = {}) {
+    const s = setup(expoOptions);
+    s.db.addTraveller({ userId: USER_A, flightIds: [FLIGHT] });
+    s.db.registerDevice(USER_A, FAKE_TOKEN_A, at(60));
+    s.db.registerDevice(USER_A, FAKE_TOKEN_B, at(30));
+    return s;
+  }
+
+  it('two devices both get the message: one delivery, two device rows, same collapse id', async () => {
+    const s = twoDevices();
+    const { eventIds } = await s.record();
+
+    const summary = await s.send();
+
+    expect(s.db.deliveries).toHaveLength(1);
+    expect(summary).toMatchObject({ claimed: 1, messages: 2, sent: 2, failed: 0 });
+    expect(s.expo.sent).toHaveLength(1);
+    // Newest device first.
+    expect(s.expo.messages().map((m) => m.to)).toEqual([FAKE_TOKEN_B, FAKE_TOKEN_A]);
+    expect(s.expo.messages().every((m) => m.collapseId === eventIds[0])).toBe(true);
+    expect(s.db.deviceSends.map((d) => d.status)).toEqual(['sent', 'sent']);
+    expect(s.db.deviceSends.every((d) => d.expo_ticket_id !== null)).toBe(true);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sent', error: null });
+  });
+
+  it('one dead device is invalidated while the other stays and the delivery is sent', async () => {
+    const s = twoDevices({
+      send: {
+        tickets: (m) =>
+          m.to === FAKE_TOKEN_B ? errorTicket('DeviceNotRegistered', m.to) : okTicket(),
+      },
+    });
+    await s.record();
+
+    const summary = await s.send();
+
+    expect(summary).toMatchObject({ sent: 1, failed: 1, devicesInvalidated: 1 });
+    expect(s.db.device(FAKE_TOKEN_B)?.invalidated_reason).toBe('device_not_registered');
+    expect(s.db.device(FAKE_TOKEN_A)?.invalidated_at).toBeNull();
+    expect(s.db.pushTokenEvents.map((e) => e.token_sha256)).toEqual([
+      pushTokenSha256(FAKE_TOKEN_B),
+    ]);
+    // `sent` if any device got a ticket; the representative ticket is the phone's.
+    expect(s.db.deliveries[0]).toMatchObject({
+      status: 'sent',
+      error: null,
+      push_token_sha256: pushTokenSha256(FAKE_TOKEN_A),
+    });
+
+    // The next event goes to the surviving device only.
+    await s.record();
+    await s.send();
+    expect(s.expo.sent[1]?.map((m) => m.to)).toEqual([FAKE_TOKEN_A]);
+  });
+
+  it('receipts per device: one delivered, one dead → delivered, only the dead device invalidated', async () => {
+    const tickets = new Map<string, string>();
+    const s = twoDevices({
+      send: {
+        tickets: (m) => {
+          const ticket = okTicket();
+          tickets.set(m.to, String(ticket.id));
+          return ticket;
+        },
+      },
+      receipts: () => ({
+        [tickets.get(FAKE_TOKEN_A) ?? '']: { status: 'ok' },
+        [tickets.get(FAKE_TOKEN_B) ?? '']: errorTicket('DeviceNotRegistered', FAKE_TOKEN_B),
+      }),
+    });
+    await s.record();
+    await s.send();
+    s.at(later(RECEIPT_DELAY_MS));
+
+    const summary = await s.receipts();
+
+    expect(summary).toMatchObject({ checked: 2, delivered: 1, failed: 1, devicesInvalidated: 1 });
+    expect(s.expo.receiptRequests).toHaveLength(1);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'delivered', error: null });
+    expect(s.db.device(FAKE_TOKEN_A)?.invalidated_at).toBeNull();
+    expect(s.db.device(FAKE_TOKEN_B)?.invalidated_at).not.toBeNull();
+  });
+
+  it('every device dead → failed with the device code', async () => {
+    const s = twoDevices({ send: { tickets: (m) => errorTicket('DeviceNotRegistered', m.to) } });
+    await s.record();
+
+    await s.send();
+
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'failed', error: 'DeviceNotRegistered' });
+    expect(s.db.pushTokens.every((t) => t.invalidated_at !== null)).toBe(true);
+    expect(s.db.pushTokenEvents).toHaveLength(2);
+  });
+
+  it('a retry after a crash does not re-send to a device that already holds a ticket', async () => {
+    const s = twoDevices();
+    await s.record();
+
+    // A worker claims the delivery, gets a ticket for the phone, records it, and
+    // dies before the tablet's request (or the finalize) is written.
+    await s.db.pool.query({
+      text: CLAIM_DELIVERIES_SQL,
+      values: [100, SEND_LEASE_MS, MAX_SEND_ATTEMPTS],
+    });
+    const deliveryId = s.db.deliveries[0]?.id as string;
+    await recordDeviceSends(s.db.pool, [
+      {
+        deliveryId,
+        tokenSha256: pushTokenSha256(FAKE_TOKEN_A),
+        status: 'sent',
+        ticketId: 'ticket-from-the-dead-worker',
+        error: null,
+      },
+    ]);
+
+    s.at(later(SEND_LEASE_MS + 1_000));
+    const retry = await s.send();
+
+    expect(retry).toMatchObject({ claimed: 1, messages: 1, sent: 1 });
+    expect(s.expo.messages().map((m) => m.to)).toEqual([FAKE_TOKEN_B]);
+    expect(
+      s.db.deviceSends.find((d) => d.token_sha256 === pushTokenSha256(FAKE_TOKEN_A)),
+    ).toMatchObject({ status: 'sent', expo_ticket_id: 'ticket-from-the-dead-worker' });
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sent', attempts: 2 });
+  });
+
+  it('a crash after every device row was written: re-claimed, nothing re-sent, delivery sent', async () => {
+    const s = twoDevices();
+    await s.record();
+    await s.db.pool.query({
+      text: CLAIM_DELIVERIES_SQL,
+      values: [100, SEND_LEASE_MS, MAX_SEND_ATTEMPTS],
+    });
+    const deliveryId = s.db.deliveries[0]?.id as string;
+    await recordDeviceSends(
+      s.db.pool,
+      [FAKE_TOKEN_A, FAKE_TOKEN_B].map((token, i) => ({
+        deliveryId,
+        tokenSha256: pushTokenSha256(token),
+        status: 'sent' as const,
+        ticketId: `ticket-${i}`,
+        error: null,
+      })),
+    );
+
+    s.at(later(SEND_LEASE_MS + 1_000));
+    const retry = await s.send();
+
+    expect(retry).toMatchObject({ claimed: 1, messages: 0 });
+    expect(s.expo.sent).toHaveLength(0);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sent', error: null });
+  });
+
+  it('a crash on the last attempt still counts a device that got a ticket', async () => {
+    const s = twoDevices();
+    await s.record();
+    const delivery = s.db.deliveries[0];
+    if (delivery) delivery.attempts = MAX_SEND_ATTEMPTS - 1;
+    await s.db.pool.query({
+      text: CLAIM_DELIVERIES_SQL,
+      values: [100, SEND_LEASE_MS, MAX_SEND_ATTEMPTS],
+    });
+    await recordDeviceSends(s.db.pool, [
+      {
+        deliveryId: delivery?.id as string,
+        tokenSha256: pushTokenSha256(FAKE_TOKEN_A),
+        status: 'sent',
+        ticketId: 'ticket-0',
+        error: null,
+      },
+    ]);
+
+    s.at(later(SEND_LEASE_MS + 1_000));
+    const run = await s.send();
+
+    expect(run.closedInterrupted).toBe(1);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sent', expo_ticket_id: 'ticket-0' });
+  });
+
+  it('one device rate-limited: only that device is retried, the other is not sent twice', async () => {
+    let round = 0;
+    const s = twoDevices({
+      send: () => {
+        round += 1;
+        return {
+          tickets: (m) =>
+            round === 1 && m.to === FAKE_TOKEN_B ? errorTicket('MessageRateExceeded') : okTicket(),
+        };
+      },
+    });
+    await s.record();
+
+    const first = await s.send();
+    expect(first).toMatchObject({ sent: 1, retrying: 1 });
+    // Retry wins while attempts remain, even though the phone got it.
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'pending', attempts: 1 });
+
+    s.at(later(61_000));
+    const second = await s.send();
+
+    expect(second).toMatchObject({ messages: 1, sent: 1 });
+    expect(s.expo.sent.map((batch) => batch.map((m) => m.to))).toEqual([
+      [FAKE_TOKEN_B, FAKE_TOKEN_A],
+      [FAKE_TOKEN_B],
+    ]);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sent', attempts: 2 });
+    expect(s.db.deviceSends.map((d) => d.status)).toEqual(['sent', 'sent']);
+  });
+
+  it('a request failure retries every device of the batch; none is sent twice once recorded', async () => {
+    let calls = 0;
+    const s = twoDevices({
+      send: () => {
+        calls += 1;
+        return calls === 1 ? { status: 503 } : { tickets: () => okTicket() };
+      },
+    });
+    await s.record();
+
+    await s.send();
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'pending' });
+    expect(s.db.deviceSends).toHaveLength(0);
+
+    s.at(later(61_000));
+    await s.send();
+    s.at(later(10 * 60_000));
+    await s.send();
+
+    expect(s.expo.messages()).toHaveLength(4);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sent', attempts: 2 });
+  });
+
+  it('batching across devices: 60 people × 2 devices = 120 messages in requests of 100 and 20', async () => {
+    const s = setup();
+    for (let i = 0; i < 60; i += 1) {
+      const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+      s.db.addTraveller({
+        userId: id,
+        flightIds: [FLIGHT],
+        tokens: [`ExponentPushToken[FAKE-phone-${i}]`, `ExponentPushToken[FAKE-tablet-${i}]`],
+      });
+    }
+    await s.record();
+
+    const summary = await s.send();
+
+    expect(summary).toMatchObject({ claimed: 60, messages: 120, sent: 120 });
+    expect(s.expo.sent.map((batch) => batch.length)).toEqual([100, 20]);
+    expect(s.db.deviceSends).toHaveLength(120);
+    expect(s.db.deliveries.every((d) => d.status === 'sent')).toBe(true);
+  });
+
+  it('a 503 on the first request stops the batch: later requests are not attempted', async () => {
+    const s = setup({ send: { status: 503 } });
+    for (let i = 0; i < 60; i += 1) {
+      const id = `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`;
+      s.db.addTraveller({
+        userId: id,
+        flightIds: [FLIGHT],
+        tokens: [`ExponentPushToken[FAKE-phone-${i}]`, `ExponentPushToken[FAKE-tablet-${i}]`],
+      });
+    }
+    await s.record();
+
+    const summary = await s.send();
+
+    expect(s.expo.sent).toHaveLength(1);
+    expect(summary).toMatchObject({ messages: 100, retrying: 120 });
+    expect(s.db.deliveries.every((d) => d.status === 'pending')).toBe(true);
+  });
+
+  it('the person’s device cap bounds the fan-out', async () => {
+    const s = setup();
+    s.db.addTraveller({ userId: USER_A, flightIds: [FLIGHT] });
+    for (let i = 0; i < MAX_DEVICES_PER_RECIPIENT + 2; i += 1) {
+      s.db.registerDevice(USER_A, `ExponentPushToken[FAKE-device-${i}]`, at(100 - i));
+    }
+    await s.record();
+
+    await s.send();
+
+    expect(s.expo.messages()).toHaveLength(MAX_DEVICES_PER_RECIPIENT);
+    expect(s.expo.messages().map((m) => m.to)).not.toContain('ExponentPushToken[FAKE-device-0]');
+  });
+
+  it('logs no token of any device', async () => {
+    const s = twoDevices({
+      send: { tickets: (m) => errorTicket('DeviceNotRegistered', m.to) },
+    });
+    await s.record();
+
+    await s.send();
+
+    expect(s.log.text()).not.toContain('ExponentPushToken');
+    expect(s.log.text()).not.toContain('FAKE-test-token');
+  });
+});
+
+describe('deliveries sent by the previous, single-device build', () => {
+  it('are adopted by the receipt job and confirmed per device', async () => {
+    const s = setup({ receipts: { 'legacy-ticket': { status: 'ok' } } });
+    s.db.addTraveller({ userId: USER_A, flightIds: [FLIGHT], token: FAKE_TOKEN_A });
+    await s.record();
+    // What the old worker wrote: ticket and token hash on the parent, no device row.
+    Object.assign(s.db.deliveries[0] ?? {}, {
+      status: 'sent',
+      attempts: 1,
+      expo_ticket_id: 'legacy-ticket',
+      push_token_sha256: pushTokenSha256(FAKE_TOKEN_A),
+      sent_at: NOW.toISOString(),
+    });
+    s.at(later(RECEIPT_DELAY_MS));
+
+    const summary = await s.receipts();
+
+    expect(summary).toMatchObject({ adopted: 1, delivered: 1 });
+    expect(s.db.deviceSends).toEqual([
+      expect.objectContaining({ status: 'delivered', expo_ticket_id: 'legacy-ticket' }),
+    ]);
+    expect(s.db.deliveries[0]?.status).toBe('delivered');
+    expect((await s.receipts()).adopted).toBe(0);
+  });
+
+  it('a legacy DeviceNotRegistered invalidates the device, not the profile column', async () => {
+    const s = setup({
+      receipts: { 'legacy-ticket': errorTicket('DeviceNotRegistered', FAKE_TOKEN_A) },
+    });
+    s.db.addTraveller({ userId: USER_A, flightIds: [FLIGHT], token: FAKE_TOKEN_A });
+    await s.record();
+    Object.assign(s.db.deliveries[0] ?? {}, {
+      status: 'sent',
+      attempts: 1,
+      expo_ticket_id: 'legacy-ticket',
+      push_token_sha256: pushTokenSha256(FAKE_TOKEN_A),
+      sent_at: NOW.toISOString(),
+    });
+    s.at(later(RECEIPT_DELAY_MS));
+
+    await s.receipts();
+
+    expect(s.db.device(FAKE_TOKEN_A)?.invalidated_reason).toBe('device_not_registered');
+    expect(s.db.profiles.get(USER_A)?.expo_push_token).toBe(FAKE_TOKEN_A);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'failed', error: 'DeviceNotRegistered' });
+  });
+});
+
 describe('push-receipts (§8.10, criterion 10)', () => {
   /** A sent delivery for USER_A, and the ticket id it got. */
   async function sentDelivery(receipt: (ticketId: string) => Record<string, unknown> | undefined) {
@@ -494,7 +878,7 @@ describe('push-receipts (§8.10, criterion 10)', () => {
     expect(s.db.deliveries[0]?.status).toBe('delivered');
   });
 
-  it('a recorded DeviceNotRegistered receipt clears that profile’s token', async () => {
+  it('a recorded DeviceNotRegistered receipt invalidates that device', async () => {
     // The DeviceNotRegistered receipt from `docs/api-samples/expo-push-receipts.json`,
     // served under this row's ticket id.
     const recorded = JSON.parse(fixtureBody('expo-push-receipts')) as {
@@ -507,22 +891,37 @@ describe('push-receipts (§8.10, criterion 10)', () => {
 
     const summary = await s.receipts();
 
-    expect(summary).toMatchObject({ failed: 1, tokensCleared: 1, tokensKept: 0 });
+    expect(summary).toMatchObject({ failed: 1, devicesInvalidated: 1, devicesKept: 0 });
     expect(s.db.deliveries[0]).toMatchObject({ status: 'failed', error: 'DeviceNotRegistered' });
-    expect(s.db.profiles.get(USER_A)?.expo_push_token).toBeNull();
+    expect(s.db.deviceSends[0]).toMatchObject({ status: 'failed', error: 'DeviceNotRegistered' });
+    expect(s.db.device(FAKE_TOKEN_A)?.invalidated_reason).toBe('device_not_registered');
+    expect(s.db.profiles.get(USER_A)?.expo_push_token).toBe(FAKE_TOKEN_A);
   });
 
-  it('a token replaced between send and receipt is NOT cleared', async () => {
+  it('a device that registered again after the send is NOT invalidated', async () => {
     const s = await sentDelivery(() => errorTicket('DeviceNotRegistered', FAKE_TOKEN_A));
-    // The user reinstalled and the app registered a new token meanwhile.
-    const profile = s.db.profiles.get(USER_A);
-    if (profile) profile.expo_push_token = FAKE_TOKEN_NEW;
+    // The app relaunched (or was reinstalled with the same token) after the send.
+    s.db.registerDevice(USER_A, FAKE_TOKEN_A, later(60_000));
     s.at(later(RECEIPT_DELAY_MS));
 
     const summary = await s.receipts();
 
-    expect(summary).toMatchObject({ failed: 1, tokensCleared: 0, tokensKept: 1 });
-    expect(s.db.profiles.get(USER_A)?.expo_push_token).toBe(FAKE_TOKEN_NEW);
+    expect(summary).toMatchObject({ failed: 1, devicesInvalidated: 0, devicesKept: 1 });
+    expect(s.db.device(FAKE_TOKEN_A)?.invalidated_at).toBeNull();
+    expect(s.db.pushTokenEvents).toEqual([]);
+  });
+
+  it('a new token registered since the send survives; only the dead one goes', async () => {
+    const s = await sentDelivery(() => errorTicket('DeviceNotRegistered', FAKE_TOKEN_A));
+    // The user reinstalled and the app registered a new token meanwhile.
+    s.db.registerDevice(USER_A, FAKE_TOKEN_NEW, later(60_000));
+    s.at(later(RECEIPT_DELAY_MS));
+
+    const summary = await s.receipts();
+
+    expect(summary.devicesInvalidated).toBe(1);
+    expect(s.db.device(FAKE_TOKEN_A)?.invalidated_at).not.toBeNull();
+    expect(s.db.device(FAKE_TOKEN_NEW)?.invalidated_at).toBeNull();
   });
 
   it('InvalidCredentials raises one operator alert', async () => {
@@ -544,7 +943,7 @@ describe('push-receipts (§8.10, criterion 10)', () => {
       await s.receipts();
 
       expect(s.db.deliveries[0]).toMatchObject({ status: 'failed', error: code });
-      expect(s.db.profiles.get(USER_A)?.expo_push_token).toBe(FAKE_TOKEN_A);
+      expect(s.db.device(FAKE_TOKEN_A)?.invalidated_at).toBeNull();
       expect(s.alerts).toEqual([]);
     },
   );
@@ -557,6 +956,14 @@ describe('push-receipts (§8.10, criterion 10)', () => {
 
     expect(summary.requeued).toBe(1);
     expect(s.db.deliveries[0]).toMatchObject({ status: 'pending', expo_ticket_id: null });
+    expect(s.db.deviceSends[0]).toMatchObject({ status: 'pending', expo_ticket_id: null });
+
+    // Re-sent to that device after the back-off, under a new ticket.
+    s.at(later(RECEIPT_DELAY_MS + 2 * 60_000));
+    await s.send();
+    expect(s.expo.messages()).toHaveLength(2);
+    expect(s.db.deliveries[0]?.status).toBe('sent');
+    expect(s.db.deviceSends[0]?.status).toBe('sent');
   });
 
   it('a missing receipt waits, and is not asked about again for 15 minutes', async () => {
@@ -591,5 +998,6 @@ describe('push-receipts (§8.10, criterion 10)', () => {
     await s.receipts();
 
     expect(s.db.deliveries[0]).toMatchObject({ status: 'sent', receipt_checked_at: null });
+    expect(s.db.deviceSends[0]).toMatchObject({ status: 'sent', receipt_checked_at: null });
   });
 });

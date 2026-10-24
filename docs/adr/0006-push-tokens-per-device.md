@@ -3,8 +3,9 @@
 ## Status
 
 Accepted — 2026-10-24 (owner chose "one token per device"). Sub-step (i), the database, is built by
-migration `push_tokens_per_device`. Sub-steps (ii) the worker and (iii) the app are designed here and
-built later. Extends, and does not replace, the single-owner rule of migration
+migration `push_tokens_per_device`. Sub-step (ii), the worker, is built by migration
+`notification_device_sends` and `services/poller/src/push/*` (section "Sub-step (ii) as built" below).
+Sub-step (iii), the app, is designed here and built later. Extends, and does not replace, the single-owner rule of migration
 `20260926130000_push_token_single_owner` (overview §6.3, §10): a device's token still belongs to at
 most one account.
 
@@ -102,7 +103,7 @@ changed or dropped. The legacy direct `update profiles set expo_push_token` path
 still works under RLS and the unique index; it bypasses `push_tokens`, and the next
 `register_push_token` call from that device reconciles it.
 
-### Sub-step (ii): the worker (designed, not built)
+### Sub-step (ii): the worker (designed; built, see "Sub-step (ii) as built")
 
 - `notification_deliveries` stays **one row per (event, person)**, so §9's per-person idempotency
   guard `unique (flight_event_id, user_id)` and the fan-out SQL are unchanged.
@@ -192,3 +193,58 @@ Amends the decision above; where they differ, this section wins.
   - A legacy direct `update profiles` by `authenticated` that lands after the lock query is a plain
     wait on that one row (or on the unique index), never a cycle: it takes no advisory lock and no
     second row lock.
+
+## Sub-step (ii) as built (2026-10-24, migration `notification_device_sends`)
+
+Amends the sub-step (ii) design above; where they differ, this section wins.
+
+- **Table.** `notification_device_sends (delivery_id → notification_deliveries on delete cascade,
+  token_sha256, status, expo_ticket_id, error, sent_at, receipt_checked_at)` with **primary key**
+  `(delivery_id, token_sha256)` (the designed unique key; it also serves the foreign key). Checks in
+  the style of `push_delivery_lifecycle`: status vocabulary, `sent`/`delivered` carry a ticket,
+  hex-only hash, `error` ≤ 64 chars. Partial index on `sent_at where status = 'sent'` for receipts.
+  RLS on, no policies, nothing for `anon`/`authenticated`/`service_role`; the worker gets `select,
+  insert` and `update (status, expo_ticket_id, error, sent_at, receipt_checked_at)` — never the key,
+  no DELETE.
+- **One more device status, `pending`.** A receipt saying `MessageRateExceeded` puts that device
+  back to `pending` (ticket cleared) so it alone is re-sent; a `pending` row is the only one the send
+  path may overwrite. A device with any other row is never sent that delivery again.
+- **When a device row is written.** Only once there is an outcome: an ok ticket (`sent`), an error
+  ticket (`failed`), an unreadable ticket (`unconfirmed`), or retries exhausted (`failed` with our
+  code). A retryable failure (429/5xx/401, network, timeout, `MessageRateExceeded` on the ticket)
+  writes nothing, so the device is tried again with its delivery. Each Expo request (≤ 100 messages,
+  devices of several people mixed) has its rows written as soon as it answers, so a crash re-sends
+  only the request in flight. A retryable request failure stops the rest of that batch.
+- **Parent status rule**, derived in SQL from the device rows in the same statement that writes the
+  parent (`services/poller/src/push/deliveryStatus.ts`, "Parent status"): `pending` while any device
+  still has a retryable send and attempts remain — even if another device already got a ticket; else
+  the best device outcome, `delivered` > `sent` > `unconfirmed` > `failed`; with no device row,
+  `skipped` / `NoPushToken` (no active device), `expired`, or `failed` with our code. The parent keeps
+  one **representative ticket and hash** (its earliest `sent`/`delivered` device's), so
+  `notification_deliveries_ticket_check` stays true without altering the parent table. The finalize
+  only touches a parent still `sending` under the same `attempts`, so a late answer after a lease
+  overrun cannot overwrite the re-claimer's result.
+- **Receipts** are per device row; afterwards each `sent` parent is re-derived (or put back to
+  `pending` when a device must be re-sent). `DeviceNotRegistered` runs exactly the designed update
+  (`… and last_registered_at <= $3`, `$3` = the device row's `sent_at`, read back at millisecond
+  precision, which only makes the guard stricter) plus one `device_not_registered` trace event, in one
+  statement. The operator path uses the read time of the device list as `$3`.
+- **Legacy deliveries.** A delivery sent by the previous single-device build is `sent` with its ticket
+  and hash on the parent and no device row. Each receipt run first adopts such rows into one device
+  row each (`ADOPT_LEGACY_SENDS_SQL`), so they still get receipts and dead-device invalidation. Expo
+  keeps receipts 24 h, so this is idle a day after the deploy; the final sub-step can remove it.
+- **The worker no longer writes `profiles.expo_push_token`.** It neither reads nor clears it, so the
+  interim bridge trigger no longer fires from the worker, and the column can keep a token the worker
+  has since invalidated (it is only read by a rollback to the previous build, which would clear it
+  again and so fire the trigger). The register/unregister functions still dual-write it.
+- **Lock order.** The worker's invalidation locks one `push_tokens` row, then the trace insert's FK
+  check takes `key share` on the owner's profile, which does not conflict with the functions'
+  `for no key update`. So the worker never waits on a lock the functions hold while holding one they
+  want, and no cycle can form with the order above.
+- **Operator alerts** go to every active device of `OPERATOR_USER_ID` (≤ 10, one request); the alert
+  counts as sent if any device got a ticket, and a dead device is invalidated as above.
+
+**A later sub-step** (after (iii)) stops the dual-write in both functions, drops the interim
+`profiles` trigger, `profiles.expo_push_token` and its unique index, revokes the worker's
+`select`/`update` on that column, and removes the legacy adoption step.
+

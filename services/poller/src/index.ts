@@ -235,9 +235,6 @@ export {
 } from './push/operatorAlerts';
 export {
   CLAIM_DELIVERIES_SQL,
-  CLEAR_DEAD_TOKEN_SQL,
-  CLOSE_EXHAUSTED_SENDS_SQL,
-  FINALIZE_SENDS_SQL,
   LOAD_DELIVERY_FACTS_SQL,
   createPushSendHandler,
   runPushSend,
@@ -245,6 +242,19 @@ export {
   type PushSendSummary,
 } from './push/pushSend';
 export {
+  CLOSE_EXHAUSTED_SENDS_SQL,
+  DEVICE_SEND_STATUSES,
+  FINALIZE_SENDS_SQL,
+  INSERT_DEVICE_SENDS_SQL,
+  INVALIDATE_DEVICE_SQL,
+  LOAD_SENDABLE_DEVICES_SQL,
+  MAX_DEVICES_PER_RECIPIENT,
+  SETTLE_DELIVERIES_SQL,
+  invalidateDeadDevice,
+  type DeviceSendStatus,
+} from './push/deviceSends';
+export {
+  ADOPT_LEGACY_SENDS_SQL,
   FINALIZE_RECEIPTS_SQL,
   SELECT_AWAITING_RECEIPTS_SQL,
   createPushReceiptsHandler,

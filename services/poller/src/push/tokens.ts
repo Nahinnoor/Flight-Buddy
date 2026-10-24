@@ -3,11 +3,10 @@
  *
  * A push token is a bearer credential for someone's lock screen (§10, the owner's
  * pre-commit rule): it is never logged, never put in an error message, and never
- * copied into another table. `notification_deliveries.push_token_sha256` holds
- * this fingerprint instead, which is enough for the receipt job to ask "is the
- * token that failed still the one on the profile?" in SQL
- * (`encode(sha256(convert_to(expo_push_token, 'UTF8')), 'hex')`), and useless to
- * anyone who reads it.
+ * copied into another table. `notification_device_sends.token_sha256` (and the
+ * delivery's representative `push_token_sha256`) hold this fingerprint instead,
+ * which equals `push_tokens.token_sha256` and lets the receipt job invalidate the
+ * one device that failed, and is useless to anyone who reads it.
  */
 import { createHash } from 'node:crypto';
 

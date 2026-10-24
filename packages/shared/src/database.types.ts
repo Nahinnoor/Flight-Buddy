@@ -328,6 +328,44 @@ export type Database = {
           },
         ]
       }
+      notification_device_sends: {
+        Row: {
+          delivery_id: string
+          error: string | null
+          expo_ticket_id: string | null
+          receipt_checked_at: string | null
+          sent_at: string
+          status: string
+          token_sha256: string
+        }
+        Insert: {
+          delivery_id: string
+          error?: string | null
+          expo_ticket_id?: string | null
+          receipt_checked_at?: string | null
+          sent_at?: string
+          status: string
+          token_sha256: string
+        }
+        Update: {
+          delivery_id?: string
+          error?: string | null
+          expo_ticket_id?: string | null
+          receipt_checked_at?: string | null
+          sent_at?: string
+          status?: string
+          token_sha256?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_device_sends_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "notification_deliveries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_prefs: {
         Row: {
           group_id: string

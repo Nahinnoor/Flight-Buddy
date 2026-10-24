@@ -8,7 +8,14 @@ import { describe, expect, it } from 'vitest';
 import { createCreditState, runCreditCheck } from '../engine/creditMonitor';
 import { createMemoryDb } from '../engine/memoryDb';
 import { captureLogger, fixtureProvider } from '../engine/testFixtures';
-import { FAKE_TOKEN_A, errorTicket, fakeExpo, type FakeExpoOptions } from './fakeExpo';
+import {
+  FAKE_TOKEN_A,
+  FAKE_TOKEN_B,
+  errorTicket,
+  fakeExpo,
+  okTicket,
+  type FakeExpoOptions,
+} from './fakeExpo';
 import {
   PUSH_ALERT_THROTTLE_MS,
   createOperatorAlertHandler,
@@ -22,11 +29,21 @@ const OPERATOR = '99999999-9999-4999-8999-999999999999';
 const LOW: OperatorNotice = { kind: 'credit_low', threshold: 100, balance: 94, failedOver: 0 };
 
 function operatorSetup(
-  options: { token?: string | null; expo?: FakeExpoOptions; operatorUserId?: string } = {},
+  options: {
+    token?: string | null;
+    tokens?: string[];
+    expo?: FakeExpoOptions;
+    operatorUserId?: string;
+  } = {},
 ) {
   const db = createMemoryDb();
-  if (options.token !== undefined) {
-    db.addTraveller({ userId: OPERATOR, flightIds: [], token: options.token });
+  if (options.token !== undefined || options.tokens !== undefined) {
+    db.addTraveller({
+      userId: OPERATOR,
+      flightIds: [],
+      token: options.token ?? null,
+      tokens: options.tokens,
+    });
   }
   const expo = fakeExpo(options.expo);
   const log = captureLogger();
@@ -57,13 +74,60 @@ describe('sendOperatorAlert', () => {
     expect(s.log.text()).not.toContain('ExponentPushToken');
   });
 
-  it('without a token: no push, a log line, no throw', async () => {
+  it('without an active device: no push, a log line, no throw', async () => {
     const s = operatorSetup({ token: null });
 
     await expect(sendOperatorAlert(LOW, s.deps)).resolves.toBe('no_token');
 
     expect(s.expo.sent).toHaveLength(0);
-    expect(s.log.text()).toContain('no usable push token');
+    expect(s.log.text()).toContain('no active push device');
+  });
+
+  it('fans out to every active device of the operator, in one request', async () => {
+    const s = operatorSetup({ tokens: [FAKE_TOKEN_A, FAKE_TOKEN_B] });
+
+    await expect(sendOperatorAlert(LOW, s.deps)).resolves.toBe('sent');
+
+    expect(s.expo.sent).toHaveLength(1);
+    expect(
+      s.expo
+        .messages()
+        .map((m) => m.to)
+        .sort(),
+    ).toEqual([FAKE_TOKEN_A, FAKE_TOKEN_B]);
+    expect(s.expo.messages().every((m) => m.title === 'FlightBuddy: alert credits low')).toBe(true);
+    expect(s.log.text()).not.toContain('ExponentPushToken');
+  });
+
+  it('skips an invalidated device of the operator', async () => {
+    const s = operatorSetup({ tokens: [FAKE_TOKEN_A, FAKE_TOKEN_B] });
+    const dead = s.db.device(FAKE_TOKEN_B);
+    if (dead) {
+      dead.invalidated_at = new Date().toISOString();
+      dead.invalidated_reason = 'device_not_registered';
+    }
+
+    await sendOperatorAlert(LOW, s.deps);
+
+    expect(s.expo.messages().map((m) => m.to)).toEqual([FAKE_TOKEN_A]);
+  });
+
+  it('one dead operator device is invalidated; the alert still counts as sent', async () => {
+    const s = operatorSetup({
+      tokens: [FAKE_TOKEN_A, FAKE_TOKEN_B],
+      expo: {
+        send: {
+          tickets: (m) =>
+            m.to === FAKE_TOKEN_B ? errorTicket('DeviceNotRegistered', m.to) : okTicket(),
+        },
+      },
+    });
+
+    await expect(sendOperatorAlert(LOW, s.deps)).resolves.toBe('sent');
+
+    expect(s.db.device(FAKE_TOKEN_B)?.invalidated_reason).toBe('device_not_registered');
+    expect(s.db.device(FAKE_TOKEN_A)?.invalidated_at).toBeNull();
+    expect(s.db.pushTokenEvents).toHaveLength(1);
   });
 
   it('without OPERATOR_USER_ID: no query, no push, no throw', async () => {
@@ -83,7 +147,7 @@ describe('sendOperatorAlert', () => {
     expect(s.log.text()).toContain('pg-boss will retry');
   });
 
-  it('a dead operator token is cleared and not retried', async () => {
+  it('a dead operator device is invalidated and not retried; the profile column is left alone', async () => {
     const s = operatorSetup({
       token: FAKE_TOKEN_A,
       expo: { send: { tickets: (m) => errorTicket('DeviceNotRegistered', m.to) } },
@@ -91,7 +155,8 @@ describe('sendOperatorAlert', () => {
 
     await expect(sendOperatorAlert(LOW, s.deps)).resolves.toBe('failed');
 
-    expect(s.db.profiles.get(OPERATOR)?.expo_push_token).toBeNull();
+    expect(s.db.device(FAKE_TOKEN_A)?.invalidated_reason).toBe('device_not_registered');
+    expect(s.db.profiles.get(OPERATOR)?.expo_push_token).toBe(FAKE_TOKEN_A);
   });
 
   it('the job handler drops data that does not parse', async () => {

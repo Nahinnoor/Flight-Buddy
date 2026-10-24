@@ -55,7 +55,7 @@ process before it connects and reports variable **names** and zod's issue code, 
 | `RAPIDAPI_KEY` | **yes** | — | Development key only in a development context (§12.3). |
 | `AERODATABOX_HOST` | no | `aerodatabox.p.rapidapi.com` | |
 | `WEBHOOK_URL` | no | — | Wave 3. Full public receiver URL including its secret path segment; the worker registers it with AeroDataBox. |
-| `OPERATOR_USER_ID` | no | — | Wave 4/5. The owner's profile id, so low-credit, failover and push-credential alerts reach a phone (`operator-alert` job). A uuid. Unset: the log line is the alert. |
+| `OPERATOR_USER_ID` | no | — | Wave 4/5. The owner's profile id, so low-credit, failover and push-credential alerts reach every active device of that profile (`operator-alert` job). A uuid. Unset: the log line is the alert. |
 | `EXPO_ACCESS_TOKEN` | no, **recommended** | — | Wave 5. Expo access token, sent as `Authorization: Bearer` on every push request. Turn on **enhanced push security** in the Expo project and set this: a leaked device push token is then useless without it. A secret: never logged. 20–512 visible ASCII characters. |
 | `LOG_LEVEL` | no | `info` | A pino level. |
 | `POLL_INTERVAL_MS` | no | `30000` | Sleep between passes (§7.5). 1 000–600 000. |
@@ -139,8 +139,8 @@ instead of being silently repaired at runtime.
 | Queue | Wave | |
 |---|---|---|
 | `webhook-ingest` | 3 | An accepted AeroDataBox alert body, ingested off the request path (§7.6). |
-| `push-send` | 5 | Expo push sends, batched. |
-| `push-receipts` | 5 | Expo receipt reads, which clear dead tokens (§8.10). |
+| `push-send` | 5 | Expo push sends to every active device of each recipient, ≤ 100 messages per request. |
+| `push-receipts` | 5 | Expo receipt reads, per device; a dead device is invalidated in `push_tokens` (§8.10, ADR 0006). |
 
 | Scheduled job | Cron (UTC) | Wave | |
 |---|---|---|---|
