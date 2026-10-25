@@ -57,6 +57,7 @@ export function parseFlightDesignator(text: string): ParsedFlightDesignator | nu
   return { carrierIata, flightNumber, designator: `${carrierIata}${flightNumber}` };
 }
 
+/** Full English month names; `monthFromName` accepts any prefix of three letters or more. */
 const MONTH_NAMES = [
   'JANUARY',
   'FEBRUARY',
@@ -101,6 +102,7 @@ function isRealDate(year: number, month: number, day: number): boolean {
   );
 }
 
+/** `YYYY-MM-DD` from numbers, zero-padded so the strings compare correctly as text. */
 function toIsoDate(year: number, month: number, day: number): string {
   const pad = (value: number, width: number): string => String(value).padStart(width, '0');
   return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`;
@@ -157,6 +159,7 @@ function parseDatePart(value: string, today: string): DateParse {
   const relative = RELATIVE_DAYS.get(value);
   if (relative !== undefined) return { dateLocal: addDays(today, relative) };
 
+  /** A month and day (and year, if typed) as a date, or the "not a real date" error. */
   const resolved = (month: number, day: number, yearText: string | undefined): DateParse => {
     const dateLocal = resolveMonthDay(month, day, yearText, today);
     return dateLocal === null ? { error: `"${value}" is not a real date.` } : { dateLocal };

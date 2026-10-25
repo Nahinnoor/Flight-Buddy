@@ -11,6 +11,7 @@
  * non-Gregorian calendar or non-Latin digits cannot change the output.
  */
 
+/** Anything `new Date()` takes: an ISO-8601 string, epoch milliseconds or a `Date`. */
 export type DateInput = string | number | Date;
 
 const MS_PER_MINUTE = 60_000;
@@ -26,6 +27,7 @@ const PINNED = { calendar: 'gregory', numberingSystem: 'latn' } as const;
 
 type FormatterKind = 'time' | 'date' | 'label';
 
+/** The `Intl` fields each kind asks for; `formatterFor` adds the zone and `PINNED`. */
 const FORMAT_OPTIONS: Record<FormatterKind, Intl.DateTimeFormatOptions> = {
   time: { hour: 'numeric', minute: '2-digit', hour12: true },
   date: { year: 'numeric', month: '2-digit', day: '2-digit' },
@@ -57,6 +59,10 @@ function formatterFor(
   return cached;
 }
 
+/**
+ * A fresh `Date` from any `DateInput`, so a caller's `Date` is never shared.
+ * Every helper taking a `DateInput` goes through it; throws `TypeError` if unparseable.
+ */
 function toDate(value: DateInput): Date {
   const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -65,6 +71,7 @@ function toDate(value: DateInput): Date {
   return date;
 }
 
+/** One field (`hour`, `day`, …) from `formatToParts`. Throws rather than leave a gap. */
 function part(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): string {
   const found = parts.find((p) => p.type === type);
   if (found === undefined) {

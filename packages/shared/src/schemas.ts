@@ -17,6 +17,7 @@ import {
 } from './types';
 import { isValidTimeZone } from './time';
 
+/** Compiles only when `T` is `true`; see `FlightCandidateContractChecked`. */
 type Assert<T extends true> = T;
 
 // ---------- primitives ----------
@@ -174,8 +175,8 @@ export type FlightLookupResponse = z.infer<typeof flightLookupResponseSchema>;
 /**
  * Body of `POST /v1/flights` (ADR 0001): the exact candidate the user picked
  * from the disambiguation list, plus an optional existing trip to append to
- * (layovers). A `manual`-tier flight is added the same way — it still gets a
- * `flights` row (§6.3) — with user-supplied times on the candidate.
+ * (layovers). A `manual`-tier add (§6.3) is not wired yet: the re-validation
+ * below rejects any candidate the provider does not return.
  *
  * The server re-validates the candidate against the provider before ingesting,
  * so a client cannot forge times, and resolves the codeshare before insert
@@ -187,6 +188,7 @@ export const addFlightRequestSchema = z.object({
 });
 export type AddFlightRequest = z.infer<typeof addFlightRequestSchema>;
 
+/** Reply to `POST /v1/flights`: where the flight landed, and its 1-based place in the trip. */
 export const addFlightResponseSchema = z.object({
   tripId: z.uuid(),
   segmentId: z.uuid(),
