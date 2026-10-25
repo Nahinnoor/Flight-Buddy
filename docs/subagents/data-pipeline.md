@@ -12,6 +12,8 @@ Build `packages/flight-provider`: the `FlightDataProvider` interface (§7.1), th
 
 ---
 
+> Regenerated 2026-10-25 from `docs/PROJECT_OVERVIEW.md` (verbatim, per §0). Phase 2 is done; the task blurbs above are history. The master wins on any conflict.
+
 ## 1. Product definition
 
 FlightBuddy tracks flights for a group of people travelling to the same place, in one view.
@@ -20,7 +22,7 @@ Solo flight tracking is a commodity — Flighty, TripIt, and airline apps all do
 
 ### MVP scope — in
 
-- Email/social auth (Sign in with Apple + Google)
+- Auth: email + password with the address confirmed before the account works, Sign in with Apple, and Google (email added 2026-09-18; PKCE links back into the app at `flightbuddy://auth/callback`)
 - Add a flight by flight number + date, enriched from AeroDataBox
 - Personal dashboard: status, gate, terminal, scheduled/estimated times, duration, delay, countdown
 - Multi-segment trips (layovers)
@@ -49,8 +51,6 @@ Solo flight tracking is a commodity — Flighty, TripIt, and airline apps all do
 ### Long-term direction
 
 One-stop group travel: expense splitting, itinerary management, recommendations. This is why a group is scoped to a single trip with a destination and date range (§6) — expenses only settle inside a bounded trip.
-
----
 
 ## 6. Data model
 
@@ -135,6 +135,11 @@ create table flights (
 
   aircraft_reg             text,
   aircraft_model           text,
+
+  -- route facts for Profile stats; NULL for manual tier and pre-2026-09-27 rows
+  distance_km              integer check (distance_km is null or distance_km between 0 and 20100),
+  origin_country_code      char(2) check (origin_country_code ~ '^[A-Z]{2}$'),       -- ISO 3166-1 alpha-2
+  destination_country_code char(2) check (destination_country_code ~ '^[A-Z]{2}$'),
 
   -- scheduling
   next_poll_at             timestamptz,
@@ -241,6 +246,39 @@ create table notification_deliveries (
   unique (flight_event_id, user_id)   -- idempotency guard
 );
 
+-- one row per device (ADR 0006); profiles.expo_push_token is dual-written until it is dropped
+create table push_tokens (
+  id                 uuid primary key default gen_random_uuid(),
+  user_id            uuid not null references profiles(id) on delete cascade,
+  token              text not null unique,   -- shape-checked; a bearer credential (§10)
+  token_sha256       text generated always as (encode(sha256(decode(token, 'escape')), 'hex')) stored,
+  created_at         timestamptz not null default now(),
+  last_registered_at timestamptz not null default now(),
+  invalidated_at     timestamptz,            -- NULL = active
+  invalidated_reason text                    -- 'device_not_registered' | NULL
+);
+
+-- why a token appeared or disappeared; never the token itself
+create table push_token_events (
+  id           bigint generated always as identity primary key,
+  user_id      uuid not null references profiles(id) on delete cascade,
+  token_sha256 text not null,
+  event        text not null,   -- registered | moved_to_other_account | signed_out | device_not_registered | retired_over_cap
+  at           timestamptz not null default now()
+);
+
+-- one row per device a delivery was sent to (ADR 0006 sub-step ii); the delivery stays one per person
+create table notification_device_sends (
+  delivery_id        uuid not null references notification_deliveries(id) on delete cascade,
+  token_sha256       text not null,          -- = push_tokens.token_sha256; never the token
+  status             text not null,          -- pending | sent | delivered | failed | unconfirmed
+  expo_ticket_id     text,
+  error              text,                   -- short code only
+  sent_at            timestamptz not null default now(),
+  receipt_checked_at timestamptz,
+  primary key (delivery_id, token_sha256)
+);
+
 -- ---------- ops ----------
 create table provider_credit_log (
   id          bigserial primary key,
@@ -264,9 +302,17 @@ create table provider_credit_log (
 
 **Implementation notes (applied 2026-09-13, migration `account_deletion_semantics`).** Implements §3.7. `travelers.user_id` is `on delete cascade` (a claimed row is the user's self-traveller; the cascade continues to trips, segments and memberships). Trigger `travelers_handover_groups_before_delete` (`security definer`, `private` schema) reassigns every group the traveller owns to the earliest-joined active member and marks that member `owner`, or deletes the group when nobody is left — without it `groups.owner_traveler_id`, which has no on-delete action, would refuse the delete. Trigger `trip_segments_archive_orphaned_flight_after_delete` sets `flights.archived_at` when the last segment referencing a flight is deleted; it is the one writer of `flights` outside ingest and the poller (rule 7 exception), touches `archived_at` only, and `ingestFlight` clears `archived_at` on every upsert so a re-add is visible again. Known race: a delete of the last segment concurrent with a new add can archive a flight the new segment references; the hourly reconcile job should un-archive any archived flight that still has a segment.
 
-**Forward compatibility.** `groups.destination_iata`, `start_date`, and `end_date` are unused in MVP. They exist because expense splitting and itineraries need a bounded trip, and adding them later is a migration on a live table.
+**Implementation notes (applied 2026-09-15, migration `seed_next_poll_at`).** The worker claims only rows whose `next_poll_at` is set (§7.5), and `ingestFlight` never writes scheduling columns, so a new flight was never polled. Trigger `flights_seed_next_poll_at` sets `next_poll_at = now()` on INSERT, and on UPDATE when a row goes from archived to active (a re-add), unless the flight is `manual`-tier or already holds a webhook subscription. The worker's first poll then places it on the §7.4 ladder. It writes no other column. On `insert … on conflict do update` the BEFORE INSERT trigger only modifies the proposed row; the conflict path applies the SET list, which never includes `next_poll_at`, so an existing row's schedule is untouched. "Due immediately" is deliberately unjittered, a bounded exception to §7.4's jitter rule: the claim batch (`limit 25`) and the 1 req/s token bucket already bound the burst, and the first poll's ladder step is jittered. The one-time backfill skips a non-`manual` row with no departure or arrival time at all; the archive backstop retires such a row 30 days after `created_at`.
 
----
+**Implementation notes (applied 2026-09-27, migration `push_token_single_owner`).** `profiles.expo_push_token` carries a partial unique index (`profiles(expo_push_token) where expo_push_token is not null`), so a device's token belongs to at most one profile; the migration's one-time cleanup nulled every value already held by more than one profile before building it (each device re-registers on its next launch). The app writes this column only through two functions. `public.register_push_token(p_token)` is `security definer` with `search_path = ''`, EXECUTE revoked from `public`/`anon` and granted to `authenticated`: it rejects a missing `auth.uid()`, validates the token shape, takes a per-token advisory lock, nulls the token on every other profile, then sets it on the caller's own. It only ever writes NULL to other rows and returns nothing, so it can neither plant a token on someone else nor reveal one. `public.unregister_push_token(p_token)` is `security invoker` and nulls the caller's own token only while it still equals `p_token`; the app calls it on sign-out, and it exists so the token travels in a POST body rather than a PostgREST URL filter that request logs record. A direct `update profiles set expo_push_token = …` (the pre-wave-5 write path) still succeeds for a token no one else holds, and now fails with a unique violation instead of silently creating a second holder. The worker's dead-token clears write only NULL, so the index cannot affect them. Amended 2026-10-24 by `push_tokens_per_device` (note below): both functions now also maintain `push_tokens`, and `unregister_push_token` is `security definer`.
+
+**Implementation notes (applied 2026-09-27, migration `flights_distance_and_countries`).** Three nullable columns on `flights` for the Profile screen's lifetime distance and countries visited: `distance_km` (great-circle, whole km, 0–20100 — half the Earth's circumference is ~20,038 km) and `origin_country_code` / `destination_country_code` (ISO 3166-1 alpha-2, uppercase; the provider sends lowercase and the mapper uppercases). They come from the provider on every lookup and delivery (`greatCircleDistance`, lowercase keys on the lookup and PascalCase on a webhook, and each airport's `countryCode`) and reach the domain as `FlightCandidate.distanceKm` / `originCountryCode` / `destinationCountryCode`; the mapper turns an invalid value into NULL rather than failing the leg. Nullable because `manual`-tier flights have no provider data and older rows have none. Writers never erase them: the worker's upsert sets each as `coalesce(excluded.col, flights.col)`, and the API's supabase-js writer omits a NULL one from the payload so PostgREST leaves it alone, so a delivery without a distance keeps the one a lookup stored while a non-NULL value still replaces it. No backfill: `raw_payload` holds our own candidate snapshot, not the provider body, so there is nothing to derive them from; existing rows fill in on their next poll or delivery. No grant or RLS change (`flightbuddy_worker` has table-level grants on `flights`).
+
+**Implementation notes (applied 2026-10-24, migration `push_tokens_per_device`, ADR 0006).** Push tokens are now one row per device in `push_tokens` (active = `invalidated_at is null`), so a second device no longer replaces the first and signing out on one device no longer clears the others. This is sub-step (i) of three: the worker (ii) still reads `profiles.expo_push_token`, which the functions **dual-write** to the most recently registered active token, so until (ii) ships alerts still reach one device per account. `register_push_token` keeps its security model (definer, `search_path = ''`, `auth.uid()` required, shape check `22023`, per-token advisory lock, returns nothing); it creates, moves (from another account) or re-activates this device's row, retires the least recently registered device beyond **10 active per user**, then nulls the token on every other profile and sets it on the caller's own, as before — except that an account which just lost the token now falls back to its own newest remaining device rather than NULL. `unregister_push_token` is now `security definer` (it must delete from a table no client role can touch); it deletes only the caller's own row for that token, never raises on an unknown token, and recomputes the caller's column from their remaining active devices, or NULL. `push_token_events` traces every gain and loss (`registered` on a new, moved or re-activated row — a plain relaunch only bumps `last_registered_at` — `moved_to_other_account`, `signed_out`, `device_not_registered`, `retired_over_cap`) with only the token's SHA-256. Both tables: RLS on, no policies, and all privileges revoked from `anon`, `authenticated` and `service_role`. `token_sha256` is generated with `decode(token, 'escape')`, the immutable equivalent of the worker's `convert_to(token, 'UTF8')` for the ASCII-only token shape. Interim bridge: an `after update` trigger on `profiles` mirrors the live worker's `DeviceNotRegistered` clear (only when running as `flightbuddy_worker`) into `push_tokens` and the trace, without changing the worker's write, so a dead device is never recomputed back into the column. The worker role now also holds `select` and `update (invalidated_at, invalidated_reason)` on `push_tokens` and `insert` on `push_token_events` for sub-step (ii); still no DELETE. Backfill: the one well-formed token on dev became one row. Invalidated rows and trace events are not purged yet (Phase 4 retention). **Hardened the same day (migration `push_tokens_hardening`):** each user's trace is capped at their newest 200 rows; the bridge trigger now re-points the column to the user's newest remaining active device after the worker clears a dead one (in a subtransaction, so the worker's clear cannot fail); both functions lock every profile row they write in `id` order right after the token's advisory lock, so cross-moves cannot deadlock (ADR 0006); and `service_role` has no EXECUTE on either function. The profile-row lock is `for no key update` (migration `push_tokens_lock_strength`), the same lock the worker's update takes, so it does not block foreign-key checks. The worker side (sub-step ii) is the next note.
+
+**Implementation notes (applied 2026-10-24, migration `notification_device_sends`, ADR 0006 sub-step ii).** The worker now sends each alert to **every active device** of the recipient (`push_tokens`, newest first, at most 10) and no longer reads or writes `profiles.expo_push_token`, which is legacy: the app's functions still dual-write it until a later sub-step drops the dual-write, the interim trigger and the column. `notification_deliveries` is unchanged and still one row per (event, person), so §9's guard holds; each device's outcome is a `notification_device_sends` row (primary key `(delivery_id, token_sha256)`, so a retry can never add a second; checks: status vocabulary, `sent`/`delivered` need a ticket, `pending` has none, hex-only hash, error ≤ 64 chars; partial index on `sent_at where status = 'sent'` for receipts). A device with a row other than `pending` is never sent that delivery again, which is how a re-claimed delivery (crash, lease overrun, a retry of another device) skips devices that already hold a ticket; each Expo request's rows (≤ 100 messages) are written as soon as it answers. **Parent status is derived from its device rows** in the statement that writes it: `pending` while a device's send failed retryably and attempts remain; else the best device outcome, `delivered` > `sent` > `unconfirmed` > `failed` (so `sent` = at least one device got a ticket); `skipped` / `NoPushToken` only when the person has no active device. The parent keeps one representative ticket and hash, so its existing ticket check is unchanged. `DeviceNotRegistered` invalidates only that device (`update push_tokens set invalidated_at, invalidated_reason = 'device_not_registered' where user_id = $1 and token_sha256 = $2 and invalidated_at is null and last_registered_at <= sent_at`) and logs a `device_not_registered` trace event, so a device that registered again after the send, or any other device, stays active. Deliveries the previous single-device build sent (ticket on the parent, no device row) are adopted by the receipt job on its first runs. A device row waiting for a re-send (`pending`, after `MessageRateExceeded`) whose device is no longer active, or whose delivery is closing unsent (expired), is closed `failed` with the code it was waiting on, so it can never hold its delivery `pending`. Device rows carry `sent_at` = when the devices were read, before the request; the lease is renewed before each further Expo request; receipt results and the re-derived deliveries are written in one transaction. Operator alerts go to every active device of `OPERATOR_USER_ID`. RLS on with no policies and no privileges for `anon`/`authenticated`/`service_role`; the worker holds `select, insert` and `update (status, expo_ticket_id, error, sent_at, receipt_checked_at)`, never the key, no DELETE (rows go with their delivery by cascade). Additive: the previous worker build ignores the table, so the migration was applied before the code deploys.
+
+**Forward compatibility.** `groups.destination_iata`, `start_date`, and `end_date` are unused in MVP. They exist because expense splitting and itineraries need a bounded trip, and adding them later is a migration on a live table.
 
 ## 7. The flight data pipeline
 
@@ -328,7 +374,7 @@ Two jobs: the pre-window schedule, and the failover schedule when alerts are una
 | > 7 days | Weekly |
 | 7 days – 48 h | Daily |
 | 48 – 24 h | Every 4 h |
-| **T-24 h → arrival** | **Webhooks. No polling.** |
+| **T-24 h → arrival** | **Webhooks. No polling.** Subscribed from the window opening (§7.6, ADR 0005); until then on the failover rows. |
 | *Failover:* 24 – 6 h | Hourly |
 | *Failover:* 6 – 1.25 h | Every 15 min |
 | *Failover:* T-75 min → wheels up | Every 5 min |
@@ -376,17 +422,19 @@ returning *;
 
 Subscriptions are **keyed by flight number with no date parameter**. A subscription to `KL1600` fires for every occurrence of that number, every day it operates, and **never expires** until we delete it (2026 alert API, ADR 0003). Billing is credit-based: 1 credit per flight item per delivery attempt, deducted when **sent**, not delivered. Deliveries are **not signed** by the provider; the receiver is protected by a secret URL token, and a gate change or cancellation that arrives by webhook is confirmed with one poll before it notifies anyone (§10).
 
-This is why subscriptions open at T-24h and not at add time. Subscribing three weeks out bleeds credits daily on a flight nobody is watching.
+This is why subscriptions do not open at add time: subscribing three weeks out bleeds credits daily on a flight nobody is watching. It is also why they do not open at T-24 h (ADR 0005): for a daily flight, T-24 h is when the **previous day's** occurrence departs, and every alert it sends — takeoff, en-route updates, landing, roughly 10–12 credits — would be billed before our own flight sends anything. The first real delivery captured was exactly that (`docs/api-samples/webhook-delivery-real-enroute.json`). So the window opens **30 minutes after the previous day's same flight is scheduled to land**: `scheduled_arrival_utc − 24 h + 30 min`, never later than departure, and T-24 h when there is no usable scheduled arrival. Between T-24 h and the opening an unsubscribed `live` flight stays on the failover ladder (hourly), so the gap is polled, not blind. Scheduled times are an approximation: a late previous occurrence can still bill its landing alert.
+
+**Other days' occurrences are ignored, not ingested.** A delivery can describe any day's occurrence of the number. The worker matches each delivered leg to a subscribed row on the full canonical key (carrier, number, `departure_date_local`, origin); a leg that matches no row is never passed to `ingestFlight`, so it creates no `flights` row and no `flight_events`. A delivery none of whose legs match is closed in `webhook_inbox` with reason `NoTrackedLeg`; its balance is still logged. The credit it cost is spent regardless — the opening rule above is what limits that cost.
 
 | Phase | Action |
 |---|---|
-| T-24 h | `POST /subscriptions/webhook/FlightByNumber/{number}?useCredits=true` with `maxDeliveryRetries: 1` (ADR 0003). Store `alert_subscription_id`. Set `next_poll_at = NULL`. |
+| Window opens: scheduled arrival − 24 h + 30 min (ADR 0005; T-24 h without a scheduled arrival; never after departure) | `POST /subscriptions/webhook/FlightByNumber/{number}` with `maxDeliveryRetries: 1` (ADR 0003; the current spec has no `useCredits` parameter — credit billing is the default). Store `alert_subscription_id`. Set `next_poll_at` to the backup cadence, 2 h by default, rather than NULL (ADR 0004: the receiver runs on a free web service that can cold-start past the provider's 10 s timeout). |
 | Window active | Receive alerts, write to `flights`, emit `flight_events` |
 | Arrival + 30 min | `DELETE /subscriptions/webhook/{id}`, archive |
 
 Creating and deleting are free. Only alerts cost.
 
-**The webhook endpoint must return 200 immediately.** Validate, enqueue to pg-boss, respond. Never process inline. AeroDataBox charges for send attempts including retries, so a slow or erroring endpoint costs 3× for nothing.
+**The webhook endpoint must return 200 immediately.** Validate, write one `webhook_inbox` row, respond (ADR 0004 replaced the pg-boss enqueue). Never process inline. AeroDataBox charges for send attempts including retries, so a slow or erroring endpoint costs 3× for nothing.
 
 Alert payloads include the remaining credit balance — log it to `provider_credit_log` on every receipt. Free monitoring.
 
@@ -398,8 +446,8 @@ Required behaviour:
 
 1. An hourly scheduled job in the worker calls `GET /subscriptions/balance` (free).
 2. **No automatic refill (ADR 0003).** Credits are not drawn from the plan automatically; the balance only grows through `POST /subscriptions/balance/refill` (1 credit = 1 API unit), which the owner calls by hand. Below the low-water mark (300, then 100, then 0 credits) the job alerts the owner. It alerts **once per downward crossing**, not on every hourly reading below a mark: a mark is disarmed by the job's own `balance_check` reading at or below it, and re-armed by any later reading above it (webhook payload, refill or check). Webhook payloads never disarm a mark, so a delivery that logs a low balance first cannot swallow the alert. On the very first reading every mark is armed.
-3. **On zero balance, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken. The flight **keeps** its `alert_subscription_id` (the provider pauses subscriptions and resumes them on refill; detaching would let the hourly reconcile delete them). While the last reading is at or below zero, the poll pass runs as if webhooks were off: subscribed flights are polled on the failover ladder rather than the backup cadence, and **no new subscription is opened** at T-24 h against an empty balance. When a reading returns above zero, the ordinary poll path puts subscribed flights back on the backup cadence and subscribes the rest; there is no separate recovery path.
-4. Alert the operator: a push notification to the owner's own phone through the Expo pipeline (`OPERATOR_USER_ID`). No Sentry or email for now (ADR 0003). Wave 4 detects and returns a typed operator alert and logs it (`warn`, `error` at zero); wave 5 connects the push.
+3. **On zero balance, set `next_poll_at` on every flight with an active subscription and resume polling immediately.** Degraded, not broken. The flight **keeps** its `alert_subscription_id` (the provider pauses subscriptions and resumes them on refill; detaching would let the hourly reconcile delete them). While the last reading is at or below zero, the poll pass runs as if webhooks were off: subscribed flights are polled on the failover ladder rather than the backup cadence, and **no new subscription is opened** at the window opening against an empty balance. When a reading returns above zero, the ordinary poll path puts subscribed flights back on the backup cadence and subscribes the rest; there is no separate recovery path.
+4. Alert the operator: a push notification to the owner's own phone through the Expo pipeline (`OPERATOR_USER_ID`). No Sentry or email for now (ADR 0003). Wave 4 detects and returns a typed operator alert and logs it (`warn`, `error` at zero); wave 5 queues it as an `operator-alert` pg-boss job (retried with back-off) that pushes to `OPERATOR_USER_ID`'s token. With no operator id or no token, the log line is the alert.
 
 Write an integration test that drains a dev balance to zero and asserts the poller takes over. Note the unit quota is per calendar month on RapidAPI; the owner is the only one who refills.
 
@@ -408,8 +456,6 @@ Write an integration test that drains a dev balance to zero and asserts the poll
 RapidAPI Pro plan (checked 2026-09-14): 5,000 API units/month, 2 req/s, $8/month. Tier 1 = 1 unit, Tier 2 = 2 units, Tier 3 = 6 units. Flight status is Tier 2. Credits convert 1:1 from units. The worker limits itself to 1 req/s, leaving the rest for interactive lookups.
 
 Approximate per-flight cost: ~14 polls (28 units) plus alert credits during the 24-hour window. At beta scale this is comfortably within budget. Track actual consumption from week one — the alert volume estimate is the least certain number in this document.
-
----
 
 ## 8. Known failure modes
 
@@ -433,13 +479,24 @@ The pipeline is the engine. These are the things that will go wrong.
 
 **9. Archive never triggers.** "Landed + 30 minutes" requires observing arrival. A `scheduled`-tier flight may never report it. Hard backstop: archive at `scheduled_arrival_utc + 6 hours` regardless of observed status.
 
-**10. Expo push token rotation.** Tokens change on reinstall and some OS updates. Read delivery receipts and clear `expo_push_token` on `DeviceNotRegistered`. Otherwise you accumulate dead tokens and silently stop notifying real users.
+**10. Expo push token rotation.** Tokens change on reinstall and some OS updates. Read delivery receipts and, on `DeviceNotRegistered`, invalidate that device's `push_tokens` row (only if it has not registered again since the send; ADR 0006). Otherwise you accumulate dead tokens and silently stop notifying real users.
 
 **11. Group page N+1 queries.** Naive implementation issues one query per member. Fetch the whole group in a single join.
 
-**12. Multi-leg flight numbers.** Some numbers operate two legs on one date. The lookup returns an array. Never take `[0]` without disambiguating (§3.1).
+**12b. Silent tier degradation.** Feed health decides the tracking tier (§7.3), and an airport whose
+health cannot be read degrades that flight to `scheduled`. Found live on 2026-09-16: the lookup asked
+about both airports at once, right after the flight call, which is a three-request burst against a
+1–2 req/s account, and the resulting 429 was swallowed — so **every** flight came back `scheduled`,
+nothing ever subscribed to alerts, and no log said why. Health is now fetched one airport at a time,
+retried once (honouring `Retry-After`), and a persistent failure is logged with the ICAO code. The
+lesson generalises: a conservative fallback must be loud, or it becomes the only path.
 
----
+**12c. A tier that flips back.** A `live` flight that later degrades to `scheduled` still holds its
+`alert_subscription_id`. Subscriptions never expire and bill per delivery (§7.6, §7.7), and the
+hourly reconcile cannot see this case — the row still claims the id and the provider still delivers.
+The poller closes the subscription whenever a flight stops being subscribable.
+
+**12. Multi-leg flight numbers.** Some numbers operate two legs on one date. The lookup returns an array. Never take `[0]` without disambiguating (§3.1).
 
 ## 12. Agent working rules
 
@@ -456,7 +513,7 @@ These are binding on every agent and subagent.
 6. Add `.mcp.json`, `.env`, and `*.local.json` to `.gitignore` before the first commit.
 
 **Data integrity**
-7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Phase 1 exceptions, both documented in §6.3: `ingestFlight` on the service-role client, and the database trigger that sets `archived_at` when a flight's last segment is deleted.)
+7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Documented exceptions, all in §6.3: `ingestFlight` — service-role client in the API, the `flightbuddy_worker` role in the worker; the database trigger that sets `archived_at` when a flight's last segment is deleted; and the trigger that sets `next_poll_at` when a flight is created or re-added.)
 8. All timestamps stored UTC. All display airport-local with a zone label.
 9. Resolve codeshares before insert, never after.
 10. Never auto-merge an unclaimed traveller. Always confirm.

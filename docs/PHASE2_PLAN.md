@@ -1,5 +1,7 @@
 # Phase 2 — The engine: plan for owner review
 
+> **Amended 2026-10-25 (plan kept as written; the overview is the master).** Two details below were superseded during the build: subscriptions open at `scheduled_arrival − 24 h + 30 min`, not T-24h (ADR 0005), and the create call has no `useCredits` parameter — credit billing is the default (ADR 0003). A subscribed flight keeps a 2 h backup poll rather than a null `next_poll_at` (ADR 0004). Phase 2 was completed 2026-10-25.
+
 **Status:** approved with owner decisions, 2026-09-13 (see §8). Nothing below is built yet. Once approved, the decisions here are copied into `docs/PROJECT_OVERVIEW.md` (rule 14) and the agent briefs in `docs/subagents/`.
 
 **Overview definition (§13):** Render Blueprint, background worker, `next_poll_at` scheduler with leasing, polling ladder, webhook receiver, subscription lifecycle, credit monitoring and failover, change detection, pg-boss, Expo Push.

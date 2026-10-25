@@ -1,9 +1,9 @@
 # FlightBuddy — Master Project Overview
 
-**Status:** Phase 1 complete — verified end to end 2026-09-13 (sign-in, add-flight, card matches the provider). Phase 2 next.
+**Status:** Phase 2 complete — all seven done criteria proven live (the last, zero-credit failover, on 2026-10-25). Next: the codebase cleanup pass, then Phase 3 (groups) before any beta testers.
 **Owner:** Solo developer.
 **Target:** iOS private beta (~10 testers) via TestFlight, then public launch.
-**Last updated:** 2026-09-05
+**Last updated:** 2026-10-25
 
 ---
 
@@ -776,6 +776,7 @@ These are binding on every agent and subagent.
 *Done when:* the app wakes you when your gate changes, and a drained credit balance falls back to polling without losing an alert.
 
 This is the hardest phase and must be correct before Phase 3. Group tracking on an unreliable engine is worse than solo tracking on a reliable one.
+*Done 2026-10-25:* criteria 1–7 in `docs/PHASE2_PLAN.md` proven live (evidence in `docs/STATUS.md`).
 
 **Phase 3 — The differentiator.** Groups, join codes, owner approval, unclaimed travellers with the manual claim path, group page, per-member mutes, multi-group priority.
 

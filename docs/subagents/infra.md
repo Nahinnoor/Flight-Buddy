@@ -12,6 +12,8 @@ Set up the monorepo: npm workspaces, root `tsconfig.base.json`, per-package tsco
 
 ---
 
+> Regenerated 2026-10-25 from `docs/PROJECT_OVERVIEW.md` (verbatim, per §0). Phase 2 is done; the task blurbs above are history. The master wins on any conflict.
+
 ## 4. Tech stack
 
 | Layer | Choice | Rationale |
@@ -34,15 +36,16 @@ A **scheduled job** wakes on a schedule inside the worker process (pg-boss's sch
 
 | Job | Service type | Schedule |
 |---|---|---|
-| Flight poller | Background worker | Continuous loop |
-| Notification sends | pg-boss queue | On demand, with retries |
+| Flight poller (and the webhook inbox drain) | Background worker | Continuous loop |
+| Webhook receiver | Web service route, writes `webhook_inbox` | On delivery |
+| Notification sends (`push-send`) | pg-boss queue in the worker | On demand when deliveries are created, plus a sweep every minute (retries with back-off) |
+| Push receipts, dead-token clearing (`push-receipts`) | pg-boss scheduled job in the worker | Every 5 minutes (asks about sends ≥ 15 min old) |
+| Operator alerts (`operator-alert`) | pg-boss queue in the worker | On demand, 5 retries with back-off |
 | Webhook payload processing | pg-boss queue | On demand |
 | Archive backstop (completed trips) | pg-boss scheduled job in the worker | Daily |
 | Purge past 90-day retention | pg-boss scheduled job in the worker (Phase 4) | Daily |
 | Reconcile orphaned subscriptions | pg-boss scheduled job in the worker | Hourly |
 | Credit balance check + low-credit alert | pg-boss scheduled job in the worker | Hourly |
-
----
 
 ## 5. Repository structure
 
@@ -70,8 +73,6 @@ flightbuddy/
 
 `render.yaml` is hand-authored. The Render MCP cannot create background workers — it only creates web services, static sites, cron jobs, Postgres, and Key Value. Agents can write the YAML; they cannot call a tool for it.
 
----
-
 ## 11. External services
 
 | Service | Plan | Notes |
@@ -79,7 +80,7 @@ flightbuddy/
 | AeroDataBox | Pro, $8/mo via RapidAPI | 5,000 units, 2 req/s (ADR 0003). Separate dev and prod apps/keys. |
 | Supabase | US region | Region fixed at creation. |
 | Render | Web service + background worker | Worker is paid-only; scheduled jobs run inside it (ADR 0003). `render.yaml` Blueprint. |
-| Expo / EAS | — | Push + TestFlight builds |
+| Expo / EAS | — | Push + TestFlight builds. Worker env: `OPERATOR_USER_ID` (operator alerts go to that profile's phone) and `EXPO_ACCESS_TOKEN` (**recommended**: with the Expo project's *enhanced push security* on, Expo refuses sends without it, so a leaked device push token is useless alone; never logged). The APNs key lives on EAS (`eas credentials`); a broken one shows up as `InvalidCredentials` receipts and raises an operator alert. |
 | Apple Developer | $99/yr | Already held |
 | Sentry | Deferred | Not used in Phase 2 (ADR 0003); Render logs and failure emails instead. |
 
@@ -100,7 +101,7 @@ Supabase MCP, two entries:
 
 **The Supabase MCP cannot configure auth providers.** Sign in with Apple and Google are dashboard tasks: Services ID, signing key, redirect URLs. Manual, once, by the owner.
 
----
+Email + password is dashboard-configured the same way: the email provider on with **Confirm email** required; **minimum password length 8**, matching `MIN_PASSWORD_LENGTH` and the iOS `passwordRules` (Supabase defaults to 6, and a mismatch means iOS saves a password the server then rejects); `flightbuddy://auth/callback` in **Redirect URLs** (without it Supabase falls back to the Site URL and links open in a browser); the "Confirm signup" and "Reset password" templates left on `{{ .ConfirmationURL }}` (the app refuses `token_hash` links); custom SMTP (the built-in sender is heavily rate-limited); and automatic identity linking on, so an Apple or Google sign-in joins an existing account only through a *verified* email.
 
 ## 12. Agent working rules
 
@@ -117,7 +118,7 @@ These are binding on every agent and subagent.
 6. Add `.mcp.json`, `.env`, and `*.local.json` to `.gitignore` before the first commit.
 
 **Data integrity**
-7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Phase 1 exceptions, both documented in §6.3: `ingestFlight` on the service-role client, and the database trigger that sets `archived_at` when a flight's last segment is deleted.)
+7. **Never write to `flights` from a request handler.** Poller and webhook processor only. (Documented exceptions, all in §6.3: `ingestFlight` — service-role client in the API, the `flightbuddy_worker` role in the worker; the database trigger that sets `archived_at` when a flight's last segment is deleted; and the trigger that sets `next_poll_at` when a flight is created or re-added.)
 8. All timestamps stored UTC. All display airport-local with a zone label.
 9. Resolve codeshares before insert, never after.
 10. Never auto-merge an unclaimed traveller. Always confirm.
