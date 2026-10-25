@@ -1,9 +1,9 @@
 /**
  * Expo push token registration, and how notifications behave in the app.
  *
- * The worker reads `profiles.expo_push_token` and sends each flight alert to
- * it (Phase 2, wave 5). A device's token must belong to **at most one
- * account**: otherwise, after A signs out and B signs in on the same phone,
+ * The worker sends each flight alert to every active device of the recipient,
+ * one `push_tokens` row per device (ADR 0006). A device's token must belong to
+ * **at most one account**: otherwise, after A signs out and B signs in on the same phone,
  * A's alerts — flight number, route, gate — land on B's lock screen. Two
  * database functions (migration `20260926130000_push_token_single_owner`)
  * keep that true:
@@ -12,8 +12,8 @@
  *   and removes it from every other profile, atomically. It is the only way
  *   the app writes the column.
  * - `unregister_push_token` runs on sign-out, while the session still exists
- *   (RLS needs it), and clears the profile's token only if it is still this
- *   device's — a newer registration from another phone survives.
+ *   (it acts for `auth.uid()`), and removes only this device's row; the
+ *   account's other devices stay registered.
  *
  * Both take the token in the RPC's POST body. It never goes in a URL, a log
  * line, an error, or the UI; failures are reported as fixed codes
@@ -28,7 +28,12 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 
-import { isExpoPushToken, safeRpcFailure, safeThrownFailure } from './push-token';
+import {
+  devicePushTokenKey,
+  isExpoPushToken,
+  safeRpcFailure,
+  safeThrownFailure,
+} from './push-token';
 import { supabase } from './supabase';
 
 export type PushRegistrationResult =
@@ -36,6 +41,22 @@ export type PushRegistrationResult =
   | { status: 'skipped'; reason: 'simulator' | 'denied' | 'no-project-id' | 'unsupported' }
   /** `reason` is a fixed code (`rpc:22023`, `thrown:TypeError`), never a message. */
   | { status: 'failed'; reason: string };
+
+export interface PushRegistrationOptions {
+  /**
+   * Show the permission prompt if permission is undecided. Default `true`, for
+   * the sign-in registration. The foreground and token-change refreshes
+   * (`push-refresh.ts`) pass `false`: iOS gives one prompt, and Android would
+   * otherwise ask again on every return to the app.
+   */
+  prompt?: boolean;
+  /**
+   * The device token `addPushTokenListener` just reported. Passed to
+   * `getExpoPushTokenAsync` so it does not ask the OS again, which would emit
+   * the listener's event a second time.
+   */
+  devicePushToken?: Notifications.DevicePushToken;
+}
 
 export type PushUnregisterResult =
   | { status: 'cleared' }
@@ -54,6 +75,9 @@ const UNREGISTER_TIMEOUT_MS = 5_000;
  * credential somewhere new is a cost with no benefit here.
  */
 let registeredToken: string | null = null;
+
+/** The native device token behind `registeredToken`, as `devicePushTokenKey`. Memory only. */
+let registeredDeviceKey: string | null = null;
 
 /**
  * A registration still on its way to the database. Sign-out waits for it, or
@@ -84,10 +108,15 @@ function projectId(): string | undefined {
  *
  * Runs on every sign-in and every launch while signed in, which is what moves
  * the token off a previous account on this phone even when that account never
- * signed out (the app was deleted, or the session expired).
+ * signed out (the app was deleted, or the session expired). It also runs again,
+ * without prompting, on return to the foreground and when Expo reports a new
+ * token (`push-refresh.ts`, `use-push-token-refresh.ts`), so a device whose row
+ * was moved, retired or invalidated comes back without a cold launch.
  */
-export function registerPushToken(): Promise<PushRegistrationResult> {
-  const attempt = register();
+export function registerPushToken(
+  options: PushRegistrationOptions = {},
+): Promise<PushRegistrationResult> {
+  const attempt = register(options);
   inflightRegistration = attempt;
   void attempt.finally(() => {
     if (inflightRegistration === attempt) inflightRegistration = null;
@@ -95,7 +124,18 @@ export function registerPushToken(): Promise<PushRegistrationResult> {
   return attempt;
 }
 
-async function register(): Promise<PushRegistrationResult> {
+/**
+ * Whether `token` (from `addPushTokenListener`) is the device token this app
+ * run last registered successfully.
+ */
+export function isRegisteredDeviceToken(token: Notifications.DevicePushToken): boolean {
+  return registeredDeviceKey !== null && devicePushTokenKey(token) === registeredDeviceKey;
+}
+
+async function register({
+  prompt = true,
+  devicePushToken,
+}: PushRegistrationOptions): Promise<PushRegistrationResult> {
   // Push certificates are not wired to the simulator; asking produces an error
   // rather than a prompt, so this is a clean skip, not a failure.
   if (!Device.isDevice) return { status: 'skipped', reason: 'simulator' };
@@ -113,7 +153,7 @@ async function register(): Promise<PushRegistrationResult> {
 
     const existing = await Notifications.getPermissionsAsync();
     let granted = existing.granted;
-    if (!granted && existing.canAskAgain) {
+    if (!granted && prompt && existing.canAskAgain) {
       const requested = await Notifications.requestPermissionsAsync();
       granted = requested.granted;
     }
@@ -122,13 +162,20 @@ async function register(): Promise<PushRegistrationResult> {
     const id = projectId();
     if (id === undefined) return { status: 'skipped', reason: 'no-project-id' };
 
-    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: id });
+    // What `getExpoPushTokenAsync` does by default, made explicit so the
+    // device token behind the registration is known (`isRegisteredDeviceToken`).
+    const device = devicePushToken ?? (await Notifications.getDevicePushTokenAsync());
+    const { data: token } = await Notifications.getExpoPushTokenAsync({
+      projectId: id,
+      devicePushToken: device,
+    });
     if (!isExpoPushToken(token)) return { status: 'failed', reason: 'unexpected-token-shape' };
 
     const { error } = await supabase.rpc('register_push_token', { p_token: token });
     if (error !== null) return { status: 'failed', reason: safeRpcFailure(error) };
 
     registeredToken = token;
+    registeredDeviceKey = devicePushTokenKey(device);
     return { status: 'registered' };
   } catch (error) {
     return { status: 'failed', reason: safeThrownFailure(error) };
@@ -163,6 +210,7 @@ async function unregister(): Promise<PushUnregisterResult> {
     if (error !== null) return { status: 'failed', reason: safeRpcFailure(error) };
 
     registeredToken = null;
+    registeredDeviceKey = null;
     return { status: 'cleared' };
   } catch (error) {
     return { status: 'failed', reason: safeThrownFailure(error) };

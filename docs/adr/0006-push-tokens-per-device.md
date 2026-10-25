@@ -5,7 +5,7 @@
 Accepted — 2026-10-24 (owner chose "one token per device"). Sub-step (i), the database, is built by
 migration `push_tokens_per_device`. Sub-step (ii), the worker, is built by migration
 `notification_device_sends` and `services/poller/src/push/*` (section "Sub-step (ii) as built" below).
-Sub-step (iii), the app, is designed here and built later. Extends, and does not replace, the single-owner rule of migration
+Sub-step (iii), the app, is built in `apps/mobile` (section "Sub-step (iii) as built" below). Extends, and does not replace, the single-owner rule of migration
 `20260926130000_push_token_single_owner` (overview §6.3, §10): a device's token still belongs to at
 most one account.
 
@@ -127,8 +127,9 @@ still works under RLS and the unique index; it bypasses `push_tokens`, and the n
   schema to alter later. That migration is additive and is applied to the database before the worker
   code reaches `main`, so the deploy order stays safe.
 
-Then (iii) the app needs no change to keep working (it already registers on every launch and
-unregisters on sign-out). After (ii) and (iii) have shipped, a final step stops the dual-write,
+Then (iii) the app needs no RPC change to keep working (it already registers on every launch and
+unregisters on sign-out); what it adds is registering again without a cold launch (section
+"Sub-step (iii) as built"). After (ii) and (iii) have shipped, a final step stops the dual-write,
 removes the interim trigger and drops `profiles.expo_push_token` and its index.
 
 ## Consequences
@@ -253,6 +254,32 @@ Amends the sub-step (ii) design above; where they differ, this section wins.
   device rows and re-derives their deliveries in one transaction. No schema change.
 - **Operator alerts** go to every active device of `OPERATOR_USER_ID` (≤ 10, one request); the alert
   counts as sent if any device got a ticket, and a dead device is invalidated as above.
+
+## Sub-step (iii) as built (2026-10-25, `apps/mobile`)
+
+No migration and no RPC change: the app calls the same `register_push_token(p_token)` /
+`unregister_push_token(p_token)`. What changes is *when* it registers, so a device whose row was
+moved to another account, retired over the cap, or invalidated by a `DeviceNotRegistered` receipt is
+back within one return to the app instead of staying silent until the next cold launch.
+
+- **Sign-in / launch:** unchanged. Once per signed-in user per app run, with the permission prompt if
+  permission is undecided.
+- **Foreground** (`AppState` → `active`): registers again, **never prompting** (iOS gives one prompt;
+  Android would otherwise ask on every return). Throttled in `src/lib/push-refresh.ts`: at most once
+  per 10 minutes after a successful registration, once per 60 seconds after a failed or skipped one,
+  and never while another registration is running. A wait longer than 10 minutes (the wall clock set
+  backwards) counts as over.
+- **Token change** (`addPushTokenListener`): a device token different from the one last registered is
+  registered at once, bypassing the throttle, and is passed to `getExpoPushTokenAsync` so the OS is
+  not asked again. A token reported while a registration is running is checked when it ends: the
+  echo of that registration's own token request is dropped, and after a failed attempt it waits for
+  the 60-second backoff rather than retrying at once.
+- **Never** while signed out, during a password reset, or from the start of a sign-out (or an
+  abandoned reset) until a new session exists; the throttle and anything queued are forgotten when
+  the session ends. Sign-out still waits for any running registration and unregisters before the
+  session ends.
+- Failures are logged as fixed codes only and never shown; neither the Expo token nor the native
+  device token (held in memory to recognise the echo) is ever logged.
 
 **A later sub-step** (after (iii)) stops the dual-write in both functions, drops the interim
 `profiles` trigger, `profiles.expo_push_token` and its unique index, revokes the worker's

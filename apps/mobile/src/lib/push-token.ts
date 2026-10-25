@@ -38,3 +38,14 @@ export function safeThrownFailure(error: unknown): string {
   const name = error instanceof Error ? error.name : null;
   return name !== null && SAFE_NAME.test(name) ? `thrown:${name}` : 'thrown:unknown';
 }
+
+/**
+ * A comparable form of the native device token Expo reports
+ * (`DevicePushToken`: `{ type, data }`, `data` a string on iOS and Android).
+ * Used only to tell whether a token reported by `addPushTokenListener` is the
+ * one already registered. It is a credential too: kept in memory, never logged.
+ */
+export function devicePushTokenKey(token: { type: string; data: unknown }): string {
+  const data = typeof token.data === 'string' ? token.data : JSON.stringify(token.data);
+  return `${token.type}:${data}`;
+}

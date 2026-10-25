@@ -25,6 +25,7 @@ import {
   signInWithGoogle,
   signOut as performSignOut,
 } from '@/lib/auth';
+import { usePushTokenRefresh } from '@/hooks/use-push-token-refresh';
 import { isUsableSession } from '@/lib/email-auth';
 import { registerPushToken, unregisterPushToken } from '@/lib/push';
 import { startSupabaseAutoRefresh, supabase } from '@/lib/supabase';
@@ -178,29 +179,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Push registration, once per signed-in user per app run. Keyed on the user
-  // id rather than the session object, so a token refresh does not re-prompt.
-  // Registering also removes this device's token from any other account that
-  // still holds it (`register_push_token`), so it runs on every launch, not
-  // only on a fresh sign-in. `reason` is a fixed code, never a token or a
-  // server message (`push-token.ts`).
-  const registeredFor = useRef<string | null>(null);
   const userId = session?.user.id ?? null;
 
+  // Set at the start of a sign-out (or an abandoned reset) and kept until a
+  // new session exists, so no foreground or token-change refresh can register
+  // this device while its token is being cleared or after the session ended.
+  // Cleared early only when the sign-out fails and the user stays signed in.
+  const signingOut = useRef(false);
   useEffect(() => {
-    if (userId === null) {
-      registeredFor.current = null;
-      return;
-    }
-    if (registeredFor.current === userId) return;
-    registeredFor.current = userId;
-
-    void registerPushToken().then((result) => {
-      if (result.status !== 'registered') {
-        console.log(`[push] token not stored: ${result.status} (${result.reason})`);
-      }
-    });
+    if (userId !== null) signingOut.current = false;
   }, [userId]);
+
+  // Push registration: once per signed-in user per app run (with the
+  // permission prompt), then again on foreground and on token change, without
+  // it. `reason` codes are fixed, never a token or a server message.
+  usePushTokenRefresh({ userId, isRecovering, signingOut });
 
   // Rejects when the server revoke fails; the caller decides how to show
   // that. `session` is cleared only on success, because supabase-js keeps the
@@ -212,10 +205,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // Bounded and never fatal; if the sign-out itself then fails, the user is
   // still signed in here, so the token is put back.
   const handleSignOut = useCallback(async () => {
+    signingOut.current = true;
     await clearThisDevicesPushToken();
     try {
       await performSignOut();
     } catch (error) {
+      signingOut.current = false;
       void registerPushToken();
       throw error;
     }
@@ -232,9 +227,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // Local scope: abandoning a reset must work offline, and the recovery
   // session was only ever on this device.
   const cancelRecovery = useCallback(async () => {
+    signingOut.current = true;
     await clearThisDevicesPushToken();
     await writeRecoveryFlag(false);
-    await supabase.auth.signOut({ scope: 'local' });
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (error) {
+      signingOut.current = false;
+      throw error;
+    }
     setIsRecovering(false);
     setSession(null);
   }, []);

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { isExpoPushToken, safeRpcFailure, safeThrownFailure } from './push-token';
+import {
+  devicePushTokenKey,
+  isExpoPushToken,
+  safeRpcFailure,
+  safeThrownFailure,
+} from './push-token';
 
 // Fabricated test values, not real device tokens.
 const TOKEN = 'ExponentPushToken[test-token-0123456789]';
@@ -45,5 +50,18 @@ describe('failure reasons never carry text from the error', () => {
     error.name = TOKEN;
     expect(safeThrownFailure(error)).toBe('thrown:unknown');
     expect(safeThrownFailure('a string')).toBe('thrown:unknown');
+  });
+});
+
+describe('devicePushTokenKey', () => {
+  it('tells device tokens apart by type and data', () => {
+    const a = { type: 'ios', data: 'test-device-token-a' };
+    expect(devicePushTokenKey(a)).toBe(devicePushTokenKey({ ...a }));
+    expect(devicePushTokenKey(a)).not.toBe(devicePushTokenKey({ type: 'ios', data: 'test-device-token-b' }));
+    expect(devicePushTokenKey(a)).not.toBe(devicePushTokenKey({ type: 'android', data: a.data }));
+  });
+
+  it('accepts non-string data', () => {
+    expect(devicePushTokenKey({ type: 'web', data: { endpoint: 'e' } })).toBe('web:{"endpoint":"e"}');
   });
 });
