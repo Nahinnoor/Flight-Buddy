@@ -177,13 +177,43 @@ export interface PushReceiptsSummary {
   devicesKept: number;
 }
 
+/**
+ * Device rows, then their deliveries, in **one transaction**: a crash between
+ * the two cannot leave a delivery `sent` whose device was set back to `pending`
+ * (the receipt job only re-reads `sent` device rows, so nothing would requeue it).
+ */
 async function finalize(
   pool: Pool,
   outcomes: readonly ReceiptOutcome[],
   requeue: ReadonlyMap<string, Date>,
 ): Promise<void> {
   if (outcomes.length === 0) return;
-  await pool.query({
+  // Not `withClient` (db.ts): a connection whose rollback failed must be
+  // released with the error, so pg discards it instead of reusing it.
+  const client = await pool.connect();
+  let broken: Error | undefined;
+  try {
+    await client.query('begin');
+    await writeReceipts(client, outcomes, requeue);
+    await client.query('commit');
+  } catch (error) {
+    try {
+      await client.query('rollback');
+    } catch (rollbackError) {
+      broken = rollbackError instanceof Error ? rollbackError : new Error('rollback failed');
+    }
+    throw error;
+  } finally {
+    client.release(broken);
+  }
+}
+
+async function writeReceipts(
+  client: Pick<Pool, 'query'>,
+  outcomes: readonly ReceiptOutcome[],
+  requeue: ReadonlyMap<string, Date>,
+): Promise<void> {
+  await client.query({
     text: FINALIZE_RECEIPTS_SQL,
     values: [
       outcomes.map((o) => o.deliveryId),
@@ -194,7 +224,7 @@ async function finalize(
     types: ENGINE_TYPES,
   });
   const deliveryIds = [...new Set(outcomes.map((o) => o.deliveryId))];
-  await pool.query({
+  await client.query({
     text: SETTLE_DELIVERIES_SQL,
     values: [deliveryIds, deliveryIds.map((id) => requeue.get(id) ?? null)],
     types: ENGINE_TYPES,
@@ -308,7 +338,9 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
           row.attempts < MAX_SEND_ATTEMPTS &&
           age < MAX_DELIVERY_AGE_MS;
         if (retryable) {
-          outcomes.push({ ...base, status: 'pending', error: null });
+          // The code stays on the row: if the device is gone before its re-send,
+          // the row is closed `failed` with it (CLOSE_STALE_PENDING_SENDS_SQL).
+          outcomes.push({ ...base, status: 'pending', error: code });
           if (row.delivery_status === 'sent') {
             requeue.set(row.delivery_id, new Date(now.getTime() + retryDelayMs(row.attempts)));
           }

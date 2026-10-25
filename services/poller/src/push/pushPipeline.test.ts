@@ -31,7 +31,12 @@ import {
 } from './fakeExpo';
 import type { OperatorNotice } from './operatorAlerts';
 import { runPushReceipts } from './pushReceipts';
-import { MAX_DEVICES_PER_RECIPIENT, recordDeviceSends } from './deviceSends';
+import {
+  CLOSE_STALE_PENDING_SENDS_SQL,
+  MAX_DEVICES_PER_RECIPIENT,
+  RENEW_SEND_LEASE_SQL,
+  recordDeviceSends,
+} from './deviceSends';
 import { CLAIM_DELIVERIES_SQL, runPushSend } from './pushSend';
 import { pushTokenSha256 } from './tokens';
 
@@ -594,15 +599,19 @@ describe('every active device (ADR 0006, sub-step ii)', () => {
       values: [100, SEND_LEASE_MS, MAX_SEND_ATTEMPTS],
     });
     const deliveryId = s.db.deliveries[0]?.id as string;
-    await recordDeviceSends(s.db.pool, [
-      {
-        deliveryId,
-        tokenSha256: pushTokenSha256(FAKE_TOKEN_A),
-        status: 'sent',
-        ticketId: 'ticket-from-the-dead-worker',
-        error: null,
-      },
-    ]);
+    await recordDeviceSends(
+      s.db.pool,
+      [
+        {
+          deliveryId,
+          tokenSha256: pushTokenSha256(FAKE_TOKEN_A),
+          status: 'sent',
+          ticketId: 'ticket-from-the-dead-worker',
+          error: null,
+        },
+      ],
+      NOW.toISOString(),
+    );
 
     s.at(later(SEND_LEASE_MS + 1_000));
     const retry = await s.send();
@@ -632,6 +641,7 @@ describe('every active device (ADR 0006, sub-step ii)', () => {
         ticketId: `ticket-${i}`,
         error: null,
       })),
+      NOW.toISOString(),
     );
 
     s.at(later(SEND_LEASE_MS + 1_000));
@@ -651,15 +661,19 @@ describe('every active device (ADR 0006, sub-step ii)', () => {
       text: CLAIM_DELIVERIES_SQL,
       values: [100, SEND_LEASE_MS, MAX_SEND_ATTEMPTS],
     });
-    await recordDeviceSends(s.db.pool, [
-      {
-        deliveryId: delivery?.id as string,
-        tokenSha256: pushTokenSha256(FAKE_TOKEN_A),
-        status: 'sent',
-        ticketId: 'ticket-0',
-        error: null,
-      },
-    ]);
+    await recordDeviceSends(
+      s.db.pool,
+      [
+        {
+          deliveryId: delivery?.id as string,
+          tokenSha256: pushTokenSha256(FAKE_TOKEN_A),
+          status: 'sent',
+          ticketId: 'ticket-0',
+          error: null,
+        },
+      ],
+      NOW.toISOString(),
+    );
 
     s.at(later(SEND_LEASE_MS + 1_000));
     const run = await s.send();
@@ -772,6 +786,201 @@ describe('every active device (ADR 0006, sub-step ii)', () => {
 
     expect(s.expo.messages()).toHaveLength(MAX_DEVICES_PER_RECIPIENT);
     expect(s.expo.messages().map((m) => m.to)).not.toContain('ExponentPushToken[FAKE-device-0]');
+  });
+
+  /** Phone ok, tablet MessageRateExceeded on its receipt: the tablet waits as `pending`. */
+  async function tabletWaitingForResend() {
+    const tickets = new Map<string, string>();
+    const s = twoDevices({
+      send: {
+        tickets: (m) => {
+          const ticket = okTicket();
+          tickets.set(m.to, String(ticket.id));
+          return ticket;
+        },
+      },
+      receipts: () => ({
+        [tickets.get(FAKE_TOKEN_B) ?? '']: errorTicket('MessageRateExceeded'),
+      }),
+    });
+    await s.record();
+    await s.send();
+    s.at(later(RECEIPT_DELAY_MS));
+    await s.receipts();
+    expect(s.db.deliveries[0]?.status).toBe('pending');
+    expect(
+      s.db.deviceSends.find((d) => d.token_sha256 === pushTokenSha256(FAKE_TOKEN_B)),
+    ).toMatchObject({ status: 'pending', error: 'MessageRateExceeded' });
+    return s;
+  }
+
+  it('a pending device that signed out does not hold the delivery pending', async () => {
+    const s = await tabletWaitingForResend();
+    // The tablet signs out (unregister deletes its row) before the re-send.
+    s.db.pushTokens.splice(
+      s.db.pushTokens.findIndex((t) => t.token === FAKE_TOKEN_B),
+      1,
+    );
+
+    s.at(later(RECEIPT_DELAY_MS + 5 * 60_000));
+    await s.send();
+
+    expect(s.expo.sent).toHaveLength(1);
+    expect(
+      s.db.deviceSends.find((d) => d.token_sha256 === pushTokenSha256(FAKE_TOKEN_B)),
+    ).toMatchObject({ status: 'failed', error: 'MessageRateExceeded' });
+    // The phone still holds its ticket: the delivery is sent, not pending, not skipped.
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sent', error: null });
+    expect((await s.send()).claimed).toBe(0);
+  });
+
+  it('a delivery whose only device had a ticket, then went away, ends failed, never NoPushToken', async () => {
+    const tickets: string[] = [];
+    const s = setup({
+      send: {
+        tickets: () => {
+          const ticket = okTicket();
+          tickets.push(String(ticket.id));
+          return ticket;
+        },
+      },
+      receipts: () => ({ [tickets[0] ?? '']: errorTicket('MessageRateExceeded') }),
+    });
+    s.db.addTraveller({ userId: USER_A, flightIds: [FLIGHT], token: FAKE_TOKEN_A });
+    await s.record();
+    await s.send();
+    s.at(later(RECEIPT_DELAY_MS));
+    await s.receipts();
+    const dead = s.db.device(FAKE_TOKEN_A);
+    if (dead) {
+      dead.invalidated_at = later(RECEIPT_DELAY_MS).toISOString();
+      dead.invalidated_reason = 'device_not_registered';
+    }
+
+    s.at(later(RECEIPT_DELAY_MS + 5 * 60_000));
+    await s.send();
+
+    expect(s.expo.sent).toHaveLength(1);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'failed', error: 'MessageRateExceeded' });
+  });
+
+  it('an expired delivery with a pending device is closed, not left pending', async () => {
+    const s = await tabletWaitingForResend();
+
+    s.at(later(MAX_DELIVERY_AGE_MS + 60_000));
+    const run = await s.send();
+
+    expect(run.expired).toBe(1);
+    expect(s.expo.sent).toHaveLength(1);
+    expect(s.db.deviceSends.every((d) => d.status !== 'pending')).toBe(true);
+    // The phone's ticket still counts.
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sent' });
+    expect((await s.send()).claimed).toBe(0);
+  });
+
+  it('a stale-pending close under an old claim leaves a newer claim’s rows alone', async () => {
+    const s = await tabletWaitingForResend();
+    s.db.pushTokens.splice(
+      s.db.pushTokens.findIndex((t) => t.token === FAKE_TOKEN_B),
+      1,
+    );
+    const row = s.db.deliveries[0];
+    if (row) {
+      // Another worker holds the newer claim (attempts 2).
+      row.status = 'sending';
+      row.attempts = 2;
+    }
+
+    await s.db.pool.query({
+      text: CLOSE_STALE_PENDING_SENDS_SQL,
+      values: [[row?.id], [1], [], DELIVERY_ERRORS.DEVICE_INACTIVE],
+    });
+    const tablet = () =>
+      s.db.deviceSends.find((d) => d.token_sha256 === pushTokenSha256(FAKE_TOKEN_B));
+    expect(tablet()?.status).toBe('pending');
+
+    await s.db.pool.query({
+      text: CLOSE_STALE_PENDING_SENDS_SQL,
+      values: [[row?.id], [2], [], DELIVERY_ERRORS.DEVICE_INACTIVE],
+    });
+    expect(tablet()).toMatchObject({ status: 'failed', error: 'MessageRateExceeded' });
+  });
+
+  it('finalize is a no-op once another worker has re-claimed the delivery (attempts changed)', async () => {
+    const s = twoDevices({
+      send: {
+        tickets: () => {
+          // Our lease ran out mid-request and another worker claimed the row.
+          const row = s.db.deliveries[0];
+          if (row && row.attempts === 1) row.attempts = 2;
+          return okTicket();
+        },
+      },
+    });
+    await s.record();
+
+    await s.send();
+
+    // Device rows are durable either way; the delivery is the re-claimer's to finish.
+    expect(s.db.deviceSends).toHaveLength(2);
+    expect(s.db.deliveries[0]).toMatchObject({ status: 'sending', attempts: 2 });
+  });
+
+  it('device rows carry the time the devices were read, not when Expo answered', async () => {
+    const s = twoDevices({
+      send: {
+        tickets: () => {
+          s.at(later(30_000));
+          return okTicket();
+        },
+      },
+    });
+    await s.record();
+
+    await s.send();
+
+    expect(s.db.deviceSends.every((d) => d.sent_at === NOW.toISOString())).toBe(true);
+  });
+
+  it('renews the lease before each further request and drops a delivery lost meanwhile', async () => {
+    const users = Array.from(
+      { length: 60 },
+      (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+    );
+    let requests = 0;
+    const s = setup({
+      send: {
+        tickets: () => {
+          if (requests === 0) {
+            requests = 1;
+            // While the first request is out, another worker takes the last delivery.
+            const lost = s.db.deliveries.find((d) => d.user_id === users[59]);
+            if (lost) lost.attempts += 1;
+          }
+          return okTicket();
+        },
+      },
+    });
+    for (const [i, id] of users.entries()) {
+      s.db.addTraveller({
+        userId: id,
+        flightIds: [FLIGHT],
+        tokens: [`ExponentPushToken[FAKE-phone-${i}]`, `ExponentPushToken[FAKE-tablet-${i}]`],
+      });
+    }
+    await s.record();
+    // Order the deliveries so the lost one is in the second request.
+    for (const [i, d] of s.db.deliveries.entries()) {
+      d.created_at = new Date(NOW.getTime() + i).toISOString();
+      d.id = `00000000-0000-4000-9000-${String(users.indexOf(d.user_id)).padStart(12, '0')}`;
+    }
+
+    await s.send();
+
+    const summary = s.db.statements.filter((st) => st.text === RENEW_SEND_LEASE_SQL);
+    expect(summary).toHaveLength(1);
+    expect(s.expo.sent.map((batch) => batch.length)).toEqual([100, 18]);
+    expect(s.log.text()).toContain('"leaseLost":1');
   });
 
   it('logs no token of any device', async () => {

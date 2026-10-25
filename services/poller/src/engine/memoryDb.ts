@@ -32,10 +32,12 @@ import {
 import type { Pool } from '../db';
 import {
   CLOSE_EXHAUSTED_SENDS_SQL,
+  CLOSE_STALE_PENDING_SENDS_SQL,
   FINALIZE_SENDS_SQL,
   INSERT_DEVICE_SENDS_SQL,
   INVALIDATE_DEVICE_SQL,
   LOAD_SENDABLE_DEVICES_SQL,
+  RENEW_SEND_LEASE_SQL,
   SETTLE_DELIVERIES_SQL,
 } from '../push/deviceSends';
 import { READ_OPERATOR_DEVICES_SQL } from '../push/operatorAlerts';
@@ -816,7 +818,12 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
                       s.status !== 'pending',
                   ),
               )
-              .map((t) => ({ delivery_id: d.id, token: t.token, token_sha256: t.token_sha256 })),
+              .map((t) => ({
+                delivery_id: d.id,
+                token: t.token,
+                token_sha256: t.token_sha256,
+                read_at: now.toISOString(),
+              })),
           );
       }
 
@@ -855,7 +862,7 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
               status,
               expo_ticket_id: ticketId,
               error: (u.error as string | null) ?? null,
-              sent_at: now.toISOString(),
+              sent_at: iso(values[5]) as string,
               receipt_checked_at: null,
             };
             deviceSends.push(row);
@@ -863,7 +870,7 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
             existing.status = status;
             existing.expo_ticket_id = ticketId;
             existing.error = (u.error as string | null) ?? null;
-            existing.sent_at = now.toISOString();
+            existing.sent_at = iso(values[5]) as string;
             existing.receipt_checked_at = null;
             row = existing;
           } else {
@@ -877,6 +884,39 @@ export function createMemoryDb(options: { now?: Date } = {}): MemoryDb {
           });
         }
         return written;
+      }
+
+      case CLOSE_STALE_PENDING_SENDS_SQL: {
+        const [ids, attempts, closing, code] = values as [string[], number[], string[], string];
+        for (const s of deviceSends) {
+          const index = ids.indexOf(s.delivery_id);
+          if (s.status !== 'pending' || index < 0) continue;
+          const d = deliveries.find((row) => row.id === s.delivery_id);
+          if (d === undefined || d.status !== 'sending' || d.attempts !== attempts[index]) continue;
+          const active = pushTokens.some(
+            (t) =>
+              t.user_id === d.user_id &&
+              t.token_sha256 === s.token_sha256 &&
+              t.invalidated_at === null,
+          );
+          if (closing.includes(d.id) || !active) {
+            s.status = 'failed';
+            s.error = s.error ?? code;
+          }
+        }
+        return [];
+      }
+
+      case RENEW_SEND_LEASE_SQL: {
+        const renewed: Row[] = [];
+        for (const u of unnestRows(values, ['id', 'attempts'])) {
+          const d = deliveries.find((row) => row.id === u.id);
+          if (d === undefined || d.status !== 'sending' || d.attempts !== Number(u.attempts))
+            continue;
+          d.claimed_until = new Date(nowMs() + Number(values[2])).toISOString();
+          renewed.push({ id: d.id });
+        }
+        return renewed;
       }
 
       case FINALIZE_SENDS_SQL: {

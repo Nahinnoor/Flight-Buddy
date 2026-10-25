@@ -1,8 +1,11 @@
 -- Contract test for migration 20261024230045_notification_device_sends (ADR 0006,
 -- sub-step ii). One transaction, always rolled back; throwaway users and a
--- synthetic flight; fabricated hashes only (never a token). The worker's own
--- statements are exercised against a real Postgres by the poller's SQL, not
--- here; this pins the table's shape, constraints and grants.
+-- synthetic flight; fabricated hashes only (never a token). This pins the
+-- table's shape, constraints and grants. The worker's own statements (the
+-- send, receipt and invalidation SQL in services/poller/src/push/) run against a
+-- real Postgres as flightbuddy_worker in pushDevices.integration.test.ts:
+--   supabase/tests/run-local.sh --exec env INTEGRATION=1 npx vitest run \
+--     --root services/poller src/push/pushDevices.integration.test.ts
 
 \set ON_ERROR_STOP 1
 begin;

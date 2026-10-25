@@ -60,8 +60,10 @@ import {
 } from './deliveryStatus';
 import {
   CLOSE_EXHAUSTED_SENDS_SQL,
+  CLOSE_STALE_PENDING_SENDS_SQL,
   FINALIZE_SENDS_SQL,
   LOAD_SENDABLE_DEVICES_SQL,
+  RENEW_SEND_LEASE_SQL,
   MAX_DEVICES_PER_RECIPIENT,
   invalidateDeadDevice,
   recordDeviceSends,
@@ -200,6 +202,7 @@ interface DeviceRow {
   delivery_id: string;
   token: string;
   token_sha256: string;
+  read_at: string;
 }
 
 /** What this attempt concluded for one delivery; SQL derives the final status. */
@@ -244,6 +247,8 @@ export interface PushSendSummary {
   unconfirmed: number;
   devicesInvalidated: number;
   closedInterrupted: number;
+  /** Deliveries dropped mid-batch because another worker re-claimed them. */
+  leaseLost: number;
 }
 
 function emptySummary(): PushSendSummary {
@@ -258,6 +263,7 @@ function emptySummary(): PushSendSummary {
     unconfirmed: 0,
     devicesInvalidated: 0,
     closedInterrupted: 0,
+    leaseLost: 0,
   };
 }
 
@@ -349,8 +355,9 @@ async function recordChunk(
   summary: PushSendSummary,
   records: readonly DeviceSendRecord[],
   userOf: ReadonlyMap<string, string>,
+  sentAt: string,
 ): Promise<void> {
-  const written = await recordDeviceSends(deps.pool, records);
+  const written = await recordDeviceSends(deps.pool, records, sentAt);
   for (const row of written) {
     const record = records.find(
       (r) => r.deliveryId === row.delivery_id && r.tokenSha256 === row.token_sha256,
@@ -415,23 +422,10 @@ async function runBatch(
     values: [ids],
     types: ENGINE_TYPES,
   });
-  const devices = await deps.pool.query<DeviceRow>({
-    text: LOAD_SENDABLE_DEVICES_SQL,
-    values: [ids, MAX_DEVICES_PER_RECIPIENT],
-    types: ENGINE_TYPES,
-  });
-  const devicesOf = new Map<string, DeviceRow[]>();
-  for (const device of devices.rows) {
-    const list = devicesOf.get(device.delivery_id) ?? [];
-    list.push(device);
-    devicesOf.set(device.delivery_id, list);
-  }
-
   /** Deliveries closed without a send, by their fallback status. */
   const closed = new Map<string, { status: DeliveryStatus; error: string }>();
-  const outgoing: Outgoing[] = [];
-  const unsendable: DeviceSendRecord[] = [];
   const userOf = new Map<string, string>();
+  const sendable: { row: FactsRow; messageFacts: MessageFacts }[] = [];
 
   for (const row of facts.rows) {
     userOf.set(row.delivery_id, row.user_id);
@@ -450,6 +444,40 @@ async function runBatch(
       summary.failed += 1;
       continue;
     }
+    sendable.push({ row, messageFacts });
+  }
+
+  // A device waiting for a re-send that will not happen (its delivery closes
+  // now, or the device is gone) must not keep its delivery `pending`.
+  await deps.pool.query({
+    text: CLOSE_STALE_PENDING_SENDS_SQL,
+    values: [
+      facts.rows.map((row) => row.delivery_id),
+      facts.rows.map((row) => row.attempts),
+      [...closed.keys()],
+      DELIVERY_ERRORS.DEVICE_INACTIVE,
+    ],
+    types: ENGINE_TYPES,
+  });
+
+  const devices = await deps.pool.query<DeviceRow>({
+    text: LOAD_SENDABLE_DEVICES_SQL,
+    values: [sendable.map((item) => item.row.delivery_id), MAX_DEVICES_PER_RECIPIENT],
+    types: ENGINE_TYPES,
+  });
+  const devicesOf = new Map<string, DeviceRow[]>();
+  for (const device of devices.rows) {
+    const list = devicesOf.get(device.delivery_id) ?? [];
+    list.push(device);
+    devicesOf.set(device.delivery_id, list);
+  }
+  // Every device row this batch writes carries the time the devices were read.
+  const sentAt = devices.rows[0]?.read_at ?? now.toISOString();
+
+  const outgoing: Outgoing[] = [];
+  const unsendable: DeviceSendRecord[] = [];
+
+  for (const { row, messageFacts } of sendable) {
     const targets = devicesOf.get(row.delivery_id) ?? [];
     if (targets.length === 0) {
       // No active device needing this message. If an earlier attempt already
@@ -485,7 +513,7 @@ async function runBatch(
     }
   }
 
-  await recordChunk(deps, summary, unsendable, userOf);
+  await recordChunk(deps, summary, unsendable, userOf, sentAt);
 
   const retries: RetryCodes = new Map();
   const errorCodes: string[] = [];
@@ -494,13 +522,33 @@ async function runBatch(
   /** Set by a retryable request failure: Expo is struggling, stop for this batch. */
   let haltCode: string | null = null;
 
-  for (let start = 0; start < outgoing.length; start += MAX_MESSAGES_PER_REQUEST) {
-    const chunk = outgoing.slice(start, start + MAX_MESSAGES_PER_REQUEST);
+  let queue = outgoing;
+  for (let first = true; queue.length > 0; first = false) {
+    if (!first) {
+      // Each request may take up to its timeout: renew the lease first, and drop
+      // any delivery another worker has re-claimed meanwhile.
+      const held = await deps.pool.query<{ id: string }>({
+        text: RENEW_SEND_LEASE_SQL,
+        values: [
+          facts.rows.map((r) => r.delivery_id),
+          facts.rows.map((r) => r.attempts),
+          SEND_LEASE_MS,
+        ],
+        types: ENGINE_TYPES,
+      });
+      const ours = new Set(held.rows.map((r) => r.id));
+      const lost = new Set(queue.map((item) => item.row.delivery_id).filter((id) => !ours.has(id)));
+      summary.leaseLost += lost.size;
+      queue = queue.filter((item) => ours.has(item.row.delivery_id));
+      if (queue.length === 0) break;
+    }
+    const chunk = queue.slice(0, MAX_MESSAGES_PER_REQUEST);
+    queue = queue.slice(MAX_MESSAGES_PER_REQUEST);
     const records: DeviceSendRecord[] = [];
 
     if (haltCode !== null) {
       for (const item of chunk) retryOrCloseDevice(item, haltCode, retries, records, summary);
-      await recordChunk(deps, summary, records, userOf);
+      await recordChunk(deps, summary, records, userOf, sentAt);
       continue;
     }
 
@@ -579,7 +627,7 @@ async function runBatch(
     }
 
     // Durable per request: a crash after this line re-sends none of these devices.
-    await recordChunk(deps, summary, records, userOf);
+    await recordChunk(deps, summary, records, userOf, sentAt);
   }
 
   if (errorCodes.length > 0) {
@@ -656,6 +704,12 @@ export async function runPushSend(deps: PushSendDeps): Promise<PushSendSummary> 
     if (claimed < batchSize) break;
   }
 
+  if (summary.leaseLost > 0) {
+    deps.logger.warn(
+      { leaseLost: summary.leaseLost },
+      'push deliveries re-claimed by another worker mid-batch; left to it',
+    );
+  }
   if (summary.claimed > 0 || summary.closedInterrupted > 0) {
     deps.logger.info({ ...summary }, 'push send run complete');
   }

@@ -241,6 +241,16 @@ Amends the sub-step (ii) design above; where they differ, this section wins.
   check takes `key share` on the owner's profile, which does not conflict with the functions'
   `for no key update`. So the worker never waits on a lock the functions hold while holding one they
   want, and no cycle can form with the order above.
+- **Review follow-ups (same day).** A `pending` device row is closed `failed` (keeping the
+  `MessageRateExceeded` code it was waiting on, else `DeviceInactive`) when its device is no longer
+  active or its delivery closes unsent (expired, unbuildable), before the devices are read
+  (`CLOSE_STALE_PENDING_SENDS_SQL`). Without that it held the delivery `pending` until attempts ran
+  out, and a delivery whose only ticketed device went away could end `NoPushToken`. Device rows'
+  `sent_at` is the database time the devices were read, before any request leaves (the guard can
+  then only keep a device that registered while the send was in flight). The lease is renewed before
+  each further Expo request, and a delivery re-claimed meanwhile is dropped from the batch
+  (`RENEW_SEND_LEASE_SQL`), so 10 devices × 100 deliveries cannot outlast it. The receipt job writes
+  device rows and re-derives their deliveries in one transaction. No schema change.
 - **Operator alerts** go to every active device of `OPERATOR_USER_ID` (≤ 10, one request); the alert
   counts as sent if any device got a ticket, and a dead device is invalidated as above.
 

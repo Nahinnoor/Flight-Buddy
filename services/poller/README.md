@@ -221,6 +221,16 @@ queues are registered. Its side effects are intended and idempotent — pg-boss 
 inside its own schema, and `createQueue`/`schedule` upsert. It writes to no application table and
 makes no provider call.
 
+`src/push/pushDevices.integration.test.ts` (ADR 0006) runs the per-device send, receipt and
+invalidation SQL as `flightbuddy_worker` on a **throwaway cluster only**: it seeds users, devices
+and pending deliveries, the worker functions it calls claim every due delivery, and a deployed worker
+sharing the database would send what it seeds. It skips unless `INTEGRATION=1` and `PUSH_IT_PGHOST`
+are set, and refuses to start without `PUSH_IT_THROWAWAY=1` (set only by `run-local.sh --exec`), on
+a host that is not a local socket or loopback, or when `auth.users` is not empty before it seeds.
+Its own cleanup touches only the users it seeded. `supabase/tests/run-local.sh --exec env INTEGRATION=1 npx vitest run --root
+services/poller src/push/pushDevices.integration.test.ts` replays every migration into a temporary
+cluster, runs it, and deletes the cluster.
+
 ## Notes for maintainers
 
 - **TLS depends on `pg` 8.x semantics.** `db.ts` never passes a connection string to `pg`, because a connection string can overwrite an explicit `ssl` option and silently drop the pinned CA. `pg` 9 / `pg-connection-string` 3 change `sslmode` handling; re-verify `db.test.ts`'s TLS assertions on that upgrade.

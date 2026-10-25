@@ -57,6 +57,10 @@
  *    active device, `expired`, or `failed` with our code (`UnbuildableMessage`,
  *    retries exhausted).
  *
+ * A `pending` device that will not be re-sent (its device is no longer active,
+ * or its delivery closes unsent) is closed `failed` first, so it can never hold
+ * rule 1 open or turn a delivery that once reached a device into `NoPushToken`.
+ *
  * `error` is NULL for `sent`/`delivered`; a `failed` parent carries our own code
  * when retries ran out, else the first failed device's code. The parent keeps one
  * representative ticket and token hash (its earliest `sent`/`delivered` device's).
@@ -89,6 +93,8 @@ export const DELIVERY_ERRORS = {
   /** Retries ran out on a request whose outcome we never learned. */
   SEND_OUTCOME_UNKNOWN: 'SendOutcomeUnknown',
   UNREADABLE_TICKET: 'UnreadableTicket',
+  /** A device waiting to be re-sent is no longer active (signed out, invalidated, …). */
+  DEVICE_INACTIVE: 'DeviceInactive',
   RECEIPT_UNAVAILABLE: 'ReceiptUnavailable',
   /** The message facts could not be read (flight or event row malformed). */
   UNBUILDABLE_MESSAGE: 'UnbuildableMessage',

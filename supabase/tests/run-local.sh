@@ -14,6 +14,13 @@
 #     defined as Supabase defines it: the `sub` of the request's JWT claims.
 #
 # Usage: supabase/tests/run-local.sh [test.sql ...]   (default: every *.test.sql)
+#        supabase/tests/run-local.sh --exec <command ...>
+#   --exec runs the command against the migrated throwaway cluster instead of the
+#   SQL tests, with PUSH_IT_PGHOST / PUSH_IT_PGPORT pointing at it (superuser
+#   `postgres`, trust auth, Unix socket only) and PUSH_IT_THROWAWAY=1 marking it
+#   as disposable (tests that write freely refuse without it), e.g. the poller's push integration
+#   test:  supabase/tests/run-local.sh --exec env INTEGRATION=1 npx vitest run \
+#            --root services/poller src/push/pushDevices.integration.test.ts
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -63,6 +70,12 @@ for file in "$migrations"/*.sql; do
   echo "migrate $(basename "$file")"
   run -f "$file" >/dev/null
 done
+
+if [ "${1:-}" = "--exec" ]; then
+  shift
+  PUSH_IT_THROWAWAY=1 PUSH_IT_PGHOST="$work" PUSH_IT_PGPORT="$port" "$@"
+  exit $?
+fi
 
 if [ "$#" -eq 0 ]; then set -- "$here"/*.test.sql; fi
 for test in "$@"; do

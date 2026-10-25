@@ -91,12 +91,17 @@ function parentOutcome(retry: string, fallbackStatus: string, fallbackError: str
  * or a retry of one device does not double-send to the others.
  *
  * Read at send time, so a device registered after the event is included.
- * `$2` = `MAX_DEVICES_PER_RECIPIENT`, newest first. Worker grants: `select` on
- * `push_tokens` (which includes `token`) and on `notification_device_sends`.
+ * `$2` = `MAX_DEVICES_PER_RECIPIENT`, newest first. `read_at` is the database
+ * time of this read, before any request leaves: it becomes the device rows'
+ * `sent_at`, so the DeviceNotRegistered guard (`last_registered_at <= sent_at`)
+ * can only ever keep a device that registered while the send was in flight.
+ * Worker grants: `select` on `push_tokens` (which includes `token`) and on
+ * `notification_device_sends`.
  */
 export const LOAD_SENDABLE_DEVICES_SQL = `select d.id as delivery_id,
        t.token,
-       t.token_sha256
+       t.token_sha256,
+       now() as read_at
   from public.notification_deliveries d
   cross join lateral (
          select pt.id, pt.token, pt.token_sha256, pt.last_registered_at
@@ -118,13 +123,14 @@ export const LOAD_SENDABLE_DEVICES_SQL = `select d.id as delivery_id,
  * Record one outcome per device. A new row is inserted; an existing row is
  * overwritten **only while it is `pending`** (the re-send it was waiting for),
  * so a slow duplicate sender can never replace a ticket already recorded.
- * `sent_at` is the database's clock, the one `push_tokens.last_registered_at`
+ * `$6` = `sent_at`: the database time the devices were read
+ * (`LOAD_SENDABLE_DEVICES_SQL.read_at`), the clock `push_tokens.last_registered_at`
  * uses. Returns the rows actually written (the DeviceNotRegistered check needs
  * their `sent_at`).
  */
 export const INSERT_DEVICE_SENDS_SQL = `insert into public.notification_device_sends as s
-       (delivery_id, token_sha256, status, expo_ticket_id, error)
-select u.delivery_id, u.token_sha256, u.status, u.ticket_id, u.error
+       (delivery_id, token_sha256, status, expo_ticket_id, error, sent_at)
+select u.delivery_id, u.token_sha256, u.status, u.ticket_id, u.error, $6::timestamptz
   from unnest($1::uuid[], $2::text[], $3::text[], $4::text[], $5::text[])
        as u(delivery_id, token_sha256, status, ticket_id, error)
 on conflict (delivery_id, token_sha256) do update
@@ -135,6 +141,53 @@ on conflict (delivery_id, token_sha256) do update
        receipt_checked_at = null
  where s.status = 'pending'
 returning s.delivery_id, s.token_sha256, s.status, s.sent_at`;
+
+/**
+ * Close `pending` device rows (waiting for a re-send after MessageRateExceeded)
+ * that will never be re-sent, so they cannot hold their delivery in `pending`:
+ *
+ * - every one of a delivery this attempt closes without sending (`$2`: expired,
+ *   unbuildable);
+ * - any whose device is no longer active (signed out, moved, retired over the
+ *   cap, invalidated).
+ *
+ * They become `failed` with the code they were waiting on (`$4` if none), so a
+ * delivery that once reached a device ends `failed` with that code, never
+ * `skipped` / `NoPushToken`. `$1`/`$2` = the claimed deliveries and the
+ * `attempts` of this claim: only rows still `sending` **under this claim**, so a
+ * worker whose lease lapsed cannot close rows under another worker's newer claim.
+ * `$3` = the deliveries closing unsent.
+ */
+export const CLOSE_STALE_PENDING_SENDS_SQL = `update public.notification_device_sends s
+   set status = 'failed',
+       error = coalesce(s.error, $4)
+  from unnest($1::uuid[], $2::int[]) as u(id, attempts)
+  join public.notification_deliveries d on d.id = u.id
+ where s.delivery_id = d.id
+   and d.status = 'sending'
+   and d.attempts = u.attempts
+   and s.status = 'pending'
+   and (d.id = any($3::uuid[])
+        or not exists (select 1
+                         from public.push_tokens t
+                        where t.user_id = d.user_id
+                          and t.token_sha256 = s.token_sha256
+                          and t.invalidated_at is null))`;
+
+/**
+ * Extend the lease of the deliveries this batch still holds (`$1` ids, `$2`
+ * the `attempts` of our claim, `$3` lease ms), before each further Expo
+ * request, so a batch of many devices cannot outlast its lease. Returns the ids
+ * still ours; a delivery missing from it was re-claimed and is not sent to again
+ * by this batch.
+ */
+export const RENEW_SEND_LEASE_SQL = `update public.notification_deliveries d
+   set claimed_until = now() + ($3::double precision * interval '1 millisecond')
+  from unnest($1::uuid[], $2::int[]) as u(id, attempts)
+ where d.id = u.id
+   and d.status = 'sending'
+   and d.attempts = u.attempts
+returning d.id`;
 
 /**
  * Write the outcome of every claimed delivery, derived from its device rows.
@@ -303,10 +356,14 @@ export interface WrittenDeviceSend {
   sent_at: string;
 }
 
-/** Write device outcomes (`INSERT_DEVICE_SENDS_SQL`); returns the rows written. */
+/**
+ * Write device outcomes (`INSERT_DEVICE_SENDS_SQL`) with `sentAt` = when the
+ * devices were read; returns the rows written.
+ */
 export async function recordDeviceSends(
   pool: Pool,
   records: readonly DeviceSendRecord[],
+  sentAt: string,
 ): Promise<WrittenDeviceSend[]> {
   if (records.length === 0) return [];
   const result = await pool.query<WrittenDeviceSend>({
@@ -317,6 +374,7 @@ export async function recordDeviceSends(
       records.map((r) => r.status),
       records.map((r) => r.ticketId),
       records.map((r) => r.error),
+      sentAt,
     ],
     types: ENGINE_TYPES,
   });
