@@ -155,7 +155,7 @@ export const flightLookupRequestSchema = z.union([
 ]);
 export type FlightLookupRequest = z.infer<typeof flightLookupRequestSchema>;
 
-/** What the parser yields and what the provider is called with (§7.1). */
+/** A lookup split into carrier, bare number and local departure date at the origin. */
 export const flightLookupSchema = z.object({
   carrierIata: carrierIataSchema,
   flightNumber: flightNumberSchema,

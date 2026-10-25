@@ -5,27 +5,21 @@
  * Wire shapes are camelCase; the database is snake_case. Conversion happens at
  * the edge (see `database.types.ts`), never in the middle of the app.
  */
+import { Constants } from './database.types';
+
+// The enum lists come from the generated database types, so a migration that
+// adds a value reaches the wire schemas too instead of being silently rejected.
 
 /** `tracking_tier` enum. See §7.3. */
-export const TRACKING_TIERS = ['live', 'scheduled', 'manual'] as const;
+export const TRACKING_TIERS = Constants.public.Enums.tracking_tier;
 export type TrackingTier = (typeof TRACKING_TIERS)[number];
 
 /** `flight_status` enum. See §6.2. */
-export const FLIGHT_STATUSES = [
-  'scheduled',
-  'delayed',
-  'boarding',
-  'departed',
-  'en_route',
-  'diverted',
-  'landed',
-  'cancelled',
-  'unknown',
-] as const;
+export const FLIGHT_STATUSES = Constants.public.Enums.flight_status;
 export type FlightStatus = (typeof FLIGHT_STATUSES)[number];
 
 /** `membership_status` enum. See §6.2. */
-export const MEMBERSHIP_STATUSES = ['pending', 'active', 'removed'] as const;
+export const MEMBERSHIP_STATUSES = Constants.public.Enums.membership_status;
 export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];
 
 /**

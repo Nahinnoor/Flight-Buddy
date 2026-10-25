@@ -28,6 +28,16 @@ export interface ParsedFlightDesignator {
 export type FlightQueryResult = { flightNumber: string; dateLocal: string } | { error: string };
 
 /**
+ * A carrier is two alphanumerics with at least one letter: "12 345" is a date
+ * and a number, not an airline.
+ */
+const CARRIER = '([A-Z][A-Z0-9]|[0-9][A-Z])';
+/** A whole designator, separators already removed: `DL1234`, `B601411`. */
+const DESIGNATOR = new RegExp(`^${CARRIER}0*([0-9]{1,4}[A-Z]?)$`);
+/** The designator at the start of a query; the rest of the text is the date. */
+const QUERY_HEAD = new RegExp(`^${CARRIER}\\s?0*(\\d{1,4}[A-Z]?)(?![0-9A-Z])`);
+
+/**
  * Split a flight designator however it was typed: `"dl 1234"`, `"DL1234"`,
  * `"DL-1234"` and `"DL 01234"` all yield `DL` / `1234`.
  *
@@ -39,14 +49,11 @@ export type FlightQueryResult = { flightNumber: string; dateLocal: string } | { 
  */
 export function parseFlightDesignator(text: string): ParsedFlightDesignator | null {
   const cleaned = text.toUpperCase().replace(/[\s.\-_/]/g, '');
-  const match = /^([A-Z0-9]{2})0*([0-9]{1,4}[A-Z]?)$/.exec(cleaned);
+  const match = DESIGNATOR.exec(cleaned);
   if (match === null) return null;
 
   const carrierIata = match[1] as string;
   const flightNumber = match[2] as string;
-  // "12 345" is a date and a number, not an airline: a designator has a letter.
-  if (!/[A-Z]/.test(carrierIata)) return null;
-
   return { carrierIata, flightNumber, designator: `${carrierIata}${flightNumber}` };
 }
 
@@ -65,8 +72,6 @@ const MONTH_NAMES = [
   'DECEMBER',
 ] as const;
 
-const MS_PER_DAY = 86_400_000;
-
 /**
  * A date typed without a year is taken as the next occurrence, but a date that
  * has only just gone by is far more likely to be a flight the user is still
@@ -74,14 +79,18 @@ const MS_PER_DAY = 86_400_000;
  */
 const PAST_DATE_GRACE_DAYS = 1;
 
+/** Words that mean a day relative to today, and how many days away they are. */
+const RELATIVE_DAYS = new Map([
+  ['TODAY', 0],
+  ['TOMORROW', 1],
+  ['YESTERDAY', -1],
+]);
+
 /** 1-12 for a month name or abbreviation, or `null`. `"Sept"` counts. */
 function monthFromName(token: string): number | null {
   if (token.length < 3) return null;
-  for (let index = 0; index < MONTH_NAMES.length; index += 1) {
-    const name = MONTH_NAMES[index] as string;
-    if (name.startsWith(token)) return index + 1;
-  }
-  return null;
+  const index = MONTH_NAMES.findIndex((name) => name.startsWith(token));
+  return index === -1 ? null : index + 1;
 }
 
 /** True when `year-month-day` is a date that exists (rejects 30 February). */
@@ -97,16 +106,10 @@ function toIsoDate(year: number, month: number, day: number): string {
   return `${pad(year, 4)}-${pad(month, 2)}-${pad(day, 2)}`;
 }
 
-/** Epoch ms at midnight UTC of a `YYYY-MM-DD` string. Calendar maths only. */
-function isoToUtcMs(isoDate: string): number {
-  const year = Number(isoDate.slice(0, 4));
-  const month = Number(isoDate.slice(5, 7));
-  const day = Number(isoDate.slice(8, 10));
-  return Date.UTC(year, month - 1, day);
-}
-
+/** `YYYY-MM-DD` shifted by whole days. Calendar maths only; `Date.UTC` rolls months over. */
 function addDays(isoDate: string, days: number): string {
-  const shifted = new Date(isoToUtcMs(isoDate) + days * MS_PER_DAY);
+  const [year, month, day] = isoDate.split('-').map(Number) as [number, number, number];
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
   return toIsoDate(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, shifted.getUTCDate());
 }
 
@@ -122,80 +125,62 @@ function expandYear(raw: string): number {
  */
 function resolveYearless(month: number, day: number, today: string): string | null {
   const thisYear = Number(today.slice(0, 4));
+  const earliest = addDays(today, -PAST_DATE_GRACE_DAYS);
   for (const year of [thisYear, thisYear + 1]) {
     if (!isRealDate(year, month, day)) continue; // 29 February in a common year.
     const candidate = toIsoDate(year, month, day);
-    if (isoToUtcMs(candidate) >= isoToUtcMs(today) - PAST_DATE_GRACE_DAYS * MS_PER_DAY) {
-      return candidate;
-    }
+    if (candidate >= earliest) return candidate; // Zero-padded ISO dates sort as text.
   }
   return null;
+}
+
+/**
+ * A month and day, with the year as typed (if any), as `YYYY-MM-DD` — or
+ * `null` when no such date exists. Out-of-range months and days land here too.
+ */
+function resolveMonthDay(
+  month: number,
+  day: number,
+  yearText: string | undefined,
+  today: string,
+): string | null {
+  if (yearText === undefined) return resolveYearless(month, day, today);
+  const year = expandYear(yearText);
+  return isRealDate(year, month, day) ? toIsoDate(year, month, day) : null;
 }
 
 /** Outcome of reading the date half of a query. */
 type DateParse = { dateLocal: string } | { error: string } | null;
 
-function parseDatePart(text: string, today: string): DateParse {
-  const value = text.trim();
+/** Read the date half of a query. `value` is already trimmed and uppercased. */
+function parseDatePart(value: string, today: string): DateParse {
+  const relative = RELATIVE_DAYS.get(value);
+  if (relative !== undefined) return { dateLocal: addDays(today, relative) };
 
-  if (value === 'TODAY') return { dateLocal: today };
-  if (value === 'TOMORROW') return { dateLocal: addDays(today, 1) };
-  if (value === 'YESTERDAY') return { dateLocal: addDays(today, -1) };
+  const resolved = (month: number, day: number, yearText: string | undefined): DateParse => {
+    const dateLocal = resolveMonthDay(month, day, yearText, today);
+    return dateLocal === null ? { error: `"${value}" is not a real date.` } : { dateLocal };
+  };
 
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(value);
-  if (iso !== null) {
-    const year = Number(iso[1]);
-    const month = Number(iso[2]);
-    const day = Number(iso[3]);
-    if (!isRealDate(year, month, day)) {
-      return { error: `"${value}" is not a real date.` };
-    }
-    return { dateLocal: toIsoDate(year, month, day) };
-  }
+  if (iso !== null) return resolved(Number(iso[2]), Number(iso[3]), iso[1]);
 
   // Month-first numeric: 3/12, 03-12, 3/12/2027, 3/12/27.
   const numeric = /^(\d{1,2})[/.](\d{1,2})(?:[/.](\d{2,4}))?$/.exec(value);
-  if (numeric !== null) {
-    const month = Number(numeric[1]);
-    const day = Number(numeric[2]);
-    const yearText = numeric[3];
-    if (month < 1 || month > 12 || day < 1 || day > 31) {
-      return { error: `"${value}" is not a real date.` };
-    }
-    if (yearText !== undefined) {
-      const year = expandYear(yearText);
-      if (!isRealDate(year, month, day)) return { error: `"${value}" is not a real date.` };
-      return { dateLocal: toIsoDate(year, month, day) };
-    }
-    const resolved = resolveYearless(month, day, today);
-    return resolved === null
-      ? { error: `"${value}" is not a real date.` }
-      : { dateLocal: resolved };
-  }
+  if (numeric !== null) return resolved(Number(numeric[1]), Number(numeric[2]), numeric[3]);
 
   // Month name either side of the day: "Mar 12", "12 Mar", "March 12 2027".
   const monthFirst = /^([A-Z]{3,9})\.?,?\s+(\d{1,2})(?:ST|ND|RD|TH)?(?:,?\s+(\d{2,4}))?$/.exec(
     value,
   );
-  const dayFirst = /^(\d{1,2})(?:ST|ND|RD|TH)?\s+([A-Z]{3,9})\.?,?(?:\s+(\d{2,4}))?$/.exec(value);
-  const named = monthFirst ?? dayFirst;
+  const named =
+    monthFirst ?? /^(\d{1,2})(?:ST|ND|RD|TH)?\s+([A-Z]{3,9})\.?,?(?:\s+(\d{2,4}))?$/.exec(value);
   if (named !== null) {
     const monthToken = (monthFirst !== null ? named[1] : named[2]) as string;
     const dayText = (monthFirst !== null ? named[2] : named[1]) as string;
-    const yearText = named[3];
     const month = monthFromName(monthToken);
     if (month === null) return null;
-
-    const day = Number(dayText);
-    if (yearText !== undefined) {
-      const year = expandYear(yearText);
-      if (!isRealDate(year, month, day)) return { error: `"${value}" is not a real date.` };
-      return { dateLocal: toIsoDate(year, month, day) };
-    }
-    const resolved = resolveYearless(month, day, today);
-    return resolved === null
-      ? { error: `"${value}" is not a real date.` }
-      : { dateLocal: resolved };
+    return resolved(month, Number(dayText), named[3]);
   }
 
   return null;
@@ -223,8 +208,8 @@ export function parseFlightQuery(text: string, now: Date, tz = 'UTC'): FlightQue
   }
 
   // The designator is the leading token(s); everything after it is the date.
-  const head = /^([A-Z0-9]{2})\s?0*(\d{1,4}[A-Z]?)(?![0-9A-Z])/.exec(normalised);
-  if (head === null || !/[A-Z]/.test(head[1] as string)) {
+  const head = QUERY_HEAD.exec(normalised);
+  if (head === null) {
     return { error: 'Start with a flight number, e.g. "DL1234 tomorrow".' };
   }
   const flightNumber = `${head[1] as string}${head[2] as string}`;

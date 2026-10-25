@@ -21,6 +21,42 @@ const ZONE_LABEL_LOCALES = ['en-US', 'en-GB'] as const;
 /** Matches labels that are really just offsets: "GMT+1", "UTC-05:00". */
 const OFFSET_LABEL = /^(?:GMT|UTC)[+-]/;
 
+/** Pinned on every formatter so a device's calendar or digits never change the output. */
+const PINNED = { calendar: 'gregory', numberingSystem: 'latn' } as const;
+
+type FormatterKind = 'time' | 'date' | 'label';
+
+const FORMAT_OPTIONS: Record<FormatterKind, Intl.DateTimeFormatOptions> = {
+  time: { hour: 'numeric', minute: '2-digit', hour12: true },
+  date: { year: 'numeric', month: '2-digit', day: '2-digit' },
+  label: { hour: 'numeric', timeZoneName: 'short' },
+};
+
+/**
+ * Building a formatter costs far more than using one, and these run for every
+ * flight card, so each (kind, locale, zone) is built once. Only successful
+ * builds are kept, and the cache resets if it grows large: zone names can come
+ * from request bodies, and every case variant of a real zone is valid.
+ */
+const FORMATTER_CACHE_LIMIT = 500;
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+/** The cached formatter for one kind of output in one zone. Throws on an unknown zone. */
+function formatterFor(
+  kind: FormatterKind,
+  timeZone: string,
+  locale = 'en-US',
+): Intl.DateTimeFormat {
+  const key = `${kind}|${locale}|${timeZone}`;
+  let cached = formatters.get(key);
+  if (cached === undefined) {
+    cached = new Intl.DateTimeFormat(locale, { timeZone, ...PINNED, ...FORMAT_OPTIONS[kind] });
+    if (formatters.size >= FORMATTER_CACHE_LIMIT) formatters.clear();
+    formatters.set(key, cached);
+  }
+  return cached;
+}
+
 function toDate(value: DateInput): Date {
   const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -40,7 +76,7 @@ function part(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTyp
 /** True if the runtime's ICU recognises `timeZone` as an IANA zone. */
 export function isValidTimeZone(timeZone: string): boolean {
   try {
-    new Intl.DateTimeFormat('en-US', { timeZone });
+    formatterFor('date', timeZone);
     return true;
   } catch {
     return false;
@@ -54,17 +90,15 @@ export function isValidTimeZone(timeZone: string): boolean {
  * offsets, so a second locale is tried before falling back to the offset form.
  */
 export function zoneAbbreviation(utcIso: DateInput, ianaTz: string): string {
-  const date = toDate(utcIso);
+  return zoneLabel(toDate(utcIso), ianaTz);
+}
+
+/** `zoneAbbreviation` for an already-validated `Date`. */
+function zoneLabel(date: Date, ianaTz: string): string {
   let fallback: string | undefined;
 
   for (const locale of ZONE_LABEL_LOCALES) {
-    const parts = new Intl.DateTimeFormat(locale, {
-      timeZone: ianaTz,
-      calendar: 'gregory',
-      numberingSystem: 'latn',
-      hour: 'numeric',
-      timeZoneName: 'short',
-    }).formatToParts(date);
+    const parts = formatterFor('label', ianaTz, locale).formatToParts(date);
     const label = parts.find((p) => p.type === 'timeZoneName')?.value;
     if (label !== undefined && !OFFSET_LABEL.test(label)) return label;
     fallback ??= label;
@@ -84,22 +118,14 @@ export function zoneAbbreviation(utcIso: DateInput, ianaTz: string): string {
  */
 export function formatAirportLocal(utcIso: DateInput, ianaTz: string): string {
   const date = toDate(utcIso);
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: ianaTz,
-    calendar: 'gregory',
-    numberingSystem: 'latn',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).formatToParts(date);
+  const parts = formatterFor('time', ianaTz).formatToParts(date);
 
   const hour = part(parts, 'hour');
   const minute = part(parts, 'minute');
-  const dayPeriod = part(parts, 'dayPeriod')
-    .toUpperCase()
-    .replace(/[\s\u00a0\u202f]/g, '');
+  // `\s` covers the no-break (U+00A0) and narrow no-break (U+202F) spaces too.
+  const dayPeriod = part(parts, 'dayPeriod').toUpperCase().replace(/\s/g, '');
 
-  return `${hour}:${minute} ${dayPeriod} ${zoneAbbreviation(date, ianaTz)}`;
+  return `${hour}:${minute} ${dayPeriod} ${zoneLabel(date, ianaTz)}`;
 }
 
 /**
@@ -110,19 +136,12 @@ export function formatAirportLocal(utcIso: DateInput, ianaTz: string): string {
  */
 export function localDateAtAirport(utcIso: DateInput, ianaTz: string): string {
   const date = toDate(utcIso);
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: ianaTz,
-    calendar: 'gregory',
-    numberingSystem: 'latn',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
+  const parts = formatterFor('date', ianaTz).formatToParts(date);
 
+  // Padded even though the formatter asks for 2 digits: not every ICU honours it.
   const year = part(parts, 'year').padStart(4, '0');
   const month = part(parts, 'month').padStart(2, '0');
   const day = part(parts, 'day').padStart(2, '0');
-
   return `${year}-${month}-${day}`;
 }
 
