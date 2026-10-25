@@ -122,6 +122,16 @@ export const balanceSchema = z.looseObject({
 // ---------------------------------------------------------------------------
 
 /**
+ * A subscription id: any 8-4-4-4-12 hex GUID, either case.
+ *
+ * `z.guid()` rather than `z.uuid()`: the shape is checked strictly (the id goes
+ * into a URL path and a `uuid` column) without rejecting a provider id whose
+ * version nibble is not RFC 9562. Shared by the response schemas below and by
+ * `unsubscribeAlerts`, which checks an id before it goes into a path.
+ */
+export const subscriptionIdSchema = z.guid();
+
+/**
  * `SubscriptionContract`: the create response, each element of the list response,
  * and `subscription` inside a delivery.
  *
@@ -129,13 +139,11 @@ export const balanceSchema = z.looseObject({
  * which contains the receiver's secret token; leaving it out of the schema means
  * zod strips it and it can never travel further than this parse.
  *
- * `z.guid()` rather than `z.uuid()`: the shape is checked strictly (the id goes
- * into a URL path and a `uuid` column) without rejecting a provider id whose
- * version nibble is not RFC 9562. Lower-cased so it compares equal to what
- * Postgres hands back for a `uuid`.
+ * The id is lower-cased so it compares equal to what Postgres hands back for a
+ * `uuid`.
  */
 export const subscriptionContractSchema = z.object({
-  id: z.guid().transform((id) => id.toLowerCase()),
+  id: subscriptionIdSchema.transform((id) => id.toLowerCase()),
   isActive: z.boolean(),
   createdOnUtc: z.string(),
   subject: z.object({

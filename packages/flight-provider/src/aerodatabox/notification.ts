@@ -33,6 +33,7 @@
  *   and an array index, never by its value.
  */
 import type { FlightCandidate } from '@flightbuddy/shared';
+import type { z } from 'zod';
 
 import { ProviderDataError } from '../errors';
 import type { AlertDelivery } from '../provider';
@@ -50,11 +51,10 @@ import {
   flightNotificationSchema,
   type AeroDataBoxFlight,
   type AeroDataBoxMovement,
+  type deliveryMovementSchema,
 } from './schemas';
 
-type DeliveryMovement = Omit<AeroDataBoxMovement, 'quality'> & {
-  quality?: EnumWire[] | null | undefined;
-};
+type DeliveryMovement = z.infer<typeof deliveryMovementSchema>;
 
 /**
  * Validate and map one delivery body.
@@ -99,15 +99,10 @@ export function parseAlertDelivery(payload: unknown): AlertDelivery {
     // Provider free text stops here (see the module note).
     const { notificationSummary: _summary, notificationRemark: _remark, ...raw } = item;
     const at = `flights[${index}]`;
-    // An unrecognised *status* drops the whole leg; the other enums may degrade.
-    // `status` is the one field the change detector reads, and a status wiped to
-    // `unknown` is not harmless: `cancelled`/`diverted` fire on the edge into
-    // them, so cancelled -> unknown -> cancelled would emit a second cancellation
-    // event with a new id, slipping past the per-event notification guard and
-    // telling everyone twice. Inside the alert window only the 2 h backup poll
-    // would correct it. So an unknown code changes nothing: the stored status
-    // stands until a delivery says something we understand. The field path is
-    // still reported (never the value).
+    // An unrecognised *status* drops the whole leg (the other enums degrade):
+    // cancelled -> unknown -> cancelled would fire the cancellation twice, so the
+    // stored status stands until a delivery says something we understand.
+    // The field path is still reported, never the value.
     const status = name(FLIGHT_STATUS_BY_CODE, raw.status, `${at}.status`);
     if (unrecognised.includes(`${at}.status`)) {
       unmappedCount += 1;

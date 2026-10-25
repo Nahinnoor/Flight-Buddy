@@ -5,13 +5,10 @@
 // here is either a `@flightbuddy/shared` type or declared in `provider.ts`.
 
 export { createAeroDataBoxProvider, type AeroDataBoxOptions } from './aerodatabox/client';
-export { mapStatus, toFlightCandidate, toUtcIso } from './aerodatabox/mapper';
 export { parseAlertDelivery } from './aerodatabox/notification';
 
 export {
   DEFAULT_MAX_DELIVERY_RETRIES,
-  FEED_STATUSES,
-  isFeedUp,
   type AlertDelivery,
   type AlertSubscription,
   type FeedHealth,

@@ -5,7 +5,8 @@
  * fixtures in `docs/api-samples/` rather than the network — §12.1 rations real
  * calls to 20 per agent, which is not a budget unit tests can draw on.
  */
-import { parseFlightDesignator, type FlightCandidate } from '@flightbuddy/shared';
+import type { FlightCandidate } from '@flightbuddy/shared';
+import type { z } from 'zod';
 
 import {
   ProviderDataError,
@@ -23,14 +24,16 @@ import {
   type FlightDataProvider,
   type SubscribeAlertsOptions,
 } from '../provider';
-import { toFlightCandidate, toUtcIso } from './mapper';
+import { localDatePart, requireDesignator, toFlightCandidate, toUtcIso } from './mapper';
 import {
   airportFeedsSchema,
   balanceSchema,
   flightListSchema,
   subscriptionContractSchema,
+  subscriptionIdSchema,
   subscriptionListSchema,
   type AeroDataBoxAirportFeeds,
+  type AeroDataBoxSubscription,
 } from './schemas';
 
 export interface AeroDataBoxOptions {
@@ -56,6 +59,13 @@ export function isLocalDate(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
+/** Throws a `ProviderDataError` unless `dateLocal` is a real `YYYY-MM-DD` date. */
+export function requireLocalDate(dateLocal: string): void {
+  if (!isLocalDate(dateLocal)) {
+    throw new ProviderDataError(`"${dateLocal}" is not a YYYY-MM-DD date.`);
+  }
+}
+
 /** Response bodies are only ever logged, so they are truncated on the way in. */
 const MAX_LOGGED_BODY = 500;
 
@@ -76,9 +86,6 @@ const KEEP_BODY: BodyPolicy = { keepBody: true };
 /** For every endpoint whose response can contain the webhook URL. */
 const SECRET_BEARING: BodyPolicy = { keepBody: false };
 
-/** GUID shape: subscription ids go into a URL path and a `uuid` column. */
-const GUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
 /** A receiver URL the provider can call: absolute http(s). Never echoed in an error. */
 function isWebhookUrl(value: string): boolean {
   try {
@@ -89,12 +96,7 @@ function isWebhookUrl(value: string): boolean {
   }
 }
 
-function toAlertSubscription(raw: {
-  id: string;
-  isActive: boolean;
-  createdOnUtc: string;
-  subject: { id: string };
-}): AlertSubscription {
+function toAlertSubscription(raw: AeroDataBoxSubscription): AlertSubscription {
   return {
     subscriptionId: raw.id,
     isActive: raw.isActive,
@@ -114,13 +116,6 @@ function normaliseFeedStatus(value: string | null | undefined): FeedStatus {
   return found ?? 'Unknown';
 }
 
-/** `YYYY-MM-DD` out of the provider's `2025-09-09` / date-time strings. */
-function datePart(value: string | null | undefined): string | null {
-  if (value === null || value === undefined) return null;
-  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim());
-  return match === null ? null : (match[1] as string);
-}
-
 function toFeedHealth(icao: string, raw: AeroDataBoxAirportFeeds | null): FeedHealth {
   const schedules = normaliseFeedStatus(raw?.flightSchedulesFeed?.status);
   const liveUpdates = normaliseFeedStatus(raw?.liveFlightUpdatesFeed?.status);
@@ -132,8 +127,8 @@ function toFeedHealth(icao: string, raw: AeroDataBoxAirportFeeds | null): FeedHe
     adsb,
     hasLiveCoverage: isFeedUp(liveUpdates) || isFeedUp(adsb),
     hasAnyCoverage: isFeedUp(schedules) || isFeedUp(liveUpdates) || isFeedUp(adsb),
-    minAvailableLocalDate: datePart(raw?.generalAvailability?.minAvailableLocalDate),
-    maxAvailableLocalDate: datePart(raw?.generalAvailability?.maxAvailableLocalDate),
+    minAvailableLocalDate: localDatePart(raw?.generalAvailability?.minAvailableLocalDate),
+    maxAvailableLocalDate: localDatePart(raw?.generalAvailability?.maxAvailableLocalDate),
   };
 }
 
@@ -228,15 +223,27 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
     }
   }
 
+  /** `parseJson`, then `schema`; a mismatch keeps body and zod cause only under `policy`. */
+  function parseBody<S extends z.ZodType>(
+    schema: S,
+    path: string,
+    raw: RawResponse,
+    policy: BodyPolicy = KEEP_BODY,
+  ): z.output<S> {
+    const parsed = schema.safeParse(parseJson(path, raw, policy));
+    if (!parsed.success) {
+      throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`, {
+        ...errorBody(raw, policy),
+        ...(policy.keepBody ? { cause: parsed.error } : {}),
+      });
+    }
+    return parsed.data;
+  }
+
   return {
     async lookupFlight(number: string, dateLocal: string): Promise<FlightCandidate[]> {
-      const designator = parseFlightDesignator(number);
-      if (designator === null) {
-        throw new ProviderDataError(`"${number}" is not a flight number.`);
-      }
-      if (!isLocalDate(dateLocal)) {
-        throw new ProviderDataError(`"${dateLocal}" is not a YYYY-MM-DD date.`);
-      }
+      const designator = requireDesignator(number);
+      requireLocalDate(dateLocal);
 
       // `dateLocalRole=Departure` because the canonical key is the local date at
       // the ORIGIN (§6.3). The provider's default, `Both`, also returns flights
@@ -255,19 +262,13 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       // empty body is a failure and must surface as one (ADR 0001 → 502).
       if (raw.body.trim() === '') return [];
 
-      const parsed = flightListSchema.safeParse(parseJson(path, raw));
-      if (!parsed.success) {
-        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`, {
-          body: raw.body.slice(0, MAX_LOGGED_BODY),
-          cause: parsed.error,
-        });
-      }
+      const flights = parseBody(flightListSchema, path, raw);
 
       // Every leg, never `[0]` (§8.12). A leg the mapper cannot express — no
       // IATA code or no time zone — is dropped rather than failing the lookup:
       // it could not be stored against the canonical key anyway.
       const candidates: FlightCandidate[] = [];
-      for (const flight of parsed.data) {
+      for (const flight of flights) {
         try {
           candidates.push(toFlightCandidate(flight, designator.designator));
         } catch (error) {
@@ -292,14 +293,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       assertOk(path, raw);
       if (raw.body.trim() === '') return toFeedHealth(code, null);
 
-      const parsed = airportFeedsSchema.safeParse(parseJson(path, raw));
-      if (!parsed.success) {
-        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`, {
-          body: raw.body.slice(0, MAX_LOGGED_BODY),
-          cause: parsed.error,
-        });
-      }
-      return toFeedHealth(code, parsed.data);
+      return toFeedHealth(code, parseBody(airportFeedsSchema, path, raw));
     },
 
     // ---------- Alert API (ADR 0003; webhook-notification-schema.md) ----------
@@ -312,12 +306,13 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       url: string,
       options: SubscribeAlertsOptions = {},
     ): Promise<{ subscriptionId: string }> {
-      const designator = parseFlightDesignator(flightNumber);
-      if (designator === null) {
-        throw new ProviderDataError(`"${flightNumber}" is not a flight number.`);
-      }
+      const designator = requireDesignator(flightNumber);
       const maxDeliveryRetries = options.maxDeliveryRetries ?? DEFAULT_MAX_DELIVERY_RETRIES;
-      if (!Number.isInteger(maxDeliveryRetries) || maxDeliveryRetries < 0 || maxDeliveryRetries > 2) {
+      if (
+        !Number.isInteger(maxDeliveryRetries) ||
+        maxDeliveryRetries < 0 ||
+        maxDeliveryRetries > 2
+      ) {
         throw new ProviderDataError('maxDeliveryRetries must be 0, 1 or 2.');
       }
       // The URL carries the receiver's secret token: validated, never quoted.
@@ -336,15 +331,12 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       });
       assertOk(path, raw, SECRET_BEARING);
 
-      const parsed = subscriptionContractSchema.safeParse(parseJson(path, raw, SECRET_BEARING));
-      if (!parsed.success) {
-        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`);
-      }
-      return { subscriptionId: parsed.data.id };
+      const created = parseBody(subscriptionContractSchema, path, raw, SECRET_BEARING);
+      return { subscriptionId: created.id };
     },
 
     async unsubscribeAlerts(subscriptionId: string): Promise<void> {
-      if (!GUID.test(subscriptionId)) {
+      if (!subscriptionIdSchema.safeParse(subscriptionId).success) {
         throw new ProviderDataError('A subscription id must be a GUID.');
       }
       const path = `/subscriptions/webhook/${encodeURIComponent(subscriptionId.toLowerCase())}`;
@@ -366,11 +358,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       // One unparseable element fails the whole list on purpose: reconcile acts on
       // what is *missing* from this list, so a silently shortened list would detach
       // flights whose subscriptions are fine.
-      const parsed = subscriptionListSchema.safeParse(parseJson(path, raw, SECRET_BEARING));
-      if (!parsed.success) {
-        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`);
-      }
-      return parsed.data.map(toAlertSubscription);
+      return parseBody(subscriptionListSchema, path, raw, SECRET_BEARING).map(toAlertSubscription);
     },
 
     async getCreditBalance(): Promise<number> {
@@ -384,14 +372,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       assertOk(path, raw);
       if (raw.body.trim() === '') return 0;
 
-      const parsed = balanceSchema.safeParse(parseJson(path, raw));
-      if (!parsed.success) {
-        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`, {
-          body: raw.body.slice(0, MAX_LOGGED_BODY),
-          cause: parsed.error,
-        });
-      }
-      return parsed.data.creditsRemaining;
+      return parseBody(balanceSchema, path, raw).creditsRemaining;
     },
 
     async refillCredits(credits: number): Promise<number> {
@@ -402,14 +383,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       const raw = await request(path, { method: 'POST', json: { credits } });
       assertOk(path, raw);
 
-      const parsed = balanceSchema.safeParse(parseJson(path, raw));
-      if (!parsed.success) {
-        throw new ProviderDataError(`Flight provider sent an unexpected shape for ${path}.`, {
-          body: raw.body.slice(0, MAX_LOGGED_BODY),
-          cause: parsed.error,
-        });
-      }
-      return parsed.data.creditsRemaining;
+      return parseBody(balanceSchema, path, raw).creditsRemaining;
     },
   };
 }

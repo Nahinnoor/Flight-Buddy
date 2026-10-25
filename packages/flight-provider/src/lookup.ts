@@ -6,10 +6,11 @@
  * typed, it returns *all* legs (§8.12 — never `[0]`), and it stamps each leg
  * with a tracking tier from the feed health of its two airports (§7.3).
  */
-import { parseFlightDesignator, type FlightCandidate } from '@flightbuddy/shared';
+import type { FlightCandidate } from '@flightbuddy/shared';
 
-import { isLocalDate } from './aerodatabox/client';
-import { ProviderDataError, ProviderRateLimitError } from './errors';
+import { requireLocalDate } from './aerodatabox/client';
+import { requireDesignator } from './aerodatabox/mapper';
+import { ProviderRateLimitError } from './errors';
 import type { FeedHealth, FlightDataProvider } from './provider';
 import { assignTrackingTier, createFeedHealthCache, type FeedHealthCache } from './trackingTier';
 
@@ -49,6 +50,38 @@ const delay = (ms: number): Promise<void> =>
 const sharedFeedHealthCache = createFeedHealthCache();
 
 /**
+ * One airport's feed health, retried once on a 429; `null` once it has failed.
+ *
+ * The retry waits for the gateway's own `Retry-After` when it sent one: retrying
+ * earlier than asked just spends another unit on another 429. Any other error,
+ * and a failed retry, goes to `onFeedHealthError`.
+ */
+async function fetchHealthWithRetry(
+  icao: string,
+  cache: FeedHealthCache,
+  provider: FlightDataProvider,
+  options: LookupOptions,
+): Promise<FeedHealth | null> {
+  try {
+    return await cache.get(icao, provider);
+  } catch (error: unknown) {
+    if (!(error instanceof ProviderRateLimitError)) {
+      options.onFeedHealthError?.(icao, error);
+      return null;
+    }
+    const asked =
+      error.retryAfterSeconds === undefined ? undefined : error.retryAfterSeconds * 1000;
+    await delay(asked ?? options.retryDelayMs ?? FEED_HEALTH_RETRY_DELAY_MS);
+    try {
+      return await cache.get(icao, provider);
+    } catch (retryError: unknown) {
+      options.onFeedHealthError?.(icao, retryError);
+      return null;
+    }
+  }
+}
+
+/**
  * Look up every leg a flight number operates on a date.
  *
  * Returns an empty array when the provider has no such flight — that is a 404
@@ -63,13 +96,8 @@ export async function lookupCandidates(
   request: LookupRequest,
   options: LookupOptions = {},
 ): Promise<FlightCandidate[]> {
-  const designator = parseFlightDesignator(request.flightNumber);
-  if (designator === null) {
-    throw new ProviderDataError(`"${request.flightNumber}" is not a flight number.`);
-  }
-  if (!isLocalDate(request.dateLocal)) {
-    throw new ProviderDataError(`"${request.dateLocal}" is not a YYYY-MM-DD date.`);
-  }
+  const designator = requireDesignator(request.flightNumber);
+  requireLocalDate(request.dateLocal);
 
   const candidates = await provider.lookupFlight(designator.designator, request.dateLocal);
   if (candidates.length === 0) return [];
@@ -91,36 +119,18 @@ export async function lookupCandidates(
   // `scheduled`, so nothing ever subscribed to alerts. One retry covers a
   // limiter that is merely busy, and `onFeedHealthError` makes a real failure
   // visible to the caller's logs instead of it vanishing.
-  const health = new Map<string, FeedHealth>();
+  const health = new Map<string, FeedHealth | null>();
   for (const icao of icaos) {
-    try {
-      health.set(icao, await cache.get(icao, provider));
-    } catch (error: unknown) {
-      if (error instanceof ProviderRateLimitError) {
-        // The gateway's own Retry-After when it sent one: retrying earlier than
-        // asked just spends another unit on another 429.
-        const asked =
-          error.retryAfterSeconds === undefined ? undefined : error.retryAfterSeconds * 1000;
-        await delay(asked ?? options.retryDelayMs ?? FEED_HEALTH_RETRY_DELAY_MS);
-        try {
-          health.set(icao, await cache.get(icao, provider));
-          continue;
-        } catch (retryError: unknown) {
-          options.onFeedHealthError?.(icao, retryError);
-          continue;
-        }
-      }
-      options.onFeedHealthError?.(icao, error);
-    }
+    health.set(icao, await fetchHealthWithRetry(icao, cache, provider, options));
   }
+  const feedOf = (icao: string | undefined): FeedHealth | null =>
+    icao === undefined ? null : (health.get(icao) ?? null);
 
   return candidates.map((candidate) => ({
     ...candidate,
     trackingTier: assignTrackingTier(
-      candidate.originIcao === undefined ? null : (health.get(candidate.originIcao) ?? null),
-      candidate.destinationIcao === undefined
-        ? null
-        : (health.get(candidate.destinationIcao) ?? null),
+      feedOf(candidate.originIcao),
+      feedOf(candidate.destinationIcao),
     ),
   }));
 }

@@ -30,13 +30,14 @@ export function assignTrackingTier(
   originFeeds: FeedHealth | null | undefined,
   destinationFeeds: FeedHealth | null | undefined,
 ): TrackingTier {
-  if (originFeeds === null || originFeeds === undefined) return 'scheduled';
-  if (destinationFeeds === null || destinationFeeds === undefined) return 'scheduled';
-  return originFeeds.hasLiveCoverage && destinationFeeds.hasLiveCoverage ? 'live' : 'scheduled';
+  return originFeeds?.hasLiveCoverage && destinationFeeds?.hasLiveCoverage ? 'live' : 'scheduled';
 }
 
 /** Feed health barely moves; re-asking on every add is wasted quota. */
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** Bounds memory in a long-lived process; an evicted airport costs one refetch. */
+const MAX_ENTRIES = 5_000;
 
 export interface FeedHealthCacheOptions {
   /** Entry lifetime. Defaults to 24 hours. */
@@ -50,6 +51,8 @@ export interface FeedHealthCacheOptions {
  *
  * Process-local and deliberately so: it is a quota optimisation, not a source
  * of truth, and a worker restart losing it costs one request per airport.
+ * Capped at 5,000 entries: when full, the oldest insertion is evicted, so a
+ * long-lived process cannot grow it without bound.
  */
 export interface FeedHealthCache {
   /** Cached health for `icao`, fetching through `provider` on a miss. */
@@ -93,6 +96,11 @@ export function createFeedHealthCache(options: FeedHealthCacheOptions = {}): Fee
       const request = provider
         .getAirportFeedHealth(key)
         .then((value) => {
+          entries.delete(key);
+          if (entries.size >= MAX_ENTRIES) {
+            const oldest = entries.keys().next();
+            if (oldest.done !== true) entries.delete(oldest.value);
+          }
           entries.set(key, { value, expiresAt: now() + ttlMs });
           return value;
         })

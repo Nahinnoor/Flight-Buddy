@@ -31,20 +31,19 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 type FlightInsert = Database['public']['Tables']['flights']['Insert'];
 
-/**
- * The unique constraint from §6.2, as PostgREST wants it: the conflict target
- * of `insert ... on conflict (...) do update`.
- */
-export const FLIGHTS_CONFLICT_TARGET =
-  'operating_carrier_iata,operating_flight_number,departure_date_local,origin_iata';
-
-/** The same key as columns, for writers that build SQL rather than a REST call. */
+/** The unique constraint from §6.2: the canonical key every writer upserts on. */
 export const FLIGHTS_CONFLICT_COLUMNS = [
   'operating_carrier_iata',
   'operating_flight_number',
   'departure_date_local',
   'origin_iata',
 ] as const;
+
+/**
+ * The same key as PostgREST wants it: the conflict target of
+ * `insert ... on conflict (...) do update`.
+ */
+export const FLIGHTS_CONFLICT_TARGET: string = FLIGHTS_CONFLICT_COLUMNS.join(',');
 
 /**
  * Every column `ingestFlight` writes, and the only columns any writer may touch.
@@ -56,10 +55,7 @@ export const FLIGHTS_CONFLICT_COLUMNS = [
  */
 export const FLIGHT_UPSERT_COLUMNS = [
   // canonical identity (§6.2 unique key)
-  'operating_carrier_iata',
-  'operating_flight_number',
-  'departure_date_local',
-  'origin_iata',
+  ...FLIGHTS_CONFLICT_COLUMNS,
 
   'destination_iata',
   'origin_tz',
@@ -91,6 +87,8 @@ export const FLIGHT_UPSERT_COLUMNS = [
 ] as const satisfies readonly (keyof FlightInsert)[];
 
 /**
+ * **The coalesce rule**, stated once here for every writer.
+ *
  * Columns an upsert may fill but must never erase: on conflict each is written as
  * `coalesce(new, existing)`, so a payload without the value (a webhook delivery
  * with no distance, a provider response missing a country) keeps the one already
@@ -113,9 +111,9 @@ export type FlightUpsertRow = Required<Pick<FlightInsert, (typeof FLIGHT_UPSERT_
  * The transport `ingestFlight` writes through.
  *
  * One method, one contract: upsert on the canonical key, update only the columns
- * present in `row` — except that a `null` in a `FLIGHT_COALESCE_COLUMNS` column
- * leaves the stored value alone — and return the row's id. `createSupabaseFlightsWriter` is what the
- * API uses; `createPgFlightsWriter` (`./pgWriter`) is what the worker uses.
+ * present in `row` (with the coalesce rule, `FLIGHT_COALESCE_COLUMNS`), and return
+ * the row's id. `createSupabaseFlightsWriter` is what the API uses;
+ * `createPgFlightsWriter` (`./pgWriter`) is what the worker uses.
  */
 export interface FlightsWriter {
   upsertFlight(row: FlightUpsertRow): Promise<{ id: string }>;
@@ -163,13 +161,14 @@ export type FlightUpsertPayload = Omit<FlightUpsertRow, FlightCoalesceColumn> &
   Partial<Pick<FlightUpsertRow, FlightCoalesceColumn>>;
 
 /**
- * `row` minus every `FLIGHT_COALESCE_COLUMNS` column whose value is `null`.
+ * `row` minus every `FLIGHT_COALESCE_COLUMNS` column whose value is `null`: the
+ * coalesce rule, in PostgREST terms.
  *
  * PostgREST has no `coalesce` in an upsert; it inserts and, on conflict, updates
  * exactly the keys of a single-object payload (supabase-js sends no `columns`
  * parameter for one object). So leaving a key out is how "keep what is stored"
  * is said to it: a new row gets the column default (NULL), an existing row keeps
- * its value. Same outcome as the worker's `coalesce(excluded.col, flights.col)`.
+ * its value.
  */
 export function withoutNullCoalesceColumns(row: FlightUpsertRow): FlightUpsertPayload {
   const payload: FlightUpsertPayload = { ...row };

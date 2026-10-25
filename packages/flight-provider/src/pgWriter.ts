@@ -1,20 +1,7 @@
 /**
- * The `FlightsWriter` the Render worker uses: plain SQL over a `pg` connection.
- *
- * The worker holds no Supabase key by design (ADR 0003 §6) — it logs in as
- * `flightbuddy_worker`, a role with `select, insert, update on public.flights` and
- * no DELETE anywhere. So rule 7's "only `ingestFlight` writes `flights`" keeps
- * holding by giving `ingestFlight` a second transport, not a second writer:
- * `ingest.ts` still decides every column and every value, and this file only
- * carries the row.
- *
- * Same semantics as the supabase-js writer, on purpose:
- * `insert … on conflict (canonical key) do update`, updating only the provider
- * fields plus `updated_at`, and clearing `archived_at`; the route columns in
- * `FLIGHT_COALESCE_COLUMNS` are `coalesce(excluded.col, flights.col)`, so a null
- * never erases a stored value (the supabase-js writer omits the key instead). Scheduling, lease and
- * webhook columns are not in the statement at all, so a concurrent poll pass
- * cannot lose its `next_poll_at` to an ingest.
+ * The `FlightsWriter` the Render worker uses: plain SQL over a `pg` connection,
+ * as the `flightbuddy_worker` role (ADR 0003 §6). Why the seam exists, and the
+ * coalesce rule, are in `ingest.ts`; this file only carries the row it builds.
  *
  * **Parameterised only.** Column names come from the frozen
  * `FLIGHT_UPSERT_COLUMNS` list and placeholders from its indices; nothing derived
@@ -46,7 +33,7 @@ export type QueryFn = (
 /** Columns that are the conflict key, so they are never in the `do update set` list. */
 const CONFLICT_SET: ReadonlySet<string> = new Set(FLIGHTS_CONFLICT_COLUMNS);
 
-/** Columns updated as `coalesce(new, existing)`: a null never erases a stored value. */
+/** Columns updated as `coalesce(excluded.col, flights.col)`: see `FLIGHT_COALESCE_COLUMNS`. */
 const COALESCE_SET: ReadonlySet<string> = new Set(FLIGHT_COALESCE_COLUMNS);
 
 /** `jsonb` columns need an explicit cast: `pg` sends every parameter as text. */

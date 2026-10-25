@@ -26,10 +26,13 @@
  */
 import {
   MAX_GREAT_CIRCLE_KM,
+  airportIataSchema,
+  airportIcaoSchema,
   localDateAtAirport,
   parseFlightDesignator,
   type FlightCandidate,
   type FlightStatus,
+  type ParsedFlightDesignator,
 } from '@flightbuddy/shared';
 
 import { ProviderDataError } from '../errors';
@@ -73,9 +76,6 @@ const STATUS_MAP: Readonly<Record<string, FlightStatus>> = {
 /** Provider statuses that mean the aircraft has physically left the gate. */
 const AFTER_DEPARTURE = new Set(['Departed', 'EnRoute', 'Approaching', 'Arrived', 'Diverted']);
 
-/** Provider statuses that mean the aircraft is on the ground at destination. */
-const AFTER_ARRIVAL = new Set(['Arrived']);
-
 export function mapStatus(providerStatus: string | null | undefined): FlightStatus {
   if (providerStatus === null || providerStatus === undefined) return 'unknown';
   return STATUS_MAP[providerStatus] ?? 'unknown';
@@ -97,23 +97,34 @@ export function toUtcIso(value: string | null | undefined): string | null {
   return parsed.toISOString();
 }
 
-/** The `YYYY-MM-DD` prefix of a local time string, or `null`. */
-function localDatePart(value: string | null | undefined): string | null {
+/** The `YYYY-MM-DD` prefix of a local time (or date-time) string, or `null`. */
+export function localDatePart(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim());
   return match === null ? null : (match[1] as string);
-}
-
-function upperOrNull(value: string | null | undefined): string | null {
-  if (value === null || value === undefined) return null;
-  const trimmed = value.trim().toUpperCase();
-  return trimmed === '' ? null : trimmed;
 }
 
 function textOrNull(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
+}
+
+function upperOrNull(value: string | null | undefined): string | null {
+  return textOrNull(value)?.toUpperCase() ?? null;
+}
+
+/**
+ * The parsed designator, or a `ProviderDataError` naming what was typed.
+ *
+ * The one guard every entry point that takes a flight number applies.
+ */
+export function requireDesignator(text: string): ParsedFlightDesignator {
+  const designator = parseFlightDesignator(text);
+  if (designator === null) {
+    throw new ProviderDataError(`"${text}" is not a flight number.`);
+  }
+  return designator;
 }
 
 /**
@@ -189,7 +200,7 @@ function resolveAirport(
   // Both are load-bearing: `origin_iata` is part of the canonical unique key
   // (§6.2) and the zone is what every display in the app formats against
   // (§8.4). A leg without them cannot be stored, so it is not a candidate.
-  if (iata === null || !/^[A-Z]{3}$/.test(iata)) {
+  if (iata === null || !airportIataSchema.safeParse(iata).success) {
     throw new ProviderDataError(`Flight ${side} has no IATA airport code.`);
   }
   if (tz === null) {
@@ -198,7 +209,7 @@ function resolveAirport(
   const icao = upperOrNull(airport?.icao);
   return {
     iata,
-    icao: icao !== null && /^[A-Z]{4}$/.test(icao) ? icao : undefined,
+    icao: icao !== null && airportIcaoSchema.safeParse(icao).success ? icao : undefined,
     tz,
     name: textOrNull(airport?.name) ?? undefined,
     countryCode: countryCodeOrNull(airport?.countryCode),
@@ -215,10 +226,7 @@ function resolveAirport(
  * @throws ProviderDataError when the leg cannot be expressed as a candidate.
  */
 export function toFlightCandidate(raw: AeroDataBoxFlight, typedNumber: string): FlightCandidate {
-  const marketing = parseFlightDesignator(typedNumber);
-  if (marketing === null) {
-    throw new ProviderDataError(`"${typedNumber}" is not a flight number.`);
-  }
+  const marketing = requireDesignator(typedNumber);
 
   // The response's own number is the operating flight — see the file comment.
   const operating = parseFlightDesignator(raw.number) ?? marketing;
@@ -236,7 +244,7 @@ export function toFlightCandidate(raw: AeroDataBoxFlight, typedNumber: string): 
 
   const providerStatus = raw.status ?? null;
   const hasDeparted = providerStatus !== null && AFTER_DEPARTURE.has(providerStatus);
-  const hasArrived = providerStatus !== null && AFTER_ARRIVAL.has(providerStatus);
+  const hasArrived = providerStatus === 'Arrived';
 
   // `revisedTime` is "actual OR estimated" and `runwayTime` is wheels up/down;
   // the provider never says which, so the status decides. Both are kept once
