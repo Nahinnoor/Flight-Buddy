@@ -22,6 +22,8 @@
 
 Errors: `{ error: { code: string, message: string } }` with 400 (validation), 401 (no/invalid JWT), 404 (no flights found), 502 (provider failure), 429 (provider rate-limited).
 
+**Amended 2026-10-26 — 401 comes before any body error.** The JWT is checked in Fastify's `onRequest` hook, before Fastify parses the body. A request without a valid token is a 401 whatever its body (malformed JSON, over the 1 MiB body limit, wrong content type), and its body is never parsed (Node still drains the unread bytes off the connection and discards them). A signed-in caller still gets 400, 413 or 415 for such a body. Before this, the check ran in `preHandler`, after parsing, so an anonymous caller saw body errors and the server parsed bodies for callers it then rejected.
+
 `FlightCandidate` is defined once in `@flightbuddy/shared` (`src/types.ts`) and validated with the zod schema there. The server re-validates the posted candidate against the provider (re-lookup by operating number + date + origin) before ingesting, so a client cannot forge times.
 
 ## Consequences

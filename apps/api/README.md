@@ -51,6 +51,11 @@ Every route except `GET /healthz` and the webhook receiver requires
 `Authorization: Bearer <supabase access token>`. The receiver authenticates by its secret path
 segment instead (below).
 
+The check runs in Fastify's `onRequest` hook, before the body is parsed: a request without a valid
+token is a 401 whatever its body, including malformed JSON, an oversized body or the wrong content
+type, and that body is never parsed (Node drains and discards the unread bytes). A signed-in caller
+with such a body still gets the 400 / 413 / 415.
+
 Tokens are verified against the project's JWKS
 (`$SUPABASE_URL/auth/v1/.well-known/jwks.json`, ES256) with `jose`, which caches the key set, so a
 burst of requests costs one fetch rather than one per request. The verifier enforces the signature,
@@ -75,7 +80,7 @@ All errors share one envelope:
 | 400 | Body failed validation (`VALIDATION_ERROR`), free text was not a flight and a date (`INVALID_QUERY`), or the posted candidate no longer matches the provider (`CANDIDATE_MISMATCH`). |
 | 401 | Missing, malformed, unverifiable or expired token (`UNAUTHORIZED`). |
 | 404 | No such flight (`NOT_FOUND`), or a `tripId` that is not yours (`TRIP_NOT_FOUND`). |
-| 413 / 415 | Webhook receiver only: body over 256 KB (`PAYLOAD_TOO_LARGE`), or not `application/json` (`UNSUPPORTED_MEDIA_TYPE`). |
+| 413 / 415 | Webhook receiver: body over 256 KB (`PAYLOAD_TOO_LARGE`), or not `application/json` (`UNSUPPORTED_MEDIA_TYPE`). `/v1`, signed-in callers only: body over 1 MiB, or a content type other than JSON or plain text (`VALIDATION_ERROR`). |
 | 429 | The provider rate-limited us (`PROVIDER_RATE_LIMITED`), or the webhook receiver's per-IP limit (`RATE_LIMITED`). Carries `Retry-After` when known. |
 | 502 | Provider failure or timeout (`PROVIDER_ERROR`, `PROVIDER_TIMEOUT`). |
 | 503 | Webhook receiver only: the inbox insert failed (`SERVICE_UNAVAILABLE`), so the provider retries. |
@@ -193,7 +198,7 @@ The limit counts right-token requests only, so wrong-token guesses cannot exhaus
 | `src/app.ts` | `buildApp(deps)` — the whole service as one value, every edge injectable. |
 | `src/deps.ts` | What those edges are. |
 | `src/config.ts` | Env schema and parsing. |
-| `src/auth.ts` | JWT verification and the `preHandler` that guards `/v1`. |
+| `src/auth.ts` | JWT verification and the `onRequest` hook that guards `/v1`. |
 | `src/supabase.ts` | The user-scoped and service-role clients, and the line between them. |
 | `src/errors.ts` | The error envelope and the one place a failure becomes a status. |
 | `src/logging.ts` | The request log serializer; redacts webhook URLs. |

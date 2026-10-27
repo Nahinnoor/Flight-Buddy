@@ -85,6 +85,119 @@ describe('authentication', () => {
   });
 });
 
+/**
+ * Authentication runs in `onRequest`, before Fastify parses the body: a caller
+ * who is about to be rejected costs no parse, and cannot learn anything from a
+ * 400/413/415 that a signed-in caller would get.
+ */
+describe('authentication runs before the body is parsed', () => {
+  // Fastify's default `bodyLimit` (1 MiB); the API does not override it.
+  const oversized = JSON.stringify({ query: 'x'.repeat(1024 * 1024) });
+  const unreadableBodies = [
+    { label: 'malformed JSON', contentType: 'application/json', payload: '{not json', status: 400 },
+    {
+      label: 'an oversized body',
+      contentType: 'application/json',
+      payload: oversized,
+      status: 413,
+    },
+    {
+      label: 'an unsupported media type',
+      contentType: 'application/xml',
+      payload: '<a/>',
+      status: 415,
+    },
+  ];
+  const postRoutes = ['/v1/flights/lookup', '/v1/flights'];
+  const anonymousCases = postRoutes.flatMap((url) =>
+    unreadableBodies.flatMap((body) => [
+      { ...body, url, caller: 'no token', headers: {} },
+      {
+        ...body,
+        url,
+        caller: 'a rejected token',
+        headers: { authorization: 'Bearer not-the-test-token' },
+      },
+    ]),
+  );
+
+  it.each(anonymousCases)(
+    '401s $url with $caller and $label',
+    async ({ url, headers, contentType, payload }) => {
+      const { app, userCalls, serviceCalls, asked } = buildTestApp();
+
+      const response = await app.inject({
+        method: 'POST',
+        url,
+        headers: { ...headers, 'content-type': contentType },
+        payload,
+      });
+
+      expect(response.statusCode).toBe(401);
+      expect(apiErrorSchema.parse(response.json()).error.code).toBe('UNAUTHORIZED');
+      expect(userCalls).toEqual([]);
+      expect(serviceCalls).toEqual([]);
+      expect(asked).toEqual([]);
+    },
+  );
+
+  const signedInCases = postRoutes.flatMap((url) =>
+    unreadableBodies.map((body) => ({ ...body, url })),
+  );
+
+  it.each(signedInCases)(
+    'still answers a signed-in caller on $url with $status for $label',
+    async ({ url, contentType, payload, status }) => {
+      const { app, asked } = buildTestApp();
+
+      const response = await app.inject({
+        method: 'POST',
+        url,
+        headers: { ...AUTH_HEADERS, 'content-type': contentType },
+        payload,
+      });
+
+      expect(response.statusCode).toBe(status);
+      const { error } = apiErrorSchema.parse(response.json());
+      expect(error.code).toBe('VALIDATION_ERROR');
+      expect(error.message).not.toMatch(/FST_ERR/);
+      expect(asked).toEqual([]);
+    },
+  );
+
+  it('still answers a CORS preflight without a token', async () => {
+    const { app } = buildTestApp();
+
+    const response = await app.inject({
+      method: 'OPTIONS',
+      url: '/v1/flights',
+      headers: {
+        origin: 'https://example.test',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers': 'authorization,content-type',
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBeDefined();
+  });
+
+  it('still carries CORS and request-id headers on the 401', async () => {
+    const { app } = buildTestApp();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/flights/lookup',
+      headers: { origin: 'https://example.test', 'content-type': 'application/json' },
+      payload: '{not json',
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.headers['access-control-allow-origin']).toBeDefined();
+    expect(response.headers['x-request-id']).toBeDefined();
+  });
+});
+
 describe('request bodies the parser rejects', () => {
   it.each([
     ['an empty body', ''],

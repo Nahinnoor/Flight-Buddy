@@ -116,10 +116,14 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
     // Everything under here is authenticated. The hook is registered on a
     // child instance so `/healthz` cannot accidentally inherit it — and, more
-    // importantly, so no future `/v1` route can accidentally skip it.
+    // importantly, so no future `/v1` route can accidentally skip it. It runs
+    // in `onRequest`, before Fastify parses the body, so a caller who will be
+    // rejected gets a 401 whatever they sent and costs no parse. CORS is an
+    // `onRequest` hook on the parent, so it still runs first: preflights are
+    // answered and a 401 still carries its headers.
     await instance.register(async (authed) => {
       authed.addHook(
-        'preHandler',
+        'onRequest',
         createAuthenticate({
           verifyToken: deps.verifyToken,
           createUserClient: deps.createUserClient,

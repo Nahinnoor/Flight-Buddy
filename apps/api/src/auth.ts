@@ -158,7 +158,7 @@ export function bearerToken(header: string | undefined): string {
   return (match[1] as string).trim();
 }
 
-// ------------------------------------------------------- the preHandler ---
+// -------------------------------------------------------- the onRequest ---
 
 /**
  * Everything the authenticated half of the API hangs off one request.
@@ -180,11 +180,13 @@ export interface AuthenticateDeps {
 }
 
 /**
- * Build the `preHandler` that guards every `/v1` route.
+ * Build the `onRequest` hook that guards every `/v1` route.
  *
  * Throws `UnauthorizedError` (401) for a missing, malformed, unverifiable or
  * expired token. It never falls through to an anonymous request: a route that
- * registers this hook is authenticated or it does not run.
+ * registers this hook is authenticated or it does not run. It reads only the
+ * `Authorization` header, so it runs before the body is parsed, and a rejected
+ * caller's body never is.
  */
 export function createAuthenticate(deps: AuthenticateDeps) {
   return async function authenticate(request: FastifyRequest): Promise<void> {
@@ -197,12 +199,12 @@ export function createAuthenticate(deps: AuthenticateDeps) {
 
 /**
  * The verified caller. Throws rather than returning `undefined` so a route that
- * forgot the `preHandler` fails loudly instead of serving somebody's data.
+ * forgot the `onRequest` hook fails loudly instead of serving somebody's data.
  */
 export function requireUser(request: FastifyRequest): AuthUser {
   if (request.user === undefined) {
     throw new UnauthorizedError('Sign in and try again.', {
-      detail: 'route ran without the authenticate preHandler',
+      detail: 'route ran without the authenticate hook',
     });
   }
   return request.user;
@@ -212,7 +214,7 @@ export function requireUser(request: FastifyRequest): AuthUser {
 export function requireUserClient(request: FastifyRequest): Client {
   if (request.supabase === undefined) {
     throw new UnauthorizedError('Sign in and try again.', {
-      detail: 'route ran without the authenticate preHandler',
+      detail: 'route ran without the authenticate hook',
     });
   }
   return request.supabase;

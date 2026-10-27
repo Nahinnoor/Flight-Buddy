@@ -2,7 +2,7 @@
  * One helper that builds the real app with every edge faked.
  *
  * Tests drive it through `app.inject()`, so they exercise routing, the CORS and
- * request-id hooks, the auth `preHandler` and the error handler — the whole
+ * request-id hooks, the auth `onRequest` hook and the error handler — the whole
  * pipeline — without a socket, a network call or a database.
  */
 import type { FastifyInstance } from 'fastify';

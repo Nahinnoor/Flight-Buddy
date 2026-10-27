@@ -490,7 +490,7 @@ describe('createTokenVerifier — what a rejection says', () => {
   });
 });
 
-// ------------------------------------------------------------- preHandler ---
+// -------------------------------------------------------------- onRequest ---
 
 describe('bearerToken', () => {
   it('pulls the token out of a well-formed header', () => {
@@ -514,7 +514,7 @@ describe('bearerToken', () => {
   });
 });
 
-/** Just enough of a Fastify request for the preHandler. */
+/** Just enough of a Fastify request for the authenticate hook. */
 function fakeRequest(authorization?: string): {
   headers: { authorization?: string };
   user?: AuthUser;
@@ -581,7 +581,7 @@ describe('createAuthenticate', () => {
     expect(request.supabase).toBeUndefined();
   });
 
-  it('accepts a real ES256 token end to end through the preHandler', async () => {
+  it('accepts a real ES256 token end to end through the authenticate hook', async () => {
     const authenticate = createAuthenticate({
       verifyToken: verifierWith(servingOurKey()),
       createUserClient: () => ({}) as unknown as Client,
@@ -602,7 +602,7 @@ describe('requireUser / requireUserClient', () => {
     expect(() => requireUserClient(request as never)).toThrow(UnauthorizedError);
   });
 
-  it('return what the preHandler put on the request', () => {
+  it('return what the authenticate hook put on the request', () => {
     const client = {} as unknown as Client;
     const request = fakeRequest('Bearer whatever');
     request.user = { id: USER_ID, email: USER_EMAIL };
