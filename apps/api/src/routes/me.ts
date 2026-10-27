@@ -11,15 +11,11 @@
 import type { FastifyInstance } from 'fastify';
 
 import { requireUser, requireUserClient } from '../auth';
-import { ensureIdentity, type ProfileView, type TravelerView } from '../identity';
+import { ensureIdentity, type MeResponse } from '../identity';
 
-export interface MeResponse {
-  profile: ProfileView;
-  traveler: TravelerView;
-}
-
+/** Registered under the `/v1` prefix (`app.ts`). */
 export function registerMeRoutes(app: FastifyInstance): void {
-  app.get('/v1/me', async (request): Promise<MeResponse> => {
+  app.get('/me', async (request): Promise<MeResponse> => {
     const user = requireUser(request);
     return ensureIdentity(requireUserClient(request), user.id, user.email);
   });

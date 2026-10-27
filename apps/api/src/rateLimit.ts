@@ -13,7 +13,7 @@
  * real delivery was refused".
  */
 
-export interface FixedWindowLimiterOptions {
+interface FixedWindowLimiterOptions {
   /** Requests allowed per key per window. */
   limit: number;
   windowMs: number;
@@ -23,13 +23,13 @@ export interface FixedWindowLimiterOptions {
   now: () => Date;
 }
 
-export interface RateLimitDecision {
+interface RateLimitDecision {
   allowed: boolean;
   /** Whole seconds until this key's window resets (at least 1). For `Retry-After`. */
   retryAfterSeconds: number;
 }
 
-export interface FixedWindowLimiter {
+interface FixedWindowLimiter {
   /** Count one request for `key` and say whether it is within the limit. */
   hit(key: string): RateLimitDecision;
   /** Keys currently tracked. */
@@ -74,11 +74,10 @@ export function createFixedWindowLimiter(options: FixedWindowLimiterOptions): Fi
       const nowMs = now().getTime();
 
       let window = windows.get(key);
-      if (window !== undefined && expired(window, nowMs)) {
+      if (window === undefined || expired(window, nowMs)) {
+        // An expired window goes first, so it neither counts toward `maxKeys`
+        // nor keeps its old place in the insertion order.
         windows.delete(key);
-        window = undefined;
-      }
-      if (window === undefined) {
         if (windows.size >= maxKeys) makeRoom(nowMs);
         window = { startMs: nowMs, count: 0 };
         windows.set(key, window);

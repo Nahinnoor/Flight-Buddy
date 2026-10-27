@@ -32,7 +32,7 @@ export interface BuildAppOptions extends Partial<Omit<AppDeps, 'config'>> {
 }
 
 /** One JSON log line per `write`. */
-export interface LogStream {
+interface LogStream {
   write(line: string): void;
 }
 
@@ -114,24 +114,27 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
     registerHealthRoutes(instance);
 
-    // Everything under here is authenticated. The hook is registered on a
-    // child instance so `/healthz` cannot accidentally inherit it — and, more
-    // importantly, so no future `/v1` route can accidentally skip it. It runs
-    // in `onRequest`, before Fastify parses the body, so a caller who will be
-    // rejected gets a 401 whatever they sent and costs no parse. CORS is an
-    // `onRequest` hook on the parent, so it still runs first: preflights are
-    // answered and a 401 still carries its headers.
-    await instance.register(async (authed) => {
-      authed.addHook(
-        'onRequest',
-        createAuthenticate({
-          verifyToken: deps.verifyToken,
-          createUserClient: deps.createUserClient,
-        }),
-      );
-      registerMeRoutes(authed);
-      registerFlightRoutes(authed, deps);
-    });
+    // Everything under `/v1` is authenticated. The hook and the prefix live on
+    // the same child instance, so `/healthz` cannot inherit the hook and no
+    // `/v1` route can exist without it. It runs in `onRequest`, before Fastify
+    // parses the body, so a caller who will be rejected gets a 401 whatever
+    // they sent and costs no parse. CORS is an `onRequest` hook on the parent,
+    // so it still runs first: preflights are answered and a 401 still carries
+    // its headers.
+    await instance.register(
+      async (authed) => {
+        authed.addHook(
+          'onRequest',
+          createAuthenticate({
+            verifyToken: deps.verifyToken,
+            createUserClient: deps.createUserClient,
+          }),
+        );
+        registerMeRoutes(authed);
+        registerFlightRoutes(authed, deps);
+      },
+      { prefix: '/v1' },
+    );
   });
 
   // The AeroDataBox receiver (ADR 0003) sits at the root, beside `/v1` rather

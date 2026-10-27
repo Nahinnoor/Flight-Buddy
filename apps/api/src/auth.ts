@@ -24,6 +24,7 @@ import {
   jwtVerify,
   type FetchImplementation,
 } from 'jose';
+import { z } from 'zod';
 
 import { UnauthorizedError } from './errors';
 import type { Client, UserClientFactory } from './supabase';
@@ -48,7 +49,7 @@ export interface AuthUser {
 
 export type TokenVerifier = (token: string) => Promise<AuthUser>;
 
-export interface TokenVerifierOptions {
+interface TokenVerifierOptions {
   /** `https://<ref>.supabase.co`. The issuer is this plus `/auth/v1`. */
   supabaseUrl: string;
   /** Legacy HS256 secret. Only consulted for tokens whose `alg` is `HS*`. */
@@ -62,7 +63,8 @@ export interface TokenVerifierOptions {
   fetchJwks?: FetchImplementation | undefined;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Any 8-4-4-4-12 hex string, either case. */
+const SUBJECT = z.guid();
 
 /** A user-facing reason, chosen so it never describes our own configuration. */
 function reasonFor(error: unknown): { message: string; detail: string } {
@@ -92,6 +94,7 @@ export function createTokenVerifier(options: TokenVerifierOptions): TokenVerifie
   });
   const secret =
     options.jwtSecret === undefined ? null : new TextEncoder().encode(options.jwtSecret);
+  const verifyOptions = { issuer, audience: AUDIENCE, clockTolerance: CLOCK_TOLERANCE_SECONDS };
 
   return async function verifyToken(token: string): Promise<AuthUser> {
     let algorithm: string;
@@ -112,20 +115,10 @@ export function createTokenVerifier(options: TokenVerifierOptions): TokenVerifie
             detail: 'HS-signed token but SUPABASE_JWT_SECRET is not configured',
           });
         }
-        const verified = await jwtVerify(token, secret, {
-          issuer,
-          audience: AUDIENCE,
-          algorithms: ['HS256'],
-          clockTolerance: CLOCK_TOLERANCE_SECONDS,
-        });
-        claims = verified.payload;
+        claims = (await jwtVerify(token, secret, { ...verifyOptions, algorithms: ['HS256'] }))
+          .payload;
       } else {
-        const verified = await jwtVerify(token, jwks, {
-          issuer,
-          audience: AUDIENCE,
-          clockTolerance: CLOCK_TOLERANCE_SECONDS,
-        });
-        claims = verified.payload;
+        claims = (await jwtVerify(token, jwks, verifyOptions)).payload;
       }
     } catch (error) {
       if (error instanceof UnauthorizedError) throw error;
@@ -133,14 +126,14 @@ export function createTokenVerifier(options: TokenVerifierOptions): TokenVerifie
       throw new UnauthorizedError(reason.message, { detail: reason.detail, cause: error });
     }
 
-    const subject = claims.sub;
-    if (typeof subject !== 'string' || !UUID.test(subject)) {
+    const subject = SUBJECT.safeParse(claims.sub);
+    if (!subject.success) {
       throw new UnauthorizedError('That token has no user on it.', {
         detail: 'sub claim missing or not a uuid',
       });
     }
     const email = typeof claims.email === 'string' && claims.email !== '' ? claims.email : null;
-    return { id: subject, email };
+    return { id: subject.data, email };
   };
 }
 
@@ -174,7 +167,7 @@ declare module 'fastify' {
   }
 }
 
-export interface AuthenticateDeps {
+interface AuthenticateDeps {
   verifyToken: TokenVerifier;
   createUserClient: UserClientFactory;
 }
@@ -197,25 +190,25 @@ export function createAuthenticate(deps: AuthenticateDeps) {
   };
 }
 
+/** `value`, or a 401 when the `onRequest` hook that sets it did not run. */
+function required<T>(value: T | undefined): T {
+  if (value === undefined) {
+    throw new UnauthorizedError('Sign in and try again.', {
+      detail: 'route ran without the authenticate hook',
+    });
+  }
+  return value;
+}
+
 /**
  * The verified caller. Throws rather than returning `undefined` so a route that
  * forgot the `onRequest` hook fails loudly instead of serving somebody's data.
  */
 export function requireUser(request: FastifyRequest): AuthUser {
-  if (request.user === undefined) {
-    throw new UnauthorizedError('Sign in and try again.', {
-      detail: 'route ran without the authenticate hook',
-    });
-  }
-  return request.user;
+  return required(request.user);
 }
 
 /** The caller's own RLS-scoped Supabase client. Same contract as `requireUser`. */
 export function requireUserClient(request: FastifyRequest): Client {
-  if (request.supabase === undefined) {
-    throw new UnauthorizedError('Sign in and try again.', {
-      detail: 'route ran without the authenticate hook',
-    });
-  }
-  return request.supabase;
+  return required(request.supabase);
 }

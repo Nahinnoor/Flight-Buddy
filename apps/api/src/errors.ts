@@ -17,27 +17,29 @@ import {
   ProviderRateLimitError,
   ProviderTimeoutError,
 } from '@flightbuddy/flight-provider';
+import type { ApiError } from '@flightbuddy/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 
 /** The wire shape every non-2xx answer takes. */
-export interface ApiErrorBody {
-  error: { code: string; message: string };
+export type ApiErrorBody = ApiError;
+
+/** `{ error: { code, message } }`. */
+export function errorBody(code: string, message: string): ApiErrorBody {
+  return { error: { code, message } };
 }
 
+/** Context for the log line (`detail`) and the error chain (`cause`). Never sent. */
+type ApiErrorOptions = { detail?: string; cause?: unknown };
+
 /** A failure with a status and a code that are safe to show the caller. */
-export class ApiHttpError extends Error {
+class ApiHttpError extends Error {
   readonly status: number;
   readonly code: string;
   /** Internal context for the log line. Never sent. */
   readonly detail: string | undefined;
 
-  constructor(
-    status: number,
-    code: string,
-    message: string,
-    options: { detail?: string; cause?: unknown } = {},
-  ) {
+  constructor(status: number, code: string, message: string, options: ApiErrorOptions = {}) {
     super(message, { cause: options.cause });
     this.name = 'ApiHttpError';
     this.status = status;
@@ -48,7 +50,7 @@ export class ApiHttpError extends Error {
 
 /** 400. The request was understood and is wrong. */
 export class BadRequestError extends ApiHttpError {
-  constructor(message: string, code = 'BAD_REQUEST', options: { detail?: string } = {}) {
+  constructor(message: string, code = 'BAD_REQUEST', options: ApiErrorOptions = {}) {
     super(400, code, message, options);
     this.name = 'BadRequestError';
   }
@@ -56,10 +58,7 @@ export class BadRequestError extends ApiHttpError {
 
 /** 401. No token, a token that does not verify, or one that has expired. */
 export class UnauthorizedError extends ApiHttpError {
-  constructor(
-    message = 'Sign in and try again.',
-    options: { detail?: string; cause?: unknown } = {},
-  ) {
+  constructor(message = 'Sign in and try again.', options: ApiErrorOptions = {}) {
     super(401, 'UNAUTHORIZED', message, options);
     this.name = 'UnauthorizedError';
   }
@@ -75,21 +74,28 @@ export class NotFoundError extends ApiHttpError {
 
 /** 500. Postgres refused something the API cannot turn into a user's mistake. */
 export class DatabaseError extends ApiHttpError {
-  constructor(message: string, options: { detail?: string; cause?: unknown } = {}) {
+  constructor(message: string, options: ApiErrorOptions = {}) {
     super(500, 'DATABASE_ERROR', message, options);
     this.name = 'DatabaseError';
   }
 }
 
+/**
+ * A `DatabaseError` whose log detail is PostgREST's message, or `fallback` when
+ * a write came back with neither an error nor a row.
+ */
+export function dbFailure(
+  message: string,
+  error: { message: string } | null | undefined,
+  fallback = 'insert returned no row',
+): DatabaseError {
+  return new DatabaseError(message, { detail: error?.message ?? fallback });
+}
+
 // ------------------------------------------------------------------- zod ---
 
-/**
- * `instanceof` works here because zod resolves to exactly one physical copy:
- * the root `node_modules/zod` is a direct devDependency of the workspace root,
- * so `@flightbuddy/shared`, `@flightbuddy/flight-provider` and this package all
- * import the same module instance and a `ZodError` thrown in one is an instance
- * of the class imported by another. `npm ls zod` must keep showing one version.
- */
+// `instanceof ZodError` in `mapError` relies on one physical copy of zod across
+// the workspace (the root devDependency); `npm ls zod` must show one version.
 
 /** `candidate.originIata: expected a 3-letter IATA airport code`, capped. */
 function describeZodError(error: ZodError): string {
@@ -110,27 +116,30 @@ interface MappedError {
   /** Safe to send. */
   message: string;
   /** Logged, never sent. */
-  detail: string | undefined;
-  retryAfterSeconds: number | undefined;
+  detail?: string | undefined;
+  retryAfterSeconds?: number | undefined;
 }
 
 const INTERNAL: MappedError = {
   status: 500,
   code: 'INTERNAL_ERROR',
   message: 'Something went wrong. Try again.',
-  detail: undefined,
-  retryAfterSeconds: undefined,
 };
 
+/** Status of a Fastify error (body parser, content type), if it has one. */
+export function statusOf(error: unknown): number | undefined {
+  const status = (error as { statusCode?: unknown }).statusCode;
+  return typeof status === 'number' ? status : undefined;
+}
+
 /** Decide the status, code and public message for anything thrown in a handler. */
-export function mapError(error: unknown): MappedError {
+function mapError(error: unknown): MappedError {
   if (error instanceof ApiHttpError) {
     return {
       status: error.status,
       code: error.code,
       message: error.message,
       detail: error.detail,
-      retryAfterSeconds: undefined,
     };
   }
 
@@ -139,8 +148,6 @@ export function mapError(error: unknown): MappedError {
       status: 400,
       code: 'VALIDATION_ERROR',
       message: describeZodError(error),
-      detail: undefined,
-      retryAfterSeconds: undefined,
     };
   }
 
@@ -160,7 +167,6 @@ export function mapError(error: unknown): MappedError {
       code: 'PROVIDER_TIMEOUT',
       message: 'The flight data provider did not answer in time. Try again.',
       detail: error.message,
-      retryAfterSeconds: undefined,
     };
   }
   if (error instanceof ProviderError) {
@@ -170,7 +176,6 @@ export function mapError(error: unknown): MappedError {
       message: 'The flight data provider could not answer that. Try again.',
       // `error.body` may be large; the provider already truncates it.
       detail: `${error.message}${error.status === undefined ? '' : ` (status ${error.status})`}`,
-      retryAfterSeconds: undefined,
     };
   }
   if (error instanceof FlightIngestError) {
@@ -179,7 +184,6 @@ export function mapError(error: unknown): MappedError {
       code: 'INGEST_FAILED',
       message: 'Could not save that flight. Try again.',
       detail: `${error.message}${error.code === undefined ? '' : ` (${error.code})`}`,
-      retryAfterSeconds: undefined,
     };
   }
 
@@ -187,8 +191,8 @@ export function mapError(error: unknown): MappedError {
   // Its messages name the problem and carry nothing of ours, but its codes
   // (`FST_ERR_CTP_*`) are an implementation detail: a body the parser rejects
   // is a validation failure to the client, the same as one zod rejects.
-  const fastifyStatus = (error as { statusCode?: unknown }).statusCode;
-  if (typeof fastifyStatus === 'number' && fastifyStatus >= 400 && fastifyStatus < 500) {
+  const fastifyStatus = statusOf(error);
+  if (fastifyStatus !== undefined && fastifyStatus >= 400 && fastifyStatus < 500) {
     const code = (error as { code?: unknown }).code;
     const isBodyParseError = typeof code === 'string' && code.startsWith('FST_ERR_CTP_');
     return {
@@ -196,7 +200,6 @@ export function mapError(error: unknown): MappedError {
       code: isBodyParseError ? 'VALIDATION_ERROR' : 'BAD_REQUEST',
       message: error instanceof Error ? error.message : 'Bad request.',
       detail: typeof code === 'string' ? code : undefined,
-      retryAfterSeconds: undefined,
     };
   }
 
@@ -221,8 +224,7 @@ export function registerErrorHandler(app: FastifyInstance): void {
       void reply.header('retry-after', String(mapped.retryAfterSeconds));
     }
 
-    const body: ApiErrorBody = { error: { code: mapped.code, message: mapped.message } };
-    void reply.status(mapped.status).send(body);
+    void reply.status(mapped.status).send(errorBody(mapped.code, mapped.message));
   });
 
   app.setNotFoundHandler((request, reply) => {
@@ -238,7 +240,5 @@ export function registerErrorHandler(app: FastifyInstance): void {
  * (ADR 0003). It echoes only what the caller sent.
  */
 export function notFoundBody(request: FastifyRequest): ApiErrorBody {
-  return {
-    error: { code: 'NOT_FOUND', message: `No route for ${request.method} ${request.url}.` },
-  };
+  return errorBody('NOT_FOUND', `No route for ${request.method} ${request.url}.`);
 }

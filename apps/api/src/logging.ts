@@ -29,7 +29,7 @@ function decoded(url: string): string {
 }
 
 /** The URL as it may appear in a log line. */
-export function redactUrl(url: string): string {
+function redactUrl(url: string): string {
   return WEBHOOK_MENTION.test(url) || WEBHOOK_MENTION.test(decoded(url))
     ? REDACTED_WEBHOOK_URL
     : url;

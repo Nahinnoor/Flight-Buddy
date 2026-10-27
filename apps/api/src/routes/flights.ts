@@ -19,7 +19,7 @@
  * client: they are what the user typed, they are display data, and they belong
  * on the segment — never on the shared `flights` row (§6.1, §7.2).
  */
-import { ingestFlight, lookupCandidates } from '@flightbuddy/flight-provider';
+import { ingestFlight, lookupCandidates, type LookupRequest } from '@flightbuddy/flight-provider';
 import {
   flightLookupByNumberSchema,
   flightQueryInputSchema,
@@ -33,19 +33,10 @@ import type { FastifyBaseLogger, FastifyInstance, FastifyRequest } from 'fastify
 
 import { requireUser, requireUserClient } from '../auth';
 import type { AppDeps } from '../deps';
-import { BadRequestError, DatabaseError, NotFoundError } from '../errors';
+import { BadRequestError, DatabaseError, NotFoundError, dbFailure } from '../errors';
+import { isRecord } from '../guards';
 import { ensureIdentity, type TravelerView } from '../identity';
 import { isUniqueViolation, type Client } from '../supabase';
-
-/** A lookup the provider can actually run. */
-interface ResolvedLookup {
-  flightNumber: string;
-  dateLocal: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 /**
  * Turn either accepted body into a number and a date.
@@ -54,8 +45,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * server's (§8.4): "tomorrow" in Auckland is not "tomorrow" in Oregon, and this
  * process runs wherever Render put it.
  */
-function resolveLookup(body: unknown, now: () => Date): ResolvedLookup {
-  if (isRecord(body) && 'query' in body) {
+function resolveLookup(body: unknown, now: () => Date): LookupRequest {
+  if (!isRecord(body)) return flightLookupByNumberSchema.parse(body);
+
+  if ('query' in body) {
     const input = flightQueryInputSchema.parse(body);
     // Uppercase-insensitive already; the parser normalises internally.
     const reference = input.today === undefined ? now() : new Date(`${input.today}T12:00:00.000Z`);
@@ -70,27 +63,16 @@ function resolveLookup(body: unknown, now: () => Date): ResolvedLookup {
 
   // Lenient on case and surrounding space, strict on shape: the shared schema
   // is the contract, but "dl 1234" is a thing people type.
-  const normalised = isRecord(body)
-    ? {
-        ...body,
-        flightNumber:
-          typeof body.flightNumber === 'string'
-            ? body.flightNumber.trim().toUpperCase()
-            : body.flightNumber,
-      }
-    : body;
-  return flightLookupByNumberSchema.parse(normalised);
+  const { flightNumber } = body;
+  return flightLookupByNumberSchema.parse({
+    ...body,
+    flightNumber:
+      typeof flightNumber === 'string' ? flightNumber.trim().toUpperCase() : flightNumber,
+  });
 }
 
 // -------------------------------------------------------------- add flight ---
 
-/**
- * Ask the provider again and return the leg the user actually picked.
- *
- * Matching is on `originIata` because that is the one field that distinguishes
- * the legs of a multi-leg number on a given date, and it is part of the
- * canonical key in §6.2. Everything else on the returned candidate is fresh.
- */
 /**
  * An airport whose feed health cannot be read degrades that flight to the
  * `scheduled` tier (§7.3). Logged, never silent: an invisible degrade is how
@@ -104,6 +86,13 @@ function logFeedHealthError(log: FastifyBaseLogger, icao: string, error: unknown
   );
 }
 
+/**
+ * Ask the provider again and return the leg the user actually picked.
+ *
+ * Matching is on `originIata` because that is the one field that distinguishes
+ * the legs of a multi-leg number on a given date, and it is part of the
+ * canonical key in §6.2. Everything else on the returned candidate is fresh.
+ */
 async function reverifyCandidate(
   deps: AppDeps,
   posted: FlightCandidate,
@@ -151,7 +140,7 @@ async function resolveTrip(
       .eq('id', tripId)
       .maybeSingle();
     if (found.error !== null) {
-      throw new DatabaseError('Could not read that trip.', { detail: found.error.message });
+      throw dbFailure('Could not read that trip.', found.error);
     }
     if (found.data === null || found.data.traveler_id !== traveler.id) {
       throw new NotFoundError('That trip does not exist.', 'TRIP_NOT_FOUND');
@@ -165,9 +154,7 @@ async function resolveTrip(
     .select('id')
     .single();
   if (created.error !== null || created.data === null) {
-    throw new DatabaseError('Could not create a trip for that flight.', {
-      detail: created.error?.message ?? 'insert returned no row',
-    });
+    throw dbFailure('Could not create a trip for that flight.', created.error);
   }
   return { tripId: created.data.id, created: true };
 }
@@ -182,7 +169,7 @@ async function nextSequenceNumber(supabase: Client, tripId: string): Promise<num
     .limit(1)
     .maybeSingle();
   if (last.error !== null) {
-    throw new DatabaseError('Could not read that trip.', { detail: last.error.message });
+    throw dbFailure('Could not read that trip.', last.error);
   }
   return last.data === null ? 1 : last.data.sequence_number + 1;
 }
@@ -202,14 +189,18 @@ interface InsertedSegment {
  */
 async function insertSegment(
   supabase: Client,
-  tripId: string,
+  trip: ResolvedTrip,
   flightId: string,
   posted: FlightCandidate,
 ): Promise<InsertedSegment> {
+  const { tripId } = trip;
   let lastError = 'sequence_number contention';
 
   for (let attempt = 0; attempt < SEQUENCE_ATTEMPTS; attempt += 1) {
-    const sequenceNumber = await nextSequenceNumber(supabase, tripId);
+    // A trip this request just created has no segments, so the first try
+    // needs no read; a retry means somebody else added one.
+    const sequenceNumber =
+      attempt === 0 && trip.created ? 1 : await nextSequenceNumber(supabase, tripId);
     const inserted = await supabase
       .from('trip_segments')
       .insert({
@@ -227,9 +218,7 @@ async function insertSegment(
       return { segmentId: inserted.data.id, sequenceNumber };
     }
     if (!isUniqueViolation(inserted.error)) {
-      throw new DatabaseError('Could not add that flight to your trip.', {
-        detail: inserted.error?.message ?? 'insert returned no row',
-      });
+      throw dbFailure('Could not add that flight to your trip.', inserted.error);
     }
     lastError = `sequence_number ${sequenceNumber} taken`;
   }
@@ -259,13 +248,14 @@ async function discardTrip(
 
 // ----------------------------------------------------------------- routes ---
 
+/** Registered under the `/v1` prefix (`app.ts`). */
 export function registerFlightRoutes(app: FastifyInstance, deps: AppDeps): void {
   /**
    * Lookup. Zero candidates is a 404, not an empty 200: "we have no such
    * flight" is a different thing for the UI to say than "here are none of
    * the many", and it is the branch that offers a manual add (§3.1).
    */
-  app.post('/v1/flights/lookup', async (request): Promise<FlightLookupResponse> => {
+  app.post('/flights/lookup', async (request): Promise<FlightLookupResponse> => {
     requireUser(request);
     const lookup = resolveLookup(request.body, deps.now);
 
@@ -286,7 +276,7 @@ export function registerFlightRoutes(app: FastifyInstance, deps: AppDeps): void 
    * canonical key — so a failure after it leaves nothing to undo except a trip
    * this request created.
    */
-  app.post('/v1/flights', async (request): Promise<AddFlightResponse> => {
+  app.post('/flights', async (request): Promise<AddFlightResponse> => {
     // The caller before the body, like the `onRequest` hook: if a route ever
     // lost the hook, an anonymous body would get a 401 here, not a 400.
     const user = requireUser(request);
@@ -301,7 +291,7 @@ export function registerFlightRoutes(app: FastifyInstance, deps: AppDeps): void 
 
     const trip = await resolveTrip(supabase, traveler, tripId);
     try {
-      const segment = await insertSegment(supabase, trip.tripId, flightId, candidate);
+      const segment = await insertSegment(supabase, trip, flightId, candidate);
       return {
         tripId: trip.tripId,
         segmentId: segment.segmentId,

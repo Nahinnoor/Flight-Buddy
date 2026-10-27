@@ -71,7 +71,7 @@ export interface PostgrestErrorLike {
 }
 
 /** `unique_violation`. Both "ensure" paths below race on this and recover. */
-export const UNIQUE_VIOLATION = '23505';
+const UNIQUE_VIOLATION = '23505';
 
 /** True when Postgres refused a write because the row already exists. */
 export function isUniqueViolation(error: PostgrestErrorLike | null): boolean {

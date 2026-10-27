@@ -12,4 +12,4 @@ export { type AppDeps } from './deps';
 export { ConfigError, loadConfig, parseConfig, type Config } from './config';
 export { createTokenVerifier, type AuthUser, type TokenVerifier } from './auth';
 export { type ApiErrorBody } from './errors';
-export { type MeResponse } from './routes/me';
+export { type MeResponse } from './identity';
