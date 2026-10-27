@@ -13,6 +13,7 @@ import type { TokenVerifier } from './auth';
 import type { Config } from './config';
 import type { Client, UserClientFactory } from './supabase';
 
+/** Filled in by `resolveDeps` in `app.ts`; the flight routes receive it whole. */
 export interface AppDeps {
   config: Config;
   /** AeroDataBox in production; a fixture-backed fake in tests. */

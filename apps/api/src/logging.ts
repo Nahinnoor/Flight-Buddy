@@ -15,10 +15,12 @@
  */
 import type { FastifyRequest } from 'fastify';
 
+/** What a webhook URL is replaced with in every log line. */
 export const REDACTED_WEBHOOK_URL = '[redacted webhook path]';
 
 const WEBHOOK_MENTION = /webhook/i;
 
+/** `url` percent-decoded, so `redactUrl` also catches an escaped "webhook". */
 function decoded(url: string): string {
   try {
     return decodeURIComponent(url);
@@ -35,6 +37,10 @@ function redactUrl(url: string): string {
     : url;
 }
 
+/**
+ * Fastify's `req` log serializer, installed by `buildApp`. Runs for every
+ * request log line, matched route or not, with the URL passed through `redactUrl`.
+ */
 export function serializeRequest(request: FastifyRequest): {
   method: string;
   url: string;

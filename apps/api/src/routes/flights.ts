@@ -125,6 +125,10 @@ interface ResolvedTrip {
   created: boolean;
 }
 
+/**
+ * The trip `POST /v1/flights` appends to: the caller's own `tripId` if given,
+ * otherwise a new trip for their self-traveller.
+ */
 async function resolveTrip(
   supabase: Client,
   traveler: TravelerView,

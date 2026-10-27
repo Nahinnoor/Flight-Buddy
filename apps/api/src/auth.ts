@@ -47,6 +47,7 @@ export interface AuthUser {
   email: string | null;
 }
 
+/** Resolves to the caller for a valid access token; throws `UnauthorizedError` otherwise. */
 export type TokenVerifier = (token: string) => Promise<AuthUser>;
 
 interface TokenVerifierOptions {
@@ -96,6 +97,7 @@ export function createTokenVerifier(options: TokenVerifierOptions): TokenVerifie
     options.jwtSecret === undefined ? null : new TextEncoder().encode(options.jwtSecret);
   const verifyOptions = { issuer, audience: AUDIENCE, clockTolerance: CLOCK_TOLERANCE_SECONDS };
 
+  /** Verify one bearer token. Run by the `/v1` `onRequest` hook on every request. */
   return async function verifyToken(token: string): Promise<AuthUser> {
     let algorithm: string;
     try {
@@ -173,7 +175,8 @@ interface AuthenticateDeps {
 }
 
 /**
- * Build the `onRequest` hook that guards every `/v1` route.
+ * Build the `onRequest` hook that guards every `/v1` route. `buildApp`
+ * installs it once, on the plugin that owns the `/v1` prefix.
  *
  * Throws `UnauthorizedError` (401) for a missing, malformed, unverifiable or
  * expired token. It never falls through to an anonymous request: a route that
@@ -182,6 +185,7 @@ interface AuthenticateDeps {
  * caller's body never is.
  */
 export function createAuthenticate(deps: AuthenticateDeps) {
+  /** The hook itself: sets `request.user` and `request.supabase`, or throws 401. */
   return async function authenticate(request: FastifyRequest): Promise<void> {
     const token = bearerToken(request.headers.authorization);
     const user = await deps.verifyToken(token);

@@ -9,6 +9,7 @@
  */
 import type { FastifyInstance } from 'fastify';
 
+/** Registered at the root by `buildApp`, outside the authenticated `/v1` plugin. */
 export function registerHealthRoutes(app: FastifyInstance): void {
   app.get('/healthz', async () => ({ status: 'ok' as const }));
 }

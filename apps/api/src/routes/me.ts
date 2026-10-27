@@ -1,9 +1,10 @@
 /**
  * `GET /v1/me` — who the caller is, creating them if this is their first call.
  *
- * The client treats this as "sign-in finished, give me my identity". It is the
- * only place a `profiles` row is repaired when the auth trigger did not run,
- * and the place a self-`travelers` row is born (ADR 0001).
+ * The client treats this as "sign-in finished, give me my identity". This and
+ * `POST /v1/flights` (both via `ensureIdentity`) are where a `profiles` row is
+ * repaired when the auth trigger did not run, and where a self-`travelers` row
+ * is born (ADR 0001).
  *
  * Idempotent, including under the concurrent-first-request race — see
  * `identity.ts` for why the insert is allowed to fail.

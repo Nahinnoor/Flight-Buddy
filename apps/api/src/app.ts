@@ -39,6 +39,7 @@ interface LogStream {
 /** Header the platform (and the mobile client) may set to correlate a request. */
 const REQUEST_ID_HEADER = 'x-request-id';
 
+/** `CORS_ORIGIN` as `@fastify/cors` wants it: `true` for `*`, else the listed origins. */
 function corsOrigin(value: string): true | string[] {
   const trimmed = value.trim();
   if (trimmed === '*') return true;
@@ -68,6 +69,11 @@ function resolveDeps(options: BuildAppOptions): AppDeps {
   };
 }
 
+/**
+ * Assemble the Fastify app: logging, error handler, CORS, `/healthz`, the
+ * authenticated `/v1` routes and, if configured, the webhook receiver.
+ * Called by `server.ts` at boot and by every test.
+ */
 export function buildApp(options: BuildAppOptions): FastifyInstance {
   const deps = resolveDeps(options);
 

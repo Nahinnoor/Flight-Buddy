@@ -8,6 +8,10 @@
 import { buildApp } from './app';
 import { ConfigError, loadConfig } from './config';
 
+/**
+ * Boot the API: run once when the process starts (`npm start` / Render).
+ * Installs the SIGINT/SIGTERM drain, then opens the socket.
+ */
 async function main(): Promise<void> {
   const config = loadConfig();
   const app = buildApp({ config });

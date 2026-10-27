@@ -195,6 +195,7 @@ export const MAX_LOGGED_KEYS = 10;
  */
 const SAFE_KEY = /^[A-Za-z_$][A-Za-z0-9_$-]{0,39}$/;
 
+/** `key` if it matches `SAFE_KEY`, else `[key]`. Used by every rejection log line. */
 export function safeKey(key: string): string {
   return SAFE_KEY.test(key) ? key : '[key]';
 }
@@ -310,6 +311,7 @@ function droppedMetaFields(input: unknown, envelope: WebhookEnvelope): string[] 
 
 // ----------------------------------------------------------------- token ---
 
+/** SHA-256 digest of a UTF-8 string, for the token comparison. */
 function sha256(value: string): Buffer {
   return createHash('sha256').update(value, 'utf8').digest();
 }
@@ -368,6 +370,10 @@ export function createWebhookRoutes(options: WebhookRouteOptions) {
   const limiter = createFixedWindowLimiter({ ...WEBHOOK_RATE_LIMIT, now: options.now });
   let tokenRejections = 0;
 
+  /**
+   * The route's `onRequest` hook: token check (→ 404), then rate limit (→ 429),
+   * both before the body is read. `undefined` lets the request through.
+   */
   async function guard(
     request: FastifyRequest<WebhookRoute>,
     reply: FastifyReply<WebhookRoute>,
@@ -390,6 +396,7 @@ export function createWebhookRoutes(options: WebhookRouteOptions) {
     return undefined;
   }
 
+  /** The plugin body Fastify runs on `register`: parser, error handler and the POST route. */
   return async function webhookRoutes(instance: FastifyInstance): Promise<void> {
     // JSON only. Content-type parsers are encapsulated, so this affects this
     // plugin alone; Fastify's default JSON parser stays.

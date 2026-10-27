@@ -21,6 +21,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import type { Config } from './config';
 
+/** A Supabase client typed against our schema; both kinds below are one of these. */
 export type Client = SupabaseClient<Database>;
 
 /** Builds a user-scoped client from one access token. */
@@ -70,7 +71,10 @@ export interface PostgrestErrorLike {
   hint?: string | undefined;
 }
 
-/** `unique_violation`. Both "ensure" paths below race on this and recover. */
+/**
+ * `unique_violation`. The get-or-create in `identity.ts` and the segment insert
+ * in `routes/flights.ts` race on this and recover.
+ */
 const UNIQUE_VIOLATION = '23505';
 
 /** True when Postgres refused a write because the row already exists. */

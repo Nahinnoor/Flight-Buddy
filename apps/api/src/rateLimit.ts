@@ -41,12 +41,17 @@ interface Window {
   count: number;
 }
 
+/** Reject a bad limiter option at construction (boot), not on the first request. */
 function assertPositiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value < 1) {
     throw new RangeError(`${name} must be a positive integer`);
   }
 }
 
+/**
+ * Build one limiter. `createWebhookRoutes` calls this once per app, keyed on
+ * `request.ip`, for the webhook receiver's per-IP limit.
+ */
 export function createFixedWindowLimiter(options: FixedWindowLimiterOptions): FixedWindowLimiter {
   const { limit, windowMs, maxKeys, now } = options;
   assertPositiveInteger('limit', limit);
@@ -58,6 +63,7 @@ export function createFixedWindowLimiter(options: FixedWindowLimiterOptions): Fi
 
   const expired = (window: Window, nowMs: number): boolean => nowMs - window.startMs >= windowMs;
 
+  /** Free a slot for a new key at the `maxKeys` bound: expired windows first, then the oldest. */
   function makeRoom(nowMs: number): void {
     for (const [key, window] of windows) {
       if (expired(window, nowMs)) windows.delete(key);

@@ -66,6 +66,7 @@ function fallbackDisplayName(email: string | null): string {
   return local === '' ? 'Traveller' : local;
 }
 
+/** A `profiles` row as the API returns it. Used by `ensureProfile`. */
 function toProfile(row: Omit<Tables['profiles']['Row'], 'expo_push_token'>): ProfileView {
   return {
     id: row.id,
@@ -76,6 +77,7 @@ function toProfile(row: Omit<Tables['profiles']['Row'], 'expo_push_token'>): Pro
   };
 }
 
+/** A `travelers` row as the API returns it, without invite contacts. Used by `ensureSelfTraveler`. */
 function toTraveler(
   row: Omit<Tables['travelers']['Row'], 'invite_email' | 'invite_phone'>,
 ): TravelerView {

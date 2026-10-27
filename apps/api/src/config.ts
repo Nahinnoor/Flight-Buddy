@@ -23,6 +23,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 /** Pino levels, so `LOG_LEVEL` cannot be a string Fastify will reject at boot. */
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 
+/** Every environment variable the API reads, with its default; `parseConfig` applies it at boot. */
 export const configSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
   HOST: z.string().min(1).default('0.0.0.0'),
