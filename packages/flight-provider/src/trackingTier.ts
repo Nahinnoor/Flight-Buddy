@@ -59,6 +59,7 @@ export interface FeedHealthCache {
   get(icao: string, provider: FlightDataProvider): Promise<FeedHealth>;
   /** Entries currently held, expired ones excluded. Testing and metrics. */
   size(): number;
+  /** Drops every entry and forgets pending fetches. Tests only. */
   clear(): void;
 }
 
@@ -67,6 +68,10 @@ interface CacheEntry {
   expiresAt: number;
 }
 
+/**
+ * Build a `FeedHealthCache`. `lookup.ts` keeps one per process by default; the
+ * poller's `main.ts` builds its own and passes it to every `lookupCandidates`.
+ */
 export function createFeedHealthCache(options: FeedHealthCacheOptions = {}): FeedHealthCache {
   const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
   const now = options.now ?? Date.now;
@@ -74,6 +79,7 @@ export function createFeedHealthCache(options: FeedHealthCacheOptions = {}): Fee
   // Concurrent adds for the same airport share one request rather than racing.
   const inFlight = new Map<string, Promise<FeedHealth>>();
 
+  /** The unexpired entry for `key`, or `null`; deletes it on the way out if expired. */
   function live(key: string): FeedHealth | null {
     const entry = entries.get(key);
     if (entry === undefined) return null;

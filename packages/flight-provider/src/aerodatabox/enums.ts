@@ -87,7 +87,8 @@ export const enumWireSchema = z.union([z.string(), z.number()]);
 export type EnumWire = z.infer<typeof enumWireSchema>;
 
 /**
- * The string name for a wire value.
+ * The string name for a wire value. `parseAlertDelivery` calls it for every
+ * enum field in a webhook delivery.
  *
  * - A string is returned unchanged; whether it is a known name is the mapper's
  *   business (an unknown one degrades to `unknown` there, as for a lookup).

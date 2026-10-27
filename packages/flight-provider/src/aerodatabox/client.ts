@@ -51,7 +51,10 @@ const DEFAULT_HOST = 'aerodatabox.p.rapidapi.com';
 const DEFAULT_TIMEOUT_MS = 10_000;
 const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Shape AND calendar validity — `2026-02-30` must never reach the provider. */
+/**
+ * Shape AND calendar validity — `2026-02-30` must never reach the provider.
+ * The test behind `requireLocalDate`.
+ */
 export function isLocalDate(value: string): boolean {
   if (!LOCAL_DATE.test(value)) return false;
   const [y, m, d] = value.split('-').map(Number) as [number, number, number];
@@ -59,7 +62,10 @@ export function isLocalDate(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
-/** Throws a `ProviderDataError` unless `dateLocal` is a real `YYYY-MM-DD` date. */
+/**
+ * Throws a `ProviderDataError` unless `dateLocal` is a real `YYYY-MM-DD` date.
+ * Run by `lookupCandidates` and `lookupFlight` before any request is made.
+ */
 export function requireLocalDate(dateLocal: string): void {
   if (!isLocalDate(dateLocal)) {
     throw new ProviderDataError(`"${dateLocal}" is not a YYYY-MM-DD date.`);
@@ -96,6 +102,7 @@ function isWebhookUrl(value: string): boolean {
   }
 }
 
+/** A provider subscription as the domain's `AlertSubscription`; used by `listSubscriptions`. */
 function toAlertSubscription(raw: AeroDataBoxSubscription): AlertSubscription {
   return {
     subscriptionId: raw.id,
@@ -105,17 +112,23 @@ function toAlertSubscription(raw: AeroDataBoxSubscription): AlertSubscription {
   };
 }
 
+/** What `request` hands back: status, full body text and any `Retry-After`. */
 interface RawResponse {
   status: number;
   body: string;
   retryAfterSeconds: number | undefined;
 }
 
+/** A provider feed status as a `FeedStatus`; anything unrecognised is `Unknown`. */
 function normaliseFeedStatus(value: string | null | undefined): FeedStatus {
   const found = FEED_STATUSES.find((status) => status === value);
   return found ?? 'Unknown';
 }
 
+/**
+ * The provider's feeds response as `FeedHealth`, for `getAirportFeedHealth`.
+ * `raw` is `null` when the airport is not carried, which reads as no coverage.
+ */
 function toFeedHealth(icao: string, raw: AeroDataBoxAirportFeeds | null): FeedHealth {
   const schedules = normaliseFeedStatus(raw?.flightSchedulesFeed?.status);
   const liveUpdates = normaliseFeedStatus(raw?.liveFlightUpdatesFeed?.status);
@@ -133,7 +146,8 @@ function toFeedHealth(icao: string, raw: AeroDataBoxAirportFeeds | null): FeedHe
 }
 
 /**
- * Build a provider bound to one API key.
+ * Build a provider bound to one API key. The API's `app.ts` and the poller's
+ * `main.ts` each build one at startup.
  *
  * @example
  * const provider = createAeroDataBoxProvider({ apiKey: process.env.RAPIDAPI_KEY! });
@@ -148,6 +162,10 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
   const doFetch = options.fetch ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
+  /**
+   * One HTTP call to the gateway with the RapidAPI headers and timeout. Every
+   * method below goes through it; it throws only for timeouts and network errors.
+   */
   async function request(
     path: string,
     init: { method?: string; json?: unknown } = {},
@@ -212,6 +230,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
     }
   }
 
+  /** The body as JSON, or a `ProviderDataError` that keeps the body only under `policy`. */
   function parseJson(path: string, raw: RawResponse, policy: BodyPolicy = KEEP_BODY): unknown {
     try {
       return JSON.parse(raw.body);
@@ -241,6 +260,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
   }
 
   return {
+    /** `GET /flights/number/...`: every leg, mapped. Reached through `lookupCandidates`. */
     async lookupFlight(number: string, dateLocal: string): Promise<FlightCandidate[]> {
       const designator = requireDesignator(number);
       requireLocalDate(dateLocal);
@@ -278,6 +298,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       return candidates;
     },
 
+    /** `GET /health/services/airports/{icao}/feeds`. Reached through `FeedHealthCache`. */
     async getAirportFeedHealth(icao: string): Promise<FeedHealth> {
       const code = icao.trim().toUpperCase();
       if (!/^[A-Z0-9]{4}$/.test(code)) {
@@ -301,6 +322,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
     // Every call here uses `SECRET_BEARING`: no response body and no zod cause is
     // ever attached to an error, and the webhook URL never appears in a message.
 
+    /** `POST /subscriptions/webhook/FlightByNumber/...`. The poller calls it at window opening. */
     async subscribeAlerts(
       flightNumber: string,
       url: string,
@@ -321,7 +343,8 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       }
 
       // Subscriptions carry no date: one subscription fires for every occurrence
-      // of the number, which is why §7.6 opens them at T-24h.
+      // of the number, which is why §7.6 opens them about a day out, once the
+      // previous day's occurrence has landed (ADR 0005), never at add time.
       // No `useCredits` query parameter: the current spec lists none and credit-based
       // is the default (docs/api-samples/webhook-notification-schema.md).
       const path = `/subscriptions/webhook/FlightByNumber/${encodeURIComponent(designator.designator)}`;
@@ -335,6 +358,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       return { subscriptionId: created.id };
     },
 
+    /** `DELETE /subscriptions/webhook/{id}`. Called by the poller's unsubscribe and reconcile. */
     async unsubscribeAlerts(subscriptionId: string): Promise<void> {
       if (!subscriptionIdSchema.safeParse(subscriptionId).success) {
         throw new ProviderDataError('A subscription id must be a GUID.');
@@ -346,6 +370,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       assertOk(path, raw, SECRET_BEARING);
     },
 
+    /** `GET /subscriptions/webhook`. The poller's hourly reconcile reads it. */
     async listSubscriptions(): Promise<AlertSubscription[]> {
       const path = '/subscriptions/webhook';
       const raw = await request(path);
@@ -361,6 +386,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       return parseBody(subscriptionListSchema, path, raw, SECRET_BEARING).map(toAlertSubscription);
     },
 
+    /** `GET /subscriptions/balance` (free). The poller's hourly credit check (§7.7). */
     async getCreditBalance(): Promise<number> {
       const path = '/subscriptions/balance';
       const raw = await request(path);
@@ -375,6 +401,7 @@ export function createAeroDataBoxProvider(options: AeroDataBoxOptions): FlightDa
       return parseBody(balanceSchema, path, raw).creditsRemaining;
     },
 
+    /** `POST /subscriptions/balance/refill`. Not called by code (ADR 0003): the owner refills. */
     async refillCredits(credits: number): Promise<number> {
       if (!Number.isInteger(credits) || credits < 1) {
         throw new ProviderDataError(`Refill needs a positive whole number of credits.`);

@@ -41,6 +41,7 @@ export interface LookupOptions {
 /** A rate limiter that is merely busy clears in well under a second. */
 const FEED_HEALTH_RETRY_DELAY_MS = 1_100;
 
+/** Resolve after `ms`; the wait before the feed-health retry. */
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -84,6 +85,9 @@ async function fetchHealthWithRetry(
 /**
  * Look up every leg a flight number operates on a date.
  *
+ * Called by the API's lookup and add-flight routes (`apps/api/src/routes/flights.ts`)
+ * and by the poller on every poll and webhook confirmation (`services/poller`).
+ *
  * Returns an empty array when the provider has no such flight — that is a 404
  * at the API edge and the prompt to add the flight manually in the UI, not an
  * error here.
@@ -123,6 +127,7 @@ export async function lookupCandidates(
   for (const icao of icaos) {
     health.set(icao, await fetchHealthWithRetry(icao, cache, provider, options));
   }
+  /** The health fetched above for one end of a leg; `null` when unknown. */
   const feedOf = (icao: string | undefined): FeedHealth | null =>
     icao === undefined ? null : (health.get(icao) ?? null);
 

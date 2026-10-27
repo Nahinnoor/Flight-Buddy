@@ -57,7 +57,8 @@ import {
 type DeliveryMovement = z.infer<typeof deliveryMovementSchema>;
 
 /**
- * Validate and map one delivery body.
+ * Validate and map one delivery body. The poller's webhook-ingest job calls it
+ * on each `webhook_inbox` row before anything is written.
  *
  * @param payload The JSON body, already parsed (an inbox row's `payload`).
  * @throws ProviderDataError when the body does not match the contract.
@@ -69,9 +70,11 @@ export function parseAlertDelivery(payload: unknown): AlertDelivery {
   }
 
   const unrecognised: string[] = [];
+  /** `enumName`, recording `field` in `unrecognised` when the value is out of table. */
   const name = (table: readonly string[], value: EnumWire, field: string): string =>
     enumName(table, value, () => unrecognised.push(field));
 
+  /** A delivery movement with its integer `quality[]` turned back into names. */
   const movement = (value: DeliveryMovement, field: string): AeroDataBoxMovement => {
     const { quality, ...rest } = value;
     if (quality === null || quality === undefined) return { ...rest, quality };

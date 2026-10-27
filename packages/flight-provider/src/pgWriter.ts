@@ -39,6 +39,7 @@ const COALESCE_SET: ReadonlySet<string> = new Set(FLIGHT_COALESCE_COLUMNS);
 /** `jsonb` columns need an explicit cast: `pg` sends every parameter as text. */
 const JSONB_COLUMNS: ReadonlySet<string> = new Set(['raw_payload']);
 
+/** The `$n` placeholder for one column of `FLIGHTS_UPSERT_SQL`, cast to jsonb where needed. */
 function placeholder(column: string, index: number): string {
   return JSONB_COLUMNS.has(column) ? `$${index + 1}::jsonb` : `$${index + 1}`;
 }
@@ -77,7 +78,8 @@ function parameterFor(column: string, value: unknown): unknown {
 }
 
 /**
- * Build the worker's `FlightsWriter`.
+ * Build the worker's `FlightsWriter`. The poller's `main.ts` builds one over its
+ * `pg` pool and hands it to `ingestFlight`.
  *
  * @param query Usually `(text, values) => pool.query(text, values)`.
  */

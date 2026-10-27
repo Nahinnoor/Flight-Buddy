@@ -2,10 +2,10 @@
  * The only writer of `flights` (ADR 0001, §12.7).
  *
  * A flight is a shared real-world fact, not a row belonging to a user (§6.1),
- * so exactly one function writes it, with the service-role key, from values the
- * provider returned. The API calls this and then writes `trip_segments`; the
- * Phase 2 poller calls the same function for status updates and gets the
- * conflict handling for free.
+ * so exactly one function writes it, from values the provider returned (the
+ * API through the service-role key, the worker through its own role; below).
+ * The API calls this and then writes `trip_segments`; the Phase 2 poller calls
+ * the same function for status updates and gets the conflict handling for free.
  *
  * Two rules are enforced here rather than trusted to callers:
  *
@@ -116,10 +116,14 @@ export type FlightUpsertRow = Required<Pick<FlightInsert, (typeof FLIGHT_UPSERT_
  * `createPgFlightsWriter` (`./pgWriter`) is what the worker uses.
  */
 export interface FlightsWriter {
+  /** Upsert `row` on the canonical key and resolve to its `flights.id`. */
   upsertFlight(row: FlightUpsertRow): Promise<{ id: string }>;
 }
 
-/** True for a `FlightsWriter`, false for a `SupabaseClient`. */
+/**
+ * True for a `FlightsWriter`, false for a `SupabaseClient`: how `ingestFlight`
+ * picks its transport.
+ */
 function isFlightsWriter(
   target: SupabaseClient<Database> | FlightsWriter,
 ): target is FlightsWriter {
@@ -129,7 +133,7 @@ function isFlightsWriter(
 export interface IngestOptions {
   /**
    * The provider response to keep for debugging. Defaults to the candidate,
-   * which is the normalised form of it. The poller passes the raw body.
+   * which is the normalised form of it; every current caller takes the default.
    */
   rawPayload?: unknown;
   /** Injected for tests. Defaults to the wall clock. */
@@ -162,7 +166,7 @@ export type FlightUpsertPayload = Omit<FlightUpsertRow, FlightCoalesceColumn> &
 
 /**
  * `row` minus every `FLIGHT_COALESCE_COLUMNS` column whose value is `null`: the
- * coalesce rule, in PostgREST terms.
+ * coalesce rule, in PostgREST terms. Used by `createSupabaseFlightsWriter`.
  *
  * PostgREST has no `coalesce` in an upsert; it inserts and, on conflict, updates
  * exactly the keys of a single-object payload (supabase-js sends no `columns`
@@ -206,6 +210,9 @@ export function createSupabaseFlightsWriter(supabase: SupabaseClient<Database>):
 
 /**
  * Upsert one candidate leg into `flights` and return its id.
+ *
+ * Called by the API's add-flight route, and by the poller after every poll and
+ * every accepted webhook leg.
  *
  * Every column written is a value the provider returned, plus `raw_payload`,
  * `updated_at` and `archived_at = null`. Scheduling, lease and webhook columns

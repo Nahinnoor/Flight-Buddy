@@ -32,7 +32,10 @@ export type FeedStatus = (typeof FEED_STATUSES)[number];
 /** Feed statuses that mean the feed is actually delivering data right now. */
 const UP_STATUSES: ReadonlySet<FeedStatus> = new Set<FeedStatus>(['OK', 'OKPartial', 'Degraded']);
 
-/** True when a feed is up, even if degraded or only covering some flights. */
+/**
+ * True when a feed is up, even if degraded or only covering some flights.
+ * `toFeedHealth` in the AeroDataBox client uses it to set the coverage flags.
+ */
 export function isFeedUp(status: FeedStatus): boolean {
   return UP_STATUSES.has(status);
 }
@@ -137,10 +140,13 @@ export interface AlertDelivery {
  */
 export interface FlightDataProvider {
   /**
+   * Every leg of a flight number on a date. Called through `lookupCandidates`.
+   *
    * @param number Flight designator as the user typed it, e.g. `"DL 1234"`.
    * @param dateLocal Local departure date at the origin, `YYYY-MM-DD` (§6.3).
    */
   lookupFlight(number: string, dateLocal: string): Promise<FlightCandidate[]>;
+  /** One airport's feed health (§7.3). Called through `FeedHealthCache`, never directly. */
   getAirportFeedHealth(icao: string): Promise<FeedHealth>;
   /**
    * Subscribe to alerts for every occurrence of a flight number (§7.6).
@@ -158,6 +164,8 @@ export interface FlightDataProvider {
   unsubscribeAlerts(subscriptionId: string): Promise<void>;
   /** Every subscription on the account; `[]` when there are none. */
   listSubscriptions(): Promise<AlertSubscription[]>;
+  /** Alert credits left; the poller's hourly credit check calls it (§7.7). */
   getCreditBalance(): Promise<number>;
+  /** Add credits and return the new balance. No code calls it: the owner refills by hand. */
   refillCredits(credits: number): Promise<number>;
 }

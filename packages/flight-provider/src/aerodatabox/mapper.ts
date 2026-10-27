@@ -76,6 +76,7 @@ const STATUS_MAP: Readonly<Record<string, FlightStatus>> = {
 /** Provider statuses that mean the aircraft has physically left the gate. */
 const AFTER_DEPARTURE = new Set(['Departed', 'EnRoute', 'Approaching', 'Arrived', 'Diverted']);
 
+/** A provider status string as our `flight_status` (`STATUS_MAP`), for `toFlightCandidate`. */
 export function mapStatus(providerStatus: string | null | undefined): FlightStatus {
   if (providerStatus === null || providerStatus === undefined) return 'unknown';
   return STATUS_MAP[providerStatus] ?? 'unknown';
@@ -104,12 +105,14 @@ export function localDatePart(value: string | null | undefined): string | null {
   return match === null ? null : (match[1] as string);
 }
 
+/** Trimmed text, or `null` for missing or blank. */
 function textOrNull(value: string | null | undefined): string | null {
   if (value === null || value === undefined) return null;
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
 }
 
+/** `textOrNull`, uppercased: airport codes and registrations. */
 function upperOrNull(value: string | null | undefined): string | null {
   return textOrNull(value)?.toUpperCase() ?? null;
 }
@@ -190,6 +193,10 @@ interface ResolvedAirport {
   countryCode: string | null;
 }
 
+/**
+ * One end of a leg as the candidate needs it, for `toFlightCandidate`. Throws
+ * `ProviderDataError` when the IATA code or time zone is missing.
+ */
 function resolveAirport(
   movement: AeroDataBoxMovement | null | undefined,
   side: 'departure' | 'arrival',
@@ -217,7 +224,9 @@ function resolveAirport(
 }
 
 /**
- * Turn one provider flight into one candidate leg.
+ * Turn one provider flight into one candidate leg. Used by the client's
+ * `lookupFlight` for each lookup element and by `parseAlertDelivery` for each
+ * webhook item, so both paths produce the same candidate (§8.2).
  *
  * @param raw One element of the `/flights/number/...` array.
  * @param typedNumber The designator the user typed, e.g. `"dl 9659"`. It

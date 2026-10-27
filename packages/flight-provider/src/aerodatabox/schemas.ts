@@ -39,6 +39,7 @@ export const airportSchema = z.looseObject({
   timeZone: z.string().nullish(),
 });
 
+/** One end of a flight (`departure` or `arrival`): airport, times, gate, terminal. */
 export const movementSchema = z.looseObject({
   airport: airportSchema.nullish(),
   scheduledTime: dateTimeSchema.nullish(),
@@ -61,6 +62,7 @@ export const airlineSchema = z.looseObject({
   icao: z.string().nullish(),
 });
 
+/** One leg of the lookup response (`FlightContract`); what `toFlightCandidate` maps. */
 export const flightSchema = z.looseObject({
   number: z.string(),
   callSign: z.string().nullish(),
