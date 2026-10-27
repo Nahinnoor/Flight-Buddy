@@ -287,9 +287,11 @@ export function registerFlightRoutes(app: FastifyInstance, deps: AppDeps): void 
    * this request created.
    */
   app.post('/v1/flights', async (request): Promise<AddFlightResponse> => {
-    const { candidate, tripId } = addFlightRequestSchema.parse(request.body);
+    // The caller before the body, like the `onRequest` hook: if a route ever
+    // lost the hook, an anonymous body would get a 401 here, not a 400.
     const user = requireUser(request);
     const supabase = requireUserClient(request);
+    const { candidate, tripId } = addFlightRequestSchema.parse(request.body);
 
     const { traveler } = await ensureIdentity(supabase, user.id, user.email);
     const fresh = await reverifyCandidate(deps, candidate, request.log);
