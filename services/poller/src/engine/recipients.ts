@@ -46,7 +46,8 @@
 
 /**
  * Recipient rules over the `inserted` CTE (the new `flight_events` rows).
- * `$notifyParam` is a `text[]` of notifying event types.
+ * `$notifyParam` is a `text[]` of notifying event types. Spliced into the event
+ * insert by `buildInsertEventsSql` (`repository.ts`).
  */
 export function recipientsCte(notifyParam: string): string {
   return `recipients as (

@@ -66,6 +66,7 @@
  * representative ticket and token hash (its earliest `sent`/`delivered` device's).
  */
 
+/** Every `notification_deliveries.status`, matching the migration's check constraint. */
 export const DELIVERY_STATUSES = [
   'pending',
   'sending',
@@ -124,7 +125,7 @@ export const MAX_CRITICAL_DELIVERY_AGE_MS = 48 * 60 * 60_000;
 /** Event types that get `MAX_CRITICAL_DELIVERY_AGE_MS` instead of the short window. */
 export const CRITICAL_EVENT_TYPES: ReadonlySet<string> = new Set(['cancelled', 'diverted']);
 
-/** How old an event may be and still be sent. */
+/** How old an event may be and still be sent. Checked by `push-send` per claimed delivery. */
 export function maxDeliveryAgeMs(eventType: string): number {
   return CRITICAL_EVENT_TYPES.has(eventType) ? MAX_CRITICAL_DELIVERY_AGE_MS : MAX_DELIVERY_AGE_MS;
 }
@@ -138,7 +139,8 @@ export const RECEIPT_RETENTION_MS = 24 * 60 * 60_000;
 /**
  * Back-off before the next claim of a row that failed retryably.
  * `attempts` is the count after this attempt: 1 → 1 min, 2 → 2, 3 → 4, 4 → 8,
- * then 15 min. Six attempts span roughly half an hour.
+ * then 15 min. Six attempts span roughly half an hour. Used by `push-send` for a
+ * retried delivery and by `push-receipts` for a MessageRateExceeded requeue.
  */
 export function retryDelayMs(attempts: number): number {
   const minutes = Math.min(2 ** Math.max(attempts - 1, 0), 15);

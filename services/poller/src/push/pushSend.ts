@@ -158,8 +158,10 @@ export const LOAD_DELIVERY_FACTS_SQL = `select d.id as delivery_id,
 
 // --- types ------------------------------------------------------------------
 
+/** Reads `flight_events.event_type` back into our event union. */
 const eventTypeSchema = z.enum(FLIGHT_EVENT_TYPES);
 
+/** A row from `LOAD_DELIVERY_FACTS_SQL`. */
 interface FactsRow {
   delivery_id: string;
   user_id: string;
@@ -186,6 +188,7 @@ interface FactsRow {
   marketing_flight_number: string | null;
 }
 
+/** A row from `LOAD_SENDABLE_DEVICES_SQL`. */
 interface DeviceRow {
   delivery_id: string;
   token: string;
@@ -205,6 +208,7 @@ interface ParentOutcome {
   notBefore: Date;
 }
 
+/** What the job needs; `main()` builds it once at startup. */
 export interface PushSendDeps {
   pool: Pool;
   expo: ExpoPushClient;
@@ -239,6 +243,7 @@ export interface PushSendSummary {
   leaseLost: number;
 }
 
+/** All-zero counters, at the start of each `runPushSend`. */
 function emptySummary(): PushSendSummary {
   return {
     claimed: 0,
@@ -255,6 +260,10 @@ function emptySummary(): PushSendSummary {
   };
 }
 
+/**
+ * One facts row as `MessageFacts`, or `null` when its event type or flight status
+ * is not one we know (the delivery then closes `UnbuildableMessage`). Used by `runBatch`.
+ */
 function toFacts(row: FactsRow): MessageFacts | null {
   const eventType = eventTypeSchema.safeParse(row.event_type);
   const status = flightStatusSchema.safeParse(row.status);
@@ -281,7 +290,7 @@ function toFacts(row: FactsRow): MessageFacts | null {
   };
 }
 
-/** Build a push message. Exported for the operator path and tests. */
+/** Build a push message. Used per device by `runBatch`; exported for the operator path and tests. */
 export function toExpoMessage(
   token: string,
   copy: { title: string; body: string; data: Record<string, string> },
@@ -299,6 +308,7 @@ export function toExpoMessage(
   };
 }
 
+/** Write every claimed delivery's status from its device rows: the last step of `runBatch`. */
 async function finalize(pool: Pool, outcomes: readonly ParentOutcome[]): Promise<void> {
   if (outcomes.length === 0) return;
   await pool.query({
@@ -316,6 +326,7 @@ async function finalize(pool: Pool, outcomes: readonly ParentOutcome[]): Promise
   });
 }
 
+/** One message ready to go: its delivery row, the device, and the built message. */
 interface Outgoing {
   row: FactsRow;
   token: string;
@@ -331,7 +342,10 @@ function failedSend(deliveryId: string, tokenSha256: string, error: string): Dev
 /** Per delivery: the retryable failure codes of its devices this attempt. */
 type RetryCodes = Map<string, string[]>;
 
-/** `{ DeviceNotRegistered: 2, … }`: codes and counts, the only shape logged. */
+/**
+ * `{ DeviceNotRegistered: 2, … }`: codes and counts, the only shape logged. Also
+ * used by `push-receipts` and the operator push.
+ */
 export function countCodes(codes: readonly string[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const code of codes) counts[code] = (counts[code] ?? 0) + 1;
@@ -341,7 +355,8 @@ export function countCodes(codes: readonly string[]): Record<string, number> {
 /**
  * Write one request's device outcomes, then invalidate its dead devices. A row
  * the insert did not write (another sender recorded this device first) is not
- * acted on.
+ * acted on. Called by `runBatch` after each Expo request, and once for devices
+ * that could not be sent to at all.
  */
 async function recordChunk(
   deps: PushSendDeps,
@@ -370,7 +385,8 @@ async function recordChunk(
 
 /**
  * A device whose send failed retryably: retried with its delivery while
- * attempts remain, else closed as its own `failed` row with `code`.
+ * attempts remain, else closed as its own `failed` row with `code`. Called by
+ * `runBatch` for a failed request and for a MessageRateExceeded ticket.
  */
 function retryOrCloseDevice(
   item: Outgoing,
@@ -390,7 +406,10 @@ function retryOrCloseDevice(
   summary.retrying += 1;
 }
 
-/** One claim → send → record cycle. Returns how many rows it claimed. */
+/**
+ * One claim → send → record cycle. Returns how many rows it claimed. Called by
+ * `runPushSend` until a batch comes back short or `MAX_BATCHES_PER_RUN` is hit.
+ */
 async function runBatch(
   deps: PushSendDeps,
   summary: PushSendSummary,
@@ -660,7 +679,8 @@ async function runBatch(
  * One run: close exhausted interrupted sends, then send in batches of ≤ 100
  * deliveries (≤ 100 messages per Expo request) until nothing is left or
  * `MAX_BATCHES_PER_RUN` is reached (the next run, a minute later at most,
- * continues).
+ * continues). Runs every minute and on each wake-up, through
+ * `createPushSendHandler`.
  *
  * @throws on a database failure; pg-boss records the job failed and the next
  *   minute's sweep runs again. Expo failures never throw: they become row states.
@@ -703,7 +723,10 @@ export async function runPushSend(deps: PushSendDeps): Promise<PushSendSummary> 
   return summary;
 }
 
-/** The pg-boss handler for `push-send` (scheduled sweep and on-demand wake-ups). */
+/**
+ * The pg-boss handler `main.ts` registers for `push-send` (the every-minute sweep
+ * and the on-demand wake-ups from `onDeliveriesCreated`).
+ */
 export function createPushSendHandler(deps: PushSendDeps) {
   return async function handlePushSend(): Promise<void> {
     await runPushSend(deps);

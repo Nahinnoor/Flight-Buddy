@@ -48,6 +48,7 @@ const isPostgresUrl = hasProtocol('postgres:', 'postgresql:');
 /** A parseable `https://` URL. */
 const isHttpsUrl = hasProtocol('https:');
 
+/** Every variable the worker reads, with its validation and default. */
 export const configSchema = z.object({
   /**
    * Session-pooler connection string for the `flightbuddy_worker` role. Contains a
@@ -152,9 +153,13 @@ export const configSchema = z.object({
   PROVIDER_RPS: z.coerce.number().positive().max(2).default(1),
 });
 
+/** The validated environment: loaded once in `main()` and passed down from there. */
 export type Config = z.infer<typeof configSchema>;
 
-/** Reads the root `.env` without clobbering anything already in the process. */
+/**
+ * Reads the root `.env` without clobbering anything already in the process.
+ * Called by `loadConfig` at startup, and by the integration tests.
+ */
 export function loadEnvFile(): void {
   loadDotenv({ path: resolve(REPO_ROOT, '.env'), quiet: true });
 }
@@ -172,7 +177,8 @@ export class ConfigError extends Error {
 }
 
 /**
- * Validate `source` (defaults to `process.env`) into a `Config`.
+ * Validate `source` (defaults to `process.env`) into a `Config`. Called by
+ * `loadConfig` at startup; tests pass their own `source`.
  *
  * A variable set to the empty string is treated as unset: `.env.example` ships
  * `WEBHOOK_URL=` style blanks, and "present but empty" is never what anybody meant.
@@ -203,6 +209,8 @@ export function parseConfig(source: NodeJS.ProcessEnv = process.env): Config {
 /**
  * The ADR 0004 backup cadence as the ladder takes it: `undefined` when
  * `WEBHOOK_BACKUP_POLL_MS` is 0, which restores §7.6's "no polling at all".
+ * Read by `tick` on every pass and by `main()` for the inbox drainer, so both
+ * paths schedule a subscribed flight the same way.
  */
 export function webhookBackupIntervalMs(
   config: Pick<Config, 'WEBHOOK_BACKUP_POLL_MS'>,

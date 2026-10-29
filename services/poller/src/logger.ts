@@ -64,14 +64,17 @@ const SENSITIVE_KEYS = [
   'displayName',
 ] as const;
 
+/** pino `redact` paths: every sensitive key at the root, one and two levels deep. */
 export const REDACT_PATHS: string[] = SENSITIVE_KEYS.flatMap((key) => [
   key,
   `*.${key}`,
   `*.*.${key}`,
 ]);
 
+/** What a redacted value is printed as. */
 export const REDACT_CENSOR = '[redacted]';
 
+/** `createLogger`'s settings. */
 export interface LoggerOptions {
   level: Level | 'silent';
   /** Test seam: a stream to write to instead of stdout. */
@@ -79,7 +82,8 @@ export interface LoggerOptions {
 }
 
 /**
- * Build the worker's root logger.
+ * Build the worker's root logger. Called once by `main()` at startup; every job
+ * logs through the instance it is handed.
  *
  * `base` is fixed to a service tag: Render interleaves the API's and the worker's
  * logs in one project view, and `pid`/`hostname` say nothing useful about a

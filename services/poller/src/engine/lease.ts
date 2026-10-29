@@ -44,9 +44,9 @@ export const LEASE_FREE_SQL = `(poll_lease_until is null or poll_lease_until < n
  *
  * The `where` clause is the index `flights_next_poll_at_idx` was built for:
  * `(next_poll_at) where archived_at is null and next_poll_at is not null`.
- * `next_poll_at is null` is the "do not poll" state — a `manual`-tier flight, or
- * (from wave 3) one whose alerts are coming over a webhook — so it must never be
- * claimable.
+ * `next_poll_at is null` is the "do not poll" state — a `manual`-tier flight, an
+ * archived one, or a subscribed flight with the ADR 0004 backup poll disabled —
+ * so it must never be claimable.
  */
 export const CLAIM_DUE_FLIGHTS_SQL = `update public.flights
    set poll_lease_until = ${LEASE_UNTIL_SQL}
@@ -74,6 +74,7 @@ export const RELEASE_LEASE_SQL = `update public.flights
  * `batchSize` is bounded (§7.5 uses 25) because it is one of the three things
  * keeping a crowd of simultaneously due flights from becoming a burst against a
  * 1 req/s limit — the others being the token bucket and the ladder's jitter (§8.3).
+ * Called by `runPollPass` at the start of each tick's poll step.
  *
  * @throws whatever `pg` throws. The caller logs and the pass ends; the lease on
  *   any row this statement did stamp expires by itself.
@@ -104,7 +105,8 @@ export async function claimDueFlights(
  *
  * The loop does not need this — an expiring lease is the design (§8.7) — but a
  * handler that knows it will not poll a flight can return it now instead of
- * leaving it parked for two minutes.
+ * leaving it parked for two minutes. The inbox drain's `applyLeg` does, when
+ * applying a delivered leg throws.
  */
 export async function releaseLease(pool: Pool, flightId: string): Promise<void> {
   await pool.query({ text: RELEASE_LEASE_SQL, values: [flightId], types: ENGINE_TYPES });

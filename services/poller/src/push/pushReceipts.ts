@@ -133,6 +133,7 @@ export const FINALIZE_RECEIPTS_SQL = `update public.notification_device_sends s
    and s.token_sha256 = u.token_sha256
    and s.status = 'sent'`;
 
+/** A device row from `SELECT_AWAITING_RECEIPTS_SQL`, with its delivery's state. */
 interface AwaitingRow {
   delivery_id: string;
   token_sha256: string;
@@ -144,6 +145,7 @@ interface AwaitingRow {
   detected_at: string;
 }
 
+/** What a receipt (or its absence) means for one device row. */
 interface ReceiptOutcome {
   deliveryId: string;
   tokenSha256: string;
@@ -151,6 +153,7 @@ interface ReceiptOutcome {
   error: string | null;
 }
 
+/** What the job needs; `main()` builds it once at startup. */
 export interface PushReceiptsDeps {
   pool: Pool;
   expo: ExpoPushClient;
@@ -179,6 +182,7 @@ export interface PushReceiptsSummary {
  * Device rows, then their deliveries, in **one transaction**: a crash between
  * the two cannot leave a delivery `sent` whose device was set back to `pending`
  * (the receipt job only re-reads `sent` device rows, so nothing would requeue it).
+ * Called by `runPushReceipts` once per batch.
  */
 async function finalize(
   pool: Pool,
@@ -206,6 +210,7 @@ async function finalize(
   }
 }
 
+/** The two statements `finalize` runs in its transaction: device rows, then their deliveries. */
 async function writeReceipts(
   client: Pick<Pool, 'query'>,
   outcomes: readonly ReceiptOutcome[],
@@ -231,7 +236,8 @@ async function writeReceipts(
 
 /**
  * One run. A receipts request that fails leaves its rows untouched for the next
- * run (five minutes) and ends this one.
+ * run (five minutes) and ends this one. Runs every five minutes through
+ * `createPushReceiptsHandler`.
  *
  * @throws on a database failure only.
  */
@@ -390,7 +396,7 @@ export async function runPushReceipts(deps: PushReceiptsDeps): Promise<PushRecei
   return summary;
 }
 
-/** The pg-boss handler for the scheduled `push-receipts` job. */
+/** The pg-boss handler `main.ts` registers for the scheduled `push-receipts` job (every 5 min). */
 export function createPushReceiptsHandler(deps: PushReceiptsDeps) {
   return async function handlePushReceipts(): Promise<void> {
     await runPushReceipts(deps);

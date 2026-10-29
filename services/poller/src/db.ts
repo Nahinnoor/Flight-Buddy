@@ -70,6 +70,7 @@ export interface ConnectionSettings {
  *
  * `pg` lets a `connectionString` overwrite an explicit `ssl` option, so passing
  * both is the one arrangement in which the pinned CA silently does nothing.
+ * Used for both pools: this module's (`poolConfig`) and pg-boss's (`createBoss`).
  */
 export function connectionSettings(config: Config): ConnectionSettings {
   const url = new URL(config.DATABASE_URL);
@@ -89,6 +90,7 @@ export function connectionSettings(config: Config): ConnectionSettings {
   };
 }
 
+/** The worker pool's settings: connection fields plus sizing and timeouts. Used by `createPool`. */
 export function poolConfig(config: Config): PoolConfig {
   return {
     ...connectionSettings(config),
@@ -100,6 +102,7 @@ export function poolConfig(config: Config): PoolConfig {
   };
 }
 
+/** The worker's one `pg` pool, created once in `main()` at startup and shared by every job. */
 export function createPool(config: Config): Pool {
   return new Pool(poolConfig(config));
 }
@@ -108,8 +111,9 @@ export function createPool(config: Config): Pool {
  * Run `fn` with a pooled client and always give it back.
  *
  * `pg` leaks a connection for good if `release()` is skipped on a throw, and with
- * `max: 5` that is five bad passes from a worker that can no longer talk to the
- * database at all.
+ * `max: 3` (`MAX_POOL_CONNECTIONS`) that is three bad passes from a worker that
+ * can no longer talk to the database at all. Used by `ping` and by the webhook
+ * inbox drain, which holds one client per row's transaction.
  */
 export async function withClient<T>(
   pool: Pool,
@@ -123,7 +127,10 @@ export async function withClient<T>(
   }
 }
 
-/** Round-trip to the database. Throws if the pool cannot serve a query. */
+/**
+ * Round-trip to the database. Throws if the pool cannot serve a query. Run once
+ * by `main()` at startup, so a bad connection fails the boot.
+ */
 export async function ping(pool: Pool): Promise<void> {
   await withClient(pool, async (client) => {
     await client.query('select 1');

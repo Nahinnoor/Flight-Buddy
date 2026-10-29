@@ -98,6 +98,7 @@ export interface LadderFlight {
   alert_subscription_id: string | null;
 }
 
+/** Webhook settings for one call, built per pass from config and the credit state. */
 export interface LadderOptions {
   /**
    * `false` (the default) keeps every `live`-tier flight on the failover ladder
@@ -111,7 +112,10 @@ export interface LadderOptions {
   webhookBackupIntervalMs?: number | undefined;
 }
 
-/** Epoch milliseconds for an ISO instant; `null` for `null` or an unparseable string. */
+/**
+ * Epoch milliseconds for an ISO instant; `null` for `null` or an unparseable string.
+ * Shared with the change detector, `subscriptions.ts` and `reconcile.ts`.
+ */
 export function toMs(iso: string | null): number | null {
   if (iso === null) return null;
   const ms = new Date(iso).getTime();
@@ -125,6 +129,9 @@ export function toMs(iso: string | null): number | null {
  * "Estimated if later" and not "estimated whenever present" because an estimate
  * that runs *early* must not pull the cadence forward past the schedule — the
  * aircraft can still leave on time.
+ *
+ * Behind `departureAnchor` / `arrivalAnchor`, and used directly by
+ * `webhookWindowOpensAt` (`subscriptions.ts`) on a fresh provider leg.
  */
 export function anchor(
   scheduled: string | null,
@@ -141,7 +148,7 @@ export function anchor(
   return Math.max(scheduledMs, estimatedMs);
 }
 
-/** The departure instant the ladder is anchored to. */
+/** The departure instant the ladder is anchored to. Read by `ladderIntervalMs`. */
 export function departureAnchor(flight: LadderFlight): number | null {
   return anchor(
     flight.scheduled_departure_utc,
@@ -150,7 +157,7 @@ export function departureAnchor(flight: LadderFlight): number | null {
   );
 }
 
-/** The arrival instant the in-flight bands are anchored to. */
+/** The arrival instant the in-flight bands are anchored to. Read by `ladderIntervalMs`. */
 export function arrivalAnchor(flight: LadderFlight): number | null {
   return anchor(
     flight.scheduled_arrival_utc,
@@ -163,7 +170,8 @@ export function arrivalAnchor(flight: LadderFlight): number | null {
  * Apply ±`JITTER_FRACTION` to an interval.
  *
  * `rng()` in `[0, 1)` maps linearly onto `[0.9, 1.1)` of the interval. Exported so
- * the caller can assert the spread without reimplementing it.
+ * the caller can assert the spread without reimplementing it. Used by
+ * `nextPollAt` and by the poll's failure back-off (`backoffPollAt`).
  */
 export function applyJitter(intervalMs: number, rng: () => number): number {
   const factor = 1 + (rng() * 2 - 1) * JITTER_FRACTION;
@@ -176,7 +184,8 @@ export function applyJitter(intervalMs: number, rng: () => number): number {
  * backup poll disabled.
  *
  * Exported for the tests, which assert the band a boundary instant lands in
- * without having to undo the jitter.
+ * without having to undo the jitter. Called by `nextPollAt`, and by
+ * `backoffPollAt` as the interval a failure doubles.
  */
 export function ladderIntervalMs(
   flight: LadderFlight,
@@ -253,7 +262,9 @@ export function ladderIntervalMs(
 }
 
 /**
- * When to poll this flight next, or `null` to stop polling it.
+ * When to poll this flight next, or `null` to stop polling it. Called after every
+ * successful poll (`pollAndUpdate`) and every applied webhook leg (`applyLeg`),
+ * and by `backoffPollAt` once a flight has failed five times in a row.
  *
  * @param flight The flight as it is *after* the current poll wrote its fresh values.
  * @param now The current instant. Absolute; never derived from a local clock reading.

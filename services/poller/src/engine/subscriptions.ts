@@ -114,6 +114,8 @@ export const WINDOW_OPENS_AFTER_PREVIOUS_LANDING_MS = 30 * 60_000;
  * Built on **scheduled** times: yesterday's flight landing late can still bill us
  * its landing alert (and anything after it). That is an accepted approximation —
  * the previous occurrence's real arrival is not something we track.
+ *
+ * Read by `shouldSubscribe` and `clampToWindowOpening`.
  */
 export function webhookWindowOpensAt(fresh: FlightCandidate): number | null {
   // The ladder's departure anchor.
@@ -137,7 +139,8 @@ export function webhookWindowOpensAt(fresh: FlightCandidate): number | null {
 /**
  * Could this flight ever want a subscription? `live` tier only (§7.3: `scheduled`
  * and `manual` never subscribe), and not once it is over — a cancelled or landed
- * flight has nothing left to alert on.
+ * flight has nothing left to alert on. Checked by `pollAndUpdate` (to close a
+ * subscription a flight no longer needs) and before subscribing.
  */
 export function isSubscribable(fresh: FlightCandidate): boolean {
   return (
@@ -146,8 +149,8 @@ export function isSubscribable(fresh: FlightCandidate): boolean {
 }
 
 /**
- * Should this poll open a subscription now? Pure; the caller checks that webhooks
- * are on.
+ * Should this poll open a subscription now? Pure; the caller (`pollAndUpdate`,
+ * after every successful lookup) checks that webhooks are on.
  *
  * @param currentSubscriptionId The row's `alert_subscription_id`.
  */
@@ -168,7 +171,8 @@ export function shouldSubscribe(
  * Before T-24 h the 48–24 h band polls every 4 h, and after it the failover band
  * polls hourly, so without this a flight would be subscribed up to four hours (or
  * one hour) after the window opens. Only applies to a flight that will want a
- * subscription; everything else keeps the ladder's answer.
+ * subscription; everything else keeps the ladder's answer. Applied by
+ * `pollAndUpdate` to an unsubscribed flight's next poll while webhooks are on.
  */
 export function clampToWindowOpening(next: Date, fresh: FlightCandidate, now: Date): Date {
   if (!isSubscribable(fresh)) return next;
@@ -179,7 +183,8 @@ export function clampToWindowOpening(next: Date, fresh: FlightCandidate, now: Da
 
 /**
  * Subscribe a flight (or join the subscription its operating number already has)
- * and store the id on its row.
+ * and store the id on its row. Called by `pollAndUpdate` once `shouldSubscribe`
+ * says the window is open.
  *
  * @returns the subscription id now on the row, or `null` if anything failed — in
  *   which case the flight stays on the failover ladder and the next poll retries.
@@ -250,6 +255,8 @@ export async function openSubscription(
  * An unsubscribe failure is logged and swallowed — the archive must proceed, and
  * reconcile deletes a subscription no active row claims. A database failure
  * throws, so the caller's poll records a failure and retries the archive.
+ * Called by `pollAndUpdate` at landed + 30 min, or when a flight stops being
+ * subscribable.
  */
 export async function closeSubscription(
   deps: SubscriptionDeps,

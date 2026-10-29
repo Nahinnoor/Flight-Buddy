@@ -44,7 +44,7 @@ export const FLIGHT_EVENT_TYPES = [
 ] as const;
 export type FlightEventType = (typeof FLIGHT_EVENT_TYPES)[number];
 
-/** `flight_events.source`. The poller only ever writes `'poll'`. */
+/** `flight_events.source`: `'poll'` from a poll, `'webhook'` from the inbox drain. */
 export type FlightEventSource = 'poll' | 'webhook';
 
 /** One detected transition, ready to become a `flight_events` row. */
@@ -70,13 +70,15 @@ export type PreviousFlight = Pick<
   | 'actual_arrival_utc'
 >;
 
+/** `detectChanges`'s knobs. */
 export interface DetectChangesOptions {
   /** §9 and PHASE2_PLAN §8.5: "delay over 30 minutes". */
   delayThresholdMinutes?: number;
-  /** Defaults to `'poll'`; wave 3's webhook processor passes `'webhook'`. */
+  /** Defaults to `'poll'`; the inbox drain (`webhookIngest.ts`) passes `'webhook'`. */
   source?: FlightEventSource;
 }
 
+/** §9's "delay over 30 minutes": movement must exceed this to be a `delay` event. */
 export const DEFAULT_DELAY_THRESHOLD_MINUTES = 30;
 
 /** Statuses that mean the aircraft is no longer at the origin gate. */
@@ -87,12 +89,15 @@ const DEPARTED_STATUSES: ReadonlySet<FlightStatus> = new Set<FlightStatus>([
   'landed',
 ]);
 
-/** Off the origin gate: an actual departure time, or a status that says so. */
+/**
+ * Off the origin gate: an actual departure time, or a status that says so. Used
+ * for the `departed` edge here and by the notification policy.
+ */
 export function hasDeparted(status: FlightStatus, actualDeparture: string | null): boolean {
   return actualDeparture !== null || DEPARTED_STATUSES.has(status);
 }
 
-/** Down: an actual arrival time, or `landed`. */
+/** Down: an actual arrival time, or `landed`. Used for the `landed` edge. */
 function hasArrived(status: FlightStatus, actualArrival: string | null): boolean {
   return actualArrival !== null || status === 'landed';
 }
@@ -104,6 +109,7 @@ function hasArrived(status: FlightStatus, actualArrival: string | null): boolean
  * Unlike the ladder's anchor this takes the estimate even when it runs *early* —
  * the question here is "has the number we would show the user moved", and an
  * estimate pulled forward is exactly such a move (it just is not a delay).
+ * Used for the `delay` rule, on both sides of the diff.
  */
 function believedDeparture(
   scheduled: string | null,
@@ -114,7 +120,9 @@ function believedDeparture(
 }
 
 /**
- * Diff a stored flight against a freshly looked-up leg.
+ * Diff a stored flight against a freshly looked-up leg. Called by
+ * `pollAndUpdate` after every successful lookup, and by the inbox drain's
+ * `applyLeg` for every delivered leg (again after a verification poll).
  *
  * @param previous The row as claimed, before this poll's ingest.
  * @param fresh The matching leg the provider just returned.
@@ -132,6 +140,7 @@ export function detectChanges(
   // deterministic and diffable and never holds two events of one type.
   const found: DetectedEvent[] = [];
 
+  /** Append one event, stamped with this call's `source`. */
   const add = (
     type: FlightEventType,
     previousValue: Record<string, unknown> | null,

@@ -16,11 +16,19 @@ import { createHash } from 'node:crypto';
  */
 const EXPO_PUSH_TOKEN = /^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]{1,200}\]$/;
 
+/**
+ * True for a well-formed Expo push token. Checked before any token goes into a
+ * message, by `push-send` and by the operator push.
+ */
 export function isExpoPushToken(value: unknown): value is string {
   return typeof value === 'string' && EXPO_PUSH_TOKEN.test(value);
 }
 
-/** Lower-case hex SHA-256 of the token's UTF-8 bytes, matching the SQL above. */
+/**
+ * Lower-case hex SHA-256 of the token's UTF-8 bytes, the same value as
+ * `push_tokens.token_sha256`. Computed from the token actually sent, by
+ * `push-send` and the operator push.
+ */
 export function pushTokenSha256(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }

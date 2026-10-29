@@ -39,6 +39,7 @@ import { ENGINE_TYPES, type FlightRow } from './types';
 /** Long enough to cover one subscribe (create + store) and one reconcile (list + read). */
 export const RECONCILE_GRACE_MS = 10 * 60_000;
 
+/** Every subscription id an active row claims: what the provider's list is checked against. */
 export const ACTIVE_SUBSCRIPTIONS_SQL = `select id, alert_subscription_id, alert_subscribed_at
   from public.flights
  where archived_at is null
@@ -54,6 +55,7 @@ export const DETACH_SUBSCRIPTION_SQL = `update public.flights
    and archived_at is null
 returning id`;
 
+/** What the job needs; `main()` builds it once at startup. */
 export interface ReconcileDeps {
   pool: Pool;
   provider: FlightDataProvider;
@@ -65,6 +67,7 @@ export interface ReconcileDeps {
   graceMs?: number;
 }
 
+/** What one run did. Logged; the handler ignores it, tests read it. */
 export interface ReconcileResult {
   skipped: boolean;
   listed: number;
@@ -76,12 +79,14 @@ export interface ReconcileResult {
   detached: string[];
 }
 
+/** A row from `ACTIVE_SUBSCRIPTIONS_SQL`. */
 type ClaimRow = Pick<FlightRow, 'id' | 'alert_subscription_id' | 'alert_subscribed_at'>;
 
 /**
  * One reconcile run. A provider failure on the list ends the run quietly (logged);
  * acting on a list we could not read would be acting on nothing. A database
- * failure throws, and pg-boss records the job as failed.
+ * failure throws, and pg-boss records the job as failed. Runs hourly at :20
+ * UTC through `createReconcileHandler`.
  */
 export async function reconcileSubscriptions(deps: ReconcileDeps): Promise<ReconcileResult> {
   const result: ReconcileResult = {
@@ -99,6 +104,7 @@ export async function reconcileSubscriptions(deps: ReconcileDeps): Promise<Recon
 
   const now = (deps.now ?? (() => new Date()))();
   const cutoff = now.getTime() - (deps.graceMs ?? RECONCILE_GRACE_MS);
+  /** Inside the grace window, so possibly mid-subscribe: left alone this run. */
   const isYoung = (iso: string | null): boolean => {
     const at = toMs(iso);
     return at !== null && at > cutoff;
@@ -182,7 +188,7 @@ export async function reconcileSubscriptions(deps: ReconcileDeps): Promise<Recon
   return result;
 }
 
-/** The pg-boss handler `main.ts` registers for `reconcile-subscriptions`. */
+/** The pg-boss handler `main.ts` registers for `reconcile-subscriptions` (hourly, :20 UTC). */
 export function createReconcileHandler(deps: ReconcileDeps) {
   return async function handleReconcileSubscriptions(): Promise<void> {
     await reconcileSubscriptions(deps);

@@ -24,11 +24,13 @@
 import { claimDueFlights, DEFAULT_LEASE_MS } from './lease';
 import { pollAndUpdate, type PollDependencies, type PollOutcome } from './poll';
 
+/** A pass's settings (`POLL_BATCH_SIZE`, lease length) plus what each poll needs. */
 export interface PollPassOptions extends PollDependencies {
   batchSize: number;
   leaseMs?: number;
 }
 
+/** What one pass did. Logged as counts; `tick` ignores the return, tests read it. */
 export interface PollPassSummary {
   claimed: number;
   updated: number;
@@ -39,7 +41,8 @@ export interface PollPassSummary {
 }
 
 /**
- * Claim a batch and poll it.
+ * Claim a batch and poll it. Called by `tick` in `main.ts` on every pass, after
+ * the inbox drain.
  *
  * A single flight's failure is already folded into its `PollOutcome`, so the only
  * thing that throws out of here is a database that will not answer — which the

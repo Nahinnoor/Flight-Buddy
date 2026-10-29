@@ -58,6 +58,7 @@ export const OPERATOR_ALERT_RETRY = {
 /** At most one push-pipeline alert of each kind per process in this window. */
 export const PUSH_ALERT_THROTTLE_MS = 6 * 60 * 60_000;
 
+/** The `operator-alert` job's data; the consumer re-validates every job against it. */
 export const operatorNoticeSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.enum(['credit_low', 'credit_exhausted']),
@@ -72,6 +73,7 @@ export const operatorNoticeSchema = z.discriminatedUnion('kind', [
 /** What an operator alert says, as data. The copy is built at send time. */
 export type OperatorNotice = z.infer<typeof operatorNoticeSchema>;
 
+/** Where `credit-check`, `push-send` and `push-receipts` raise operator alerts. */
 export interface OperatorAlertSink {
   /** Never throws. */
   raise(notice: OperatorNotice): Promise<void>;
@@ -91,7 +93,7 @@ export const READ_OPERATOR_DEVICES_SQL = `select token,
  order by last_registered_at desc, id desc
  limit $2`;
 
-/** Lock-screen copy for the owner. Numbers and fixed words only. */
+/** Lock-screen copy for the owner. Numbers and fixed words only. Built by `sendOperatorAlert`. */
 export function operatorCopy(notice: OperatorNotice): { title: string; body: string } {
   switch (notice.kind) {
     case 'credit_low':
@@ -117,6 +119,7 @@ export function operatorCopy(notice: OperatorNotice): { title: string; body: str
   }
 }
 
+/** `createOperatorAlertSink`'s settings. */
 export interface OperatorAlertSinkOptions {
   /** `OPERATOR_USER_ID`; unset = log only. Never logged. */
   operatorUserId: string | undefined;
@@ -126,11 +129,16 @@ export interface OperatorAlertSinkOptions {
   now?: () => Date;
 }
 
+/** The kinds the push pipeline raises: throttled per `PUSH_ALERT_THROTTLE_MS`. */
 const PUSH_KINDS: ReadonlySet<OperatorNotice['kind']> = new Set([
   'push_credentials_invalid',
   'push_unauthorized',
 ]);
 
+/**
+ * The sink: logs and stops when no operator is configured, throttles the push
+ * kinds, and otherwise queues an `operator-alert` job. Built once by `main()`.
+ */
 export function createOperatorAlertSink(options: OperatorAlertSinkOptions): OperatorAlertSink {
   const lastRaised = new Map<OperatorNotice['kind'], number>();
   const now = options.now ?? (() => new Date());
@@ -169,6 +177,7 @@ export function createOperatorAlertSink(options: OperatorAlertSinkOptions): Oper
   };
 }
 
+/** What the `operator-alert` consumer needs; `main()` supplies it. */
 export interface OperatorPushDeps {
   pool: Pool;
   expo: ExpoPushClient;
@@ -179,7 +188,8 @@ export interface OperatorPushDeps {
 export type OperatorPushResult = 'sent' | 'no_operator' | 'no_token' | 'failed';
 
 /**
- * Send one operator alert to every active device of the operator.
+ * Send one operator alert to every active device of the operator. Called by the
+ * `operator-alert` consumer once per job.
  *
  * Resolves `'sent'` when at least one device got a ticket.
  *
@@ -276,7 +286,10 @@ export async function sendOperatorAlert(
   return 'failed';
 }
 
-/** The pg-boss handler for `operator-alert`. A job whose data does not parse is dropped. */
+/**
+ * The pg-boss handler for `operator-alert`, registered by `main()` as that
+ * queue's consumer. A job whose data does not parse is dropped.
+ */
 export function createOperatorAlertHandler(deps: OperatorPushDeps) {
   return async function handleOperatorAlert(jobs: { data: unknown }[]): Promise<void> {
     for (const job of jobs) {

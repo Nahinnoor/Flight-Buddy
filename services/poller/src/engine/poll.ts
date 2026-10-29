@@ -71,6 +71,7 @@ export const MAX_CONSECUTIVE_FAILURES = 5;
 /** No back-off ever exceeds this, however long the failure streak. */
 export const MAX_BACKOFF_MS = 6 * 60 * 60_000;
 
+/** What `pollAndUpdate` needs; `runPollPass` passes it through from `tick`. */
 export interface PollDependencies {
   pool: Pool;
   provider: FlightDataProvider;
@@ -111,6 +112,7 @@ export type PollFailureReason =
   /** The write itself failed. The provider data is fine; the database is not. */
   | 'write_failed';
 
+/** The provider returned the leg and everything that follows was written. */
 export interface PollSuccess {
   kind: 'updated';
   flightId: string;
@@ -120,6 +122,7 @@ export interface PollSuccess {
   archived: boolean;
 }
 
+/** The poll failed; the failure and its back-off are already recorded on the row. */
 export interface PollFailure {
   kind: 'failed';
   flightId: string;
@@ -130,9 +133,13 @@ export interface PollFailure {
   backedOff: boolean;
 }
 
+/** What `pollAndUpdate` returns for one flight; `runPollPass` tallies these. */
 export type PollOutcome = PollSuccess | PollFailure;
 
-/** The operating designator the provider is queried with, e.g. `"KL1405"`. */
+/**
+ * The operating designator the provider is queried with, e.g. `"KL1405"`. Used
+ * by `pollAndUpdate` and by the inbox drain's verification poll.
+ */
 export function operatingDesignator(
   flight: Pick<FlightRow, 'operating_carrier_iata' | 'operating_flight_number'>,
 ): string {
@@ -167,7 +174,8 @@ export function ladderViewOf(flight: FlightRow, fresh: FlightCandidate): LadderF
  * flight onto one instant. From `MAX_CONSECUTIVE_FAILURES` the result is also
  * pushed out to at least the flight's next natural ladder step.
  *
- * Exported because the back-off policy is worth asserting on its own.
+ * Exported because the back-off policy is worth asserting on its own. Called by
+ * `fail` for every failed poll.
  */
 export function backoffPollAt(
   flight: FlightRow,
@@ -176,9 +184,10 @@ export function backoffPollAt(
   rng: () => number,
   options: { webhooksEnabled?: boolean } = {},
 ): Date {
-  // A flight the ladder says not to poll can still be here: its lease was claimed
-  // before wave 3 turned webhooks on for it. An hour is the coarsest failover band
-  // and a safe floor to double from.
+  // The ladder can say "do not poll" here: only `webhooksEnabled` is passed in,
+  // not the backup cadence, so a subscribed `live` flight whose backup poll
+  // failed reads as `null`. An hour is the coarsest failover band and a safe
+  // floor to double from.
   const base = ladderIntervalMs(flight, now, options) ?? LADDER_INTERVALS.HOURLY;
 
   const doubled = base * 2 ** Math.max(failureCount, 1);
@@ -194,7 +203,10 @@ export function backoffPollAt(
   return new Date(at);
 }
 
-/** Record a failure and return the outcome. Never touches `archived_at` (§8.8). */
+/**
+ * Record a failure and return the outcome. Never touches `archived_at` (§8.8).
+ * Every failure path in `pollAndUpdate` ends here.
+ */
 async function fail(
   flight: FlightRow,
   deps: PollDependencies,
@@ -226,7 +238,8 @@ async function fail(
 }
 
 /**
- * Poll one claimed flight and write everything that follows from it.
+ * Poll one claimed flight and write everything that follows from it. Called by
+ * `runPollPass` once per claimed flight, one at a time.
  *
  * The caller has already leased the flight and committed that lease. This function
  * never throws for a provider or write failure — those become a `PollFailure` and a

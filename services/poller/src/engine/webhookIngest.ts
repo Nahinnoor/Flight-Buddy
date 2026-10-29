@@ -174,6 +174,7 @@ export const INBOX_REASONS = {
 
 // --- types ------------------------------------------------------------------
 
+/** One claimed `webhook_inbox` row, as `CLAIM_INBOX_ROW_SQL` returns it. */
 export interface InboxRow {
   id: string;
   subscription_id: string;
@@ -181,6 +182,7 @@ export interface InboxRow {
   attempts: number;
 }
 
+/** What the drain needs; `main()` builds it once for `createInboxDrainer`. */
 export interface WebhookIngestDeps {
   pool: Pool;
   provider: FlightDataProvider;
@@ -208,6 +210,7 @@ export interface WebhookIngestDeps {
   batchSize?: number;
 }
 
+/** How one inbox row ended; each kind has its own `DrainSummary` counter (`COUNTER`). */
 export type InboxOutcomeKind =
   | 'processed'
   | 'unknown_subscription'
@@ -220,6 +223,7 @@ export type InboxOutcomeKind =
   /** Failed for the `INBOX_MAX_ATTEMPTS`th time: marked processed, not retried. */
   | 'abandoned';
 
+/** What handling one inbox row produced. */
 export interface InboxOutcome {
   inboxId: string;
   kind: InboxOutcomeKind;
@@ -231,6 +235,7 @@ export interface InboxOutcome {
   errorName?: string;
 }
 
+/** Totals for one drain, logged when it claimed anything. */
 export interface DrainSummary {
   claimed: number;
   processed: number;
@@ -262,6 +267,7 @@ class SubscriptionMismatchError extends ProviderDataError {
 
 // --- helpers ----------------------------------------------------------------
 
+/** A row `FIND_SUBSCRIBED_FLIGHTS_SQL` returns: its id and canonical key. */
 type SubscribedFlight = Pick<
   FlightRow,
   | 'id'
@@ -278,7 +284,8 @@ type SubscribedFlight = Pick<
  * describe any leg and any day that number operates. A leg belongs to a row only
  * if its whole canonical key matches — number, origin-local date and origin —
  * which is also what guarantees `ingestFlight`'s upsert lands on that row and no
- * other. Legs for dates nobody tracks are ignored.
+ * other. Legs for dates nobody tracks are ignored. Called by `handleRow` once
+ * per delivery.
  */
 export function matchLegs(
   rows: readonly SubscribedFlight[],
@@ -306,6 +313,7 @@ export function matchLegs(
   return { matched, ignored };
 }
 
+/** What `applyLeg` reports for one leg it applied. */
 interface AppliedLeg {
   flightId: string;
   events: FlightEventType[];
@@ -314,7 +322,8 @@ interface AppliedLeg {
 }
 
 /**
- * ADR 0003 decision 1: one poll, through the limiter, matched on origin.
+ * ADR 0003 decision 1: one poll, through the limiter, matched on origin. Called
+ * by `applyLeg` when a delivered leg would raise a gate change or cancellation.
  * @throws VerificationLegMissingError, or whatever the provider throws.
  */
 async function verificationPoll(
@@ -334,6 +343,7 @@ async function verificationPoll(
 
 /**
  * Apply one delivered leg to its flight, or report `'busy'` if a poll holds it.
+ * Called by `handleRow` for each matched leg, in order.
  * @throws on a provider or database failure; the lease is handed back first.
  */
 async function applyLeg(
@@ -407,7 +417,8 @@ async function applyLeg(
 /**
  * §7.6: log a delivery's balance to `provider_credit_log`, when it carries one —
  * free monitoring. The statement and its int4 guard live in `repository.ts`,
- * shared with the hourly `credit-check`.
+ * shared with the hourly `credit-check`. Called by `handleRow` once for a
+ * delivery that was applied or matched no tracked flight.
  */
 async function logDeliveryBalance(
   deps: WebhookIngestDeps,
@@ -426,11 +437,18 @@ async function logDeliveryBalance(
   }
 }
 
+/**
+ * Close an inbox row as handled: `reason` is a fixed `INBOX_REASONS` code, or
+ * `null` when the delivery was applied. Called by `handleRow`, on its `client`.
+ */
 async function markDone(client: PoolClient, inboxId: string, reason: string | null): Promise<void> {
   await client.query({ text: MARK_INBOX_DONE_SQL, values: [inboxId, reason], types: ENGINE_TYPES });
 }
 
-/** The per-leg results of a delivery, aggregated onto its outcome. */
+/**
+ * The per-leg results of a delivery, aggregated onto its outcome. Used by
+ * `handleRow` for both `processed` and `deferred`.
+ */
 function fromApplied(
   applied: readonly AppliedLeg[],
 ): Pick<InboxOutcome, 'flightIds' | 'events' | 'eventIds' | 'verifications'> {
@@ -442,6 +460,7 @@ function fromApplied(
   };
 }
 
+/** An `InboxOutcome` with empty lists, overlaid with `extra`; `handleRow`'s return helper. */
 function outcome(
   inboxId: string,
   kind: InboxOutcomeKind,
@@ -452,7 +471,8 @@ function outcome(
 
 /**
  * Handle one claimed row. Every write to the inbox row goes through `client`,
- * inside the claiming transaction; flight writes go through the pool.
+ * inside the claiming transaction; flight writes go through the pool. Called by
+ * `claimAndHandle` for each row the drain claims.
  */
 async function handleRow(
   client: PoolClient,
@@ -595,7 +615,8 @@ async function handleRow(
 }
 
 /**
- * Claim one inbox row on `client`, inside the caller's transaction.
+ * Claim one inbox row on `client`, inside the caller's transaction. Called by
+ * `claimAndHandle`.
  *
  * Exported for the integration test, which proves two concurrent claimers never
  * get the same row.
@@ -612,6 +633,10 @@ export async function claimInboxRow(
   return result.rows[0] ?? null;
 }
 
+/**
+ * One row's transaction: begin, claim, handle, commit (rollback on a throw).
+ * `null` when nothing is left to claim. Called by `drainWebhookInbox` per row.
+ */
 async function claimAndHandle(
   client: PoolClient,
   seen: readonly string[],
@@ -641,7 +666,8 @@ const COUNTER = {
 } as const satisfies Record<InboxOutcomeKind, keyof DrainSummary>;
 
 /**
- * Drain up to `batchSize` inbox rows, one transaction per row.
+ * Drain up to `batchSize` inbox rows, one transaction per row. Runs at the start
+ * of every tick, through `createInboxDrainer`'s `drain()`.
  *
  * @throws only when the inbox itself cannot be read or written (missing table,
  *   missing grant, database down). A bad row is recorded on the row, not thrown.
@@ -698,12 +724,14 @@ const INBOX_UNAVAILABLE_CODES: ReadonlySet<string> = new Set([
   '42501', // insufficient_privilege: the grant has not been applied
 ]);
 
+/** A `pg` error's SQLSTATE, or `null`. Lets `drain()` recognise a missing inbox. */
 function sqlStateOf(error: unknown): string | null {
   if (typeof error !== 'object' || error === null) return null;
   const code = (error as { code?: unknown }).code;
   return typeof code === 'string' ? code : null;
 }
 
+/** What `main.ts` holds as `WorkerContext.inboxDrainer`. */
 export interface InboxDrainer {
   /** One drain. Never throws; `null` when the inbox could not be drained at all. */
   drain(): Promise<DrainSummary | null>;
@@ -712,6 +740,7 @@ export interface InboxDrainer {
 /**
  * The drain as the worker loop runs it: failures are logged, never thrown, so a
  * missing inbox (the API's migration not yet applied) never stops polling.
+ * Built once by `main()` at startup; `tick` calls `drain()` first on every pass.
  *
  * The same failure repeated every pass is logged once at warn/error and then at
  * debug, so a missing table is one line in Render's logs, not 2,880 a day. Logs

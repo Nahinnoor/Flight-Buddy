@@ -5,8 +5,9 @@
  * before the loop kills the process with a non-zero exit so Render restarts it
  * rather than keeping a worker alive that cannot do anything.
  *
- * Wave 2 filled `tick()` in: the pass itself lives in `engine/tick.ts` so it can
- * be tested without importing the module that starts a worker on import.
+ * `tick()` stays thin: the poll pass itself lives in `engine/tick.ts` so it can
+ * be tested without importing this module, which starts a worker on import.
+ * Nothing imports the worker as a library; this file is its only entry point.
  */
 import {
   createAeroDataBoxProvider,
@@ -65,7 +66,7 @@ export interface WorkerContext {
 
 /**
  * One pass of the worker loop: drain the webhook inbox, then claim a batch and
- * poll each flight.
+ * poll each flight. Called by `runLoop` every `POLL_INTERVAL_MS` (30 s by default).
  *
  * The drain goes first so a delivered gate change is applied before any poll of
  * the same flight; both write the value they saw, so whichever runs second sees
@@ -102,6 +103,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve) => {
     const timer = setTimeout(finish, ms);
     signal.addEventListener('abort', finish, { once: true });
+    /** Whichever comes first, the timer or the abort: clean up both and resolve. */
     function finish(): void {
       clearTimeout(timer);
       signal.removeEventListener('abort', finish);
@@ -111,7 +113,8 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 /**
- * Run `tick` every `POLL_INTERVAL_MS` until `signal` aborts.
+ * Run `tick` every `POLL_INTERVAL_MS` until `signal` aborts. The last startup
+ * step of `main()`; it returns on SIGINT/SIGTERM and `main()` then shuts down.
  *
  * A thrown pass is logged and the loop continues: a provider outage or one bad row
  * must not end the process, because a restarted worker re-reads the same row and a
@@ -135,7 +138,8 @@ export async function runLoop(context: WorkerContext, signal: AbortSignal): Prom
  *
  * Only ever requests `/healthz`, which needs no auth and touches no dependency,
  * so this costs nothing and carries no secret. Failures are warnings: the worker
- * must not exit because the API is briefly down.
+ * must not exit because the API is briefly down. Started by `main()` only when
+ * `KEEPALIVE_URL` is set; stops on shutdown.
  */
 export function startKeepAlive(options: {
   url: string;
@@ -145,6 +149,7 @@ export function startKeepAlive(options: {
   fetchImpl?: typeof fetch;
 }): () => void {
   const doFetch = options.fetchImpl ?? fetch;
+  /** One GET to `/healthz`: once at start, then every `intervalMs`. */
   const ping = async (): Promise<void> => {
     try {
       const response = await doFetch(options.url, {
@@ -165,6 +170,11 @@ export function startKeepAlive(options: {
   return stop;
 }
 
+/**
+ * Process startup, run on import: config, logger, database ping, provider and
+ * credit state, pg-boss with every job's real body, then the loop until a signal.
+ * Any throw before the loop exits non-zero (see the catch below).
+ */
 async function main(): Promise<void> {
   const config = loadConfig();
   const logger = createLogger({ level: config.LOG_LEVEL });

@@ -23,6 +23,7 @@ import { ENGINE_TYPES } from '../engine/types';
 /** ADR 0006: a user has at most 10 active devices; the read is bounded the same. */
 export const MAX_DEVICES_PER_RECIPIENT = 10;
 
+/** Every `notification_device_sends.status`. */
 export const DEVICE_SEND_STATUSES = [
   'pending',
   'sent',
@@ -40,7 +41,8 @@ export type DeviceSendStatus = (typeof DEVICE_SEND_STATUSES)[number];
  * one representative ticket (the earliest `sent`/`delivered` device's), which
  * keeps `notification_deliveries_ticket_check` true for a `sent` parent.
  *
- * `memoryDb.childAggregate` mirrors this; keep them together.
+ * `memoryDb.childAggregate` mirrors this; keep them together. Spliced into
+ * `FINALIZE_SENDS_SQL`, `CLOSE_EXHAUSTED_SENDS_SQL` and `SETTLE_DELIVERIES_SQL`.
  */
 function deviceOutcomesCte(idSource: string): string {
   return `c as (
@@ -67,7 +69,8 @@ function deviceOutcomesCte(idSource: string): string {
  * (what this attempt concluded with no device outcome to go on: `skipped`,
  * `expired`, an exhausted retry, …). `retry` wins; then the device aggregate;
  * then the fallback. A `failed` parent keeps the caller's own failure code when
- * it has one (e.g. retries ran out), else the first device's.
+ * it has one (e.g. retries ran out), else the first device's. Spliced into the
+ * same three statements as `deviceOutcomesCte`.
  */
 function parentOutcome(retry: string, fallbackStatus: string, fallbackError: string): string {
   return `case when ${retry} then 'pending'
@@ -326,7 +329,11 @@ traced as (
 select count(*)::int as invalidated
   from invalidated`;
 
-/** Invalidate a dead device. Returns whether it did (false: re-registered or already gone). */
+/**
+ * Invalidate a dead device. Returns whether it did (false: re-registered or
+ * already gone). Called on a `DeviceNotRegistered` ticket (`push-send`, the
+ * operator push) or receipt (`push-receipts`).
+ */
 export async function invalidateDeadDevice(
   pool: Pool,
   userId: string,
@@ -341,6 +348,7 @@ export async function invalidateDeadDevice(
   return (result.rows[0]?.invalidated ?? 0) > 0;
 }
 
+/** One device's outcome for one delivery, as `recordDeviceSends` writes it. */
 export interface DeviceSendRecord {
   deliveryId: string;
   tokenSha256: string;
@@ -349,6 +357,7 @@ export interface DeviceSendRecord {
   error: string | null;
 }
 
+/** A row `INSERT_DEVICE_SENDS_SQL` actually wrote (a `pending` row it overwrote counts). */
 export interface WrittenDeviceSend {
   delivery_id: string;
   token_sha256: string;
@@ -358,7 +367,8 @@ export interface WrittenDeviceSend {
 
 /**
  * Write device outcomes (`INSERT_DEVICE_SENDS_SQL`) with `sentAt` = when the
- * devices were read; returns the rows written.
+ * devices were read; returns the rows written. Called by `push-send` after each
+ * Expo request.
  */
 export async function recordDeviceSends(
   pool: Pool,

@@ -48,6 +48,7 @@ export const QUEUE_NAMES = {
   OPERATOR_ALERT: 'operator-alert',
 } as const;
 
+/** Every name in `QUEUE_NAMES`: the queues `startQueue` creates at boot. */
 export const DECLARED_QUEUES: readonly string[] = Object.values(QUEUE_NAMES);
 
 /**
@@ -60,6 +61,7 @@ export const QUEUE_OPTIONS: Readonly<Partial<Record<string, typeof OPERATOR_ALER
   [QUEUE_NAMES.OPERATOR_ALERT]: OPERATOR_ALERT_RETRY,
 };
 
+/** One row of `SCHEDULED_JOBS`. */
 export interface ScheduledJob {
   readonly name: string;
   /** Standard 5-field cron, evaluated in `SCHEDULE_TIMEZONE`. */
@@ -127,8 +129,11 @@ export type ScheduledHandler = (jobs: JobBatch) => Promise<void>;
  *
  * Real handlers must be idempotent (§5, "Engineering basics"): a
  * `missed: 'once'` catch-up or a redelivery can run the same occurrence twice.
+ *
+ * Called by `startQueue`, which lays `handlers` overrides on top of these.
  */
 export function createScheduledHandlers(logger: Logger): Record<string, ScheduledHandler> {
+  /** A placeholder for `job` that logs at `level` that it ran, and returns. */
   const noop =
     (job: string, level: 'info' | 'debug'): ScheduledHandler =>
     async (jobs) => {
@@ -149,7 +154,8 @@ export function createScheduledHandlers(logger: Logger): Record<string, Schedule
 }
 
 /**
- * Build the pg-boss instance. Does not connect — `startQueue` does that.
+ * Build the pg-boss instance. Does not connect — `startQueue` does that. Called
+ * once by `main()` at startup.
  *
  * `createSchema: false` is the least-privilege half of §8.7: `pgboss` is created by
  * a migration and owned by the worker role, so the process never needs CREATE on
@@ -168,6 +174,7 @@ export function createBoss(config: Config): PgBoss {
   });
 }
 
+/** What `startQueue` takes: the instance, and the real bodies `main()` supplies. */
 export interface StartQueueOptions {
   boss: PgBoss;
   logger: Logger;
@@ -188,6 +195,8 @@ export interface StartQueueOptions {
 
 /**
  * Connect, declare the queues, register the scheduled jobs and their workers.
+ * Called once by `main()` at startup, after the inbox drainer is built and
+ * before the loop starts.
  *
  * Every step is idempotent: `createQueue` and `schedule` upsert, so a redeploy or a
  * second worker re-asserts the same rows rather than duplicating them.
@@ -250,7 +259,8 @@ export async function startQueue({
  * `stop()` resolves only once all of that is done, so awaiting it is the whole
  * shutdown. The timeout bounds a handler that will not finish — Render's own grace
  * period is finite, and being killed mid-shutdown is worse than giving up on one
- * job, whose lease expires and is retried.
+ * job, whose lease expires and is retried. Called by `main()` once the loop has
+ * returned on SIGINT/SIGTERM.
  */
 export async function stopQueue(boss: PgBoss): Promise<void> {
   await boss.stop({ graceful: true, close: true, timeout: 20_000 });

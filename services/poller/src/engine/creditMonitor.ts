@@ -188,7 +188,12 @@ export interface CreditState {
   observe(balance: number | null): void;
 }
 
-/** @param initialBalance The latest logged balance, or `null` when none is known (treated as healthy). */
+/**
+ * Build the shared credit state. Called once by `main()` at startup, seeded from
+ * `readLatestCreditBalance`.
+ *
+ * @param initialBalance The latest logged balance, or `null` when none is known (treated as healthy).
+ */
 export function createCreditState(initialBalance: number | null = null): CreditState {
   let exhausted = initialBalance !== null && initialBalance <= 0;
   return {
@@ -204,7 +209,8 @@ export function createCreditState(initialBalance: number | null = null): CreditS
  *
  * Exhausted credits run the pass as if `WEBHOOK_URL` were unset: subscribed
  * flights take the failover ladder instead of the backup cadence, and nothing
- * opens a subscription against an empty balance.
+ * opens a subscription against an empty balance. Called by `tick` at the start
+ * of every pass's poll step.
  */
 export function pollWebhookSettings(
   webhookUrl: string | undefined,
@@ -218,6 +224,7 @@ export function pollWebhookSettings(
 
 /**
  * The lowest armed mark this reading is at or below, or `null` for no alert.
+ * Called by `runCreditCheck` before it logs the reading.
  *
  * @param disarmed Marks this job has already alerted on since they were last
  *   re-armed (`DISARMED_THRESHOLDS_SQL`). Empty on the first ever run.
@@ -234,7 +241,7 @@ export function crossedThreshold(
   return lowest;
 }
 
-/** Marks already disarmed, read before this run logs its reading. */
+/** Marks already disarmed, read by `runCreditCheck` before this run logs its reading. */
 export async function readDisarmedThresholds(pool: Pool): Promise<Set<number>> {
   const result = await pool.query<{ mark: number }>({
     text: DISARMED_THRESHOLDS_SQL,
@@ -269,6 +276,7 @@ export interface OperatorAlert {
   observedAt: string;
 }
 
+/** What the job needs; `main()` builds it once at startup. */
 export interface CreditCheckDeps {
   pool: Pool;
   provider: FlightDataProvider;
@@ -298,6 +306,7 @@ export interface CreditCheckDeps {
   now?: () => Date;
 }
 
+/** What one run did. Logged; the handler ignores it, tests read it. */
 export interface CreditCheckResult {
   skipped: boolean;
   balance: number | null;
@@ -313,6 +322,7 @@ export interface CreditCheckResult {
  * One credit check. A provider failure ends the run quietly (logged at `error`)
  * and changes no state — acting on a balance we could not read would be acting on
  * nothing. A database failure throws, and pg-boss records the job as failed.
+ * Runs hourly on the hour (UTC) through `createCreditCheckHandler`.
  */
 export async function runCreditCheck(deps: CreditCheckDeps): Promise<CreditCheckResult> {
   const result: CreditCheckResult = {
@@ -467,7 +477,7 @@ export async function runCreditCheck(deps: CreditCheckDeps): Promise<CreditCheck
   return result;
 }
 
-/** The pg-boss handler `main.ts` registers for `credit-check`. */
+/** The pg-boss handler `main.ts` registers for `credit-check` (hourly, :00 UTC). */
 export function createCreditCheckHandler(deps: CreditCheckDeps) {
   return async function handleCreditCheck(): Promise<void> {
     await runCreditCheck(deps);

@@ -44,6 +44,7 @@ export const systemClock: Clock = {
     }),
 };
 
+/** `createRateLimiter`'s settings. */
 export interface RateLimiterOptions {
   /** Requests per second. `PROVIDER_RPS`, default 1. */
   rps?: number;
@@ -55,6 +56,7 @@ export interface RateLimiterOptions {
   clock?: Clock;
 }
 
+/** The limiter every provider call waits on. */
 export interface RateLimiter {
   /** Resolves when the caller may make exactly one request. */
   acquire(): Promise<void>;
@@ -62,10 +64,13 @@ export interface RateLimiter {
   readonly granted: number;
 }
 
+/** `PROVIDER_RPS`'s default: the worker's half of the plan's 2 req/s. */
 export const DEFAULT_PROVIDER_RPS = 1;
 
 /**
- * Build a token bucket.
+ * Build a token bucket. `main()` builds one at startup and shares it with the
+ * poll pass, the inbox drain, `reconcile-subscriptions` and `credit-check`, so
+ * the ceiling holds across the whole process.
  *
  * @throws RangeError for a non-positive rate, which would hang every caller.
  */

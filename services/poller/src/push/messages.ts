@@ -66,6 +66,7 @@ export interface MessageFacts {
   estimatedArrivalUtc: string | null;
 }
 
+/** What one push says: lock-screen title and body, and the ids the app opens. */
 export interface PushCopy {
   title: string;
   body: string;
@@ -74,7 +75,9 @@ export interface PushCopy {
 
 /** Gates like `B12`, `12A`, `C-5`, `A1`. Short and plain on purpose. */
 const GATE = /^[A-Za-z0-9-]{1,6}$/;
+/** Terminals like `4`, `T2`, `B`: shorter still. */
 const TERMINAL = /^[A-Za-z0-9-]{1,4}$/;
+/** `YYYY-MM-DD`, captured for `shortDate`. */
 const LOCAL_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -82,6 +85,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 /** A shared zod schema (carrier, flight number, airport) or one of the patterns above. */
 type Shape = RegExp | { safeParse(value: string): { success: boolean } };
 
+/** The trimmed string if it fits `shape`, else `null`. Every printed field passes through here. */
 function clean(value: unknown, shape: Shape): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
@@ -89,6 +93,7 @@ function clean(value: unknown, shape: Shape): string | null {
   return ok ? trimmed : null;
 }
 
+/** `record[key]` when `record` is an object: reads the event's JSON `previous_value` / `new_value`. */
 function field(record: unknown, key: string): unknown {
   return typeof record === 'object' && record !== null
     ? (record as Record<string, unknown>)[key]
@@ -107,12 +112,14 @@ export function displayFlightNumber(facts: MessageFacts): string | null {
   return carrier !== null && number !== null ? `${carrier} ${number}` : null;
 }
 
+/** "JFK → LAX", or `null` when either code fails its shape. */
 function route(facts: MessageFacts): string | null {
   const origin = clean(facts.originIata, airportIataSchema);
   const destination = clean(facts.destinationIata, airportIataSchema);
   return origin !== null && destination !== null ? `${origin} → ${destination}` : null;
 }
 
+/** `value` if it is a parseable instant string, else `null`. Used by `airportTime`. */
 function validInstant(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   return Number.isNaN(Date.parse(value)) ? null : value;
@@ -153,10 +160,12 @@ export function formatDuration(minutes: number): string {
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
 
+/** A body line from the parts that survived: "JFK → LAX · Terminal 4 · was B12". */
 function joinParts(parts: readonly (string | null)[]): string {
   return parts.filter((part): part is string => part !== null && part !== '').join(' · ');
 }
 
+/** A finite, positive minute count from an event value, else `null`. Used for the delay title. */
 function positiveMinutes(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 }
@@ -166,7 +175,8 @@ function positiveMinutes(value: unknown): number | null {
  *
  * Never throws: a field that fails its shape is dropped from the sentence. The
  * one thing that cannot be dropped is a flight number, and without one there is
- * still "Your flight".
+ * still "Your flight". Called by `push-send` once per delivery, before its devices
+ * are sent to.
  */
 export function buildPushCopy(facts: MessageFacts): PushCopy {
   const flight = displayFlightNumber(facts) ?? 'Your flight';
@@ -174,6 +184,7 @@ export function buildPushCopy(facts: MessageFacts): PushCopy {
   const origin = clean(facts.originIata, airportIataSchema);
   const destination = clean(facts.destinationIata, airportIataSchema);
   const date = facts.departureDateLocal;
+  // Times at the origin and at the destination, dated when off the departure date.
   const departureTime = (utc: unknown) => airportTime(utc, facts.originTz, date);
   const arrivalTime = (utc: unknown) => airportTime(utc, facts.destinationTz, date);
   const believedDeparture = facts.estimatedDepartureUtc ?? facts.scheduledDepartureUtc;

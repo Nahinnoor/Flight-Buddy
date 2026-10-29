@@ -57,6 +57,8 @@ export interface PolicyState {
 /**
  * The event types in this batch that should notify, in `FLIGHT_EVENT_TYPES`
  * order. A batch never holds two events of one type (each detector branch runs once).
+ * Called by `pollAndUpdate` and the inbox drain's `applyLeg`, between
+ * `detectChanges` and `recordFlightEvents`.
  */
 export function notifyingEventTypes(
   events: readonly Pick<DetectedEvent, 'type'>[],

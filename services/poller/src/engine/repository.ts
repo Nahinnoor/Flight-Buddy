@@ -52,6 +52,7 @@ export const CREDIT_LOG_SOURCES = {
 
 export type CreditLogSource = (typeof CREDIT_LOG_SOURCES)[keyof typeof CREDIT_LOG_SOURCES];
 
+/** Append one balance reading; run by `insertCreditLog`. */
 export const INSERT_CREDIT_LOG_SQL = `insert into public.provider_credit_log (balance, source)
 values ($1, $2)`;
 
@@ -72,12 +73,18 @@ export const LATEST_CREDIT_BALANCE_SQL = `select balance
  order by id desc
  limit 1`;
 
-/** A whole number the `int` column can hold. Anything else is not written. */
+/**
+ * A whole number the `int` column can hold. Anything else is not written.
+ * Checked by both writers before `insertCreditLog`.
+ */
 export function isLoggableBalance(balance: number): boolean {
   return Number.isInteger(balance) && balance >= INT4_MIN && balance <= INT4_MAX;
 }
 
-/** Record one reading. The caller checks `isLoggableBalance` first. */
+/**
+ * Record one reading. The caller checks `isLoggableBalance` first. Called by the
+ * hourly `credit-check` and by the inbox drain for each delivery's balance.
+ */
 export async function insertCreditLog(
   pool: Pool,
   balance: number,
@@ -90,7 +97,11 @@ export async function insertCreditLog(
   });
 }
 
-/** The latest logged balance, or `null` when the log is empty. */
+/**
+ * The latest logged balance (drill rows skipped), or `null` when there is none.
+ * Read by `main()` at startup to seed the credit state, and by `credit-check`
+ * as the alert's previous balance.
+ */
 export async function readLatestCreditBalance(pool: Pool): Promise<number | null> {
   const result = await pool.query<{ balance: number }>({
     text: LATEST_CREDIT_BALANCE_SQL,
@@ -123,15 +134,20 @@ export const RECORD_POLL_FAILURE_SQL = `update public.flights
        poll_lease_until = null
  where id = $1`;
 
+/** `RECORD_POLL_SUCCESS_SQL`'s values, as `pollAndUpdate` hands them over. */
 export interface PollSuccessUpdate {
   flightId: string;
-  /** `null` stops polling: landed and archived, or (wave 3) handed to a webhook. */
+  /**
+   * `null` stops polling: landed and archived, or a subscribed flight left to
+   * its webhook with the ADR 0004 backup poll disabled.
+   */
   nextPollAt: Date | null;
   polledAt: Date;
   /** Set only at landed + 30 min; `null` otherwise, matching the ingest that just ran. */
   archivedAt: Date | null;
 }
 
+/** `RECORD_POLL_FAILURE_SQL`'s values, as `poll.ts`'s `fail` hands them over. */
 export interface PollFailureUpdate {
   flightId: string;
   nextPollAt: Date | null;
@@ -139,6 +155,7 @@ export interface PollFailureUpdate {
   failureCount: number;
 }
 
+/** The last write of a successful poll: schedule, archive, lease released. Called by `pollAndUpdate`. */
 export async function recordPollSuccess(pool: Pool, update: PollSuccessUpdate): Promise<void> {
   await pool.query({
     text: RECORD_POLL_SUCCESS_SQL,
@@ -147,6 +164,7 @@ export async function recordPollSuccess(pool: Pool, update: PollSuccessUpdate): 
   });
 }
 
+/** Back-off, failure count, lease released. Called by `fail` in `poll.ts` for every failed poll. */
 export async function recordPollFailure(pool: Pool, update: PollFailureUpdate): Promise<void> {
   await pool.query({
     text: RECORD_POLL_FAILURE_SQL,
@@ -168,12 +186,14 @@ export async function recordPollFailure(pool: Pool, update: PollFailureUpdate): 
  * 3. `fanned` — one delivery per (event, user), `on conflict do nothing` on the
  *    §9 unique key. A user who already had a delivery for a once-per-flight event
  *    type on this flight (`ONCE_PER_FLIGHT_EVENT_TYPES`) is skipped, so a status
- *    bounce cannot send a second "cancelled".
+ *    bounce cannot send a second "departed" or "landed". (`cancelled` is not in
+ *    that list on purpose; see `notificationPolicy.ts`.)
  *
  * Returns one row per event: its id, and the number of deliveries the whole
  * statement created (the same on every row).
  *
- * Exported so a test can assert the statement's shape without a database. The
+ * Called by `recordFlightEvents` with the batch size; exported so a test can
+ * assert the statement's shape without a database. The
  * placeholder numbers come from the event's index in the array — never from any
  * value inside it. The two trailing parameters are the notifying types and the
  * once-per-flight types, both `text[]`.
@@ -216,6 +236,7 @@ select i.id, (select count(*) from fanned)::int as deliveries
   from inserted i`;
 }
 
+/** What `recordFlightEvents` returns. */
 export interface RecordedEvents {
   eventIds: string[];
   /** `notification_deliveries` rows created: > 0 means there is something to send. */
@@ -224,7 +245,8 @@ export interface RecordedEvents {
 
 /**
  * Insert the events one poll (or one delivery) detected, create their
- * deliveries, and return both.
+ * deliveries, and return both. Called by `pollAndUpdate` and the inbox drain's
+ * `applyLeg`; a non-zero `deliveries` is what wakes `push-send`.
  *
  * @param notify The event types in this batch allowed to notify
  *   (`notifyingEventTypes`). Events outside it are still recorded; they get no
@@ -262,7 +284,7 @@ export async function recordFlightEvents(
   };
 }
 
-/** `recordFlightEvents`, returning only the event ids. */
+/** `recordFlightEvents`, returning only the event ids. Only the tests call it now. */
 export async function insertFlightEvents(
   pool: Pool,
   flightId: string,

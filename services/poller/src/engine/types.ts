@@ -43,6 +43,7 @@ const pgParseTimestamptz = pgTypes.getTypeParser(OID_TIMESTAMPTZ, 'text') as (
   value: string,
 ) => unknown;
 
+/** The `timestamptz` / `timestamp` parser `ENGINE_TYPES` hands `pg` (see above). */
 function parseTimestamptz(value: string): string {
   const parsed = pgParseTimestamptz(value);
   if (parsed instanceof Date && !Number.isNaN(parsed.getTime())) {
@@ -61,6 +62,7 @@ function parseTimestamptz(value: string): string {
  * `getTypeParser(oid, format)`.
  */
 export const ENGINE_TYPES = {
+  /** Called by `pg` once per result column: ours for dates and timestamps, `pg`'s otherwise. */
   getTypeParser(oid: number, format?: unknown): unknown {
     if (oid === OID_DATE) return parseDate;
     if (oid === OID_TIMESTAMPTZ || oid === OID_TIMESTAMP) return parseTimestamptz;

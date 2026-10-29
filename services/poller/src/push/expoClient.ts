@@ -37,6 +37,7 @@ export const MAX_MESSAGES_PER_REQUEST = 100;
 /** Expo: at most 1000 ids per receipts request. */
 export const MAX_RECEIPT_IDS_PER_REQUEST = 1000;
 
+/** Per request. Running out is an `ambiguous` failure: Expo may have taken it. */
 export const EXPO_REQUEST_TIMEOUT_MS = 15_000;
 
 /** The error codes Expo documents on tickets and receipts. */
@@ -63,12 +64,14 @@ export interface ExpoPushMessage {
   collapseId?: string;
 }
 
+/** One send ticket, reduced to what the pipeline keeps: an id or a sanitised code. */
 export type ExpoTicket =
   | { status: 'ok'; id: string }
   | { status: 'error'; errorCode: string }
   /** The ticket did not parse. Expo took the request, so the message may have gone. */
   | { status: 'unreadable' };
 
+/** One receipt: delivered, or a sanitised error code. */
 export type ExpoReceipt = { status: 'ok' } | { status: 'error'; errorCode: string };
 
 /**
@@ -84,6 +87,7 @@ export type ExpoReceipt = { status: 'ok' } | { status: 'error'; errorCode: strin
  */
 export type ExpoFailureKind = 'unavailable' | 'unauthorized' | 'rejected' | 'ambiguous';
 
+/** Thrown by `send` / `getReceipts` when a whole request failed. Carries no response text. */
 export class ExpoRequestError extends Error {
   readonly kind: ExpoFailureKind;
   /** HTTP status, when there was a response. */
@@ -101,6 +105,7 @@ export class ExpoRequestError extends Error {
   }
 }
 
+/** The only shape of Expo error code we store or log. */
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 
 /**
@@ -128,7 +133,10 @@ const requestErrors = z.looseObject({
   errors: z.array(z.looseObject({ code: z.unknown().optional() })).min(1),
 });
 
-/** An error ticket or receipt, keeping only its sanitised code; `null` if `raw` is not one. */
+/**
+ * An error ticket or receipt, keeping only its sanitised code; `null` if `raw` is
+ * not one. Shared by `readTicket` and `readReceipt`.
+ */
 function readError(raw: unknown): { status: 'error'; errorCode: string } | null {
   const error = errorShape.safeParse(raw);
   if (!error.success) return null;
@@ -139,17 +147,20 @@ function readError(raw: unknown): { status: 'error'; errorCode: string } | null 
   };
 }
 
+/** One entry of a send response: ok, error, or `unreadable`. Used by `send`. */
 function readTicket(raw: unknown): ExpoTicket {
   const ok = okTicket.safeParse(raw);
   if (ok.success) return { status: 'ok', id: ok.data.id };
   return readError(raw) ?? { status: 'unreadable' };
 }
 
+/** One entry of a receipts response; `null` (skipped) when it is neither shape. Used by `getReceipts`. */
 function readReceipt(raw: unknown): ExpoReceipt | null {
   if (okReceipt.safeParse(raw).success) return { status: 'ok' };
   return readError(raw);
 }
 
+/** The two Expo calls the push jobs make. */
 export interface ExpoPushClient {
   /**
    * Send up to 100 messages. Resolves with one ticket per message, in order.
@@ -164,6 +175,7 @@ export interface ExpoPushClient {
   getReceipts(ticketIds: readonly string[]): Promise<Map<string, ExpoReceipt>>;
 }
 
+/** `createExpoPushClient`'s settings; `fetch` and `timeoutMs` are test seams. */
 export interface ExpoClientOptions {
   /** `EXPO_ACCESS_TOKEN`. Never logged. */
   accessToken?: string | undefined;
@@ -171,6 +183,10 @@ export interface ExpoClientOptions {
   timeoutMs?: number;
 }
 
+/**
+ * Build the Expo client. `main()` builds one at startup and shares it with
+ * `push-send`, `push-receipts` and the `operator-alert` consumer.
+ */
 export function createExpoPushClient(options: ExpoClientOptions = {}): ExpoPushClient {
   const doFetch = options.fetch ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? EXPO_REQUEST_TIMEOUT_MS;
@@ -181,6 +197,10 @@ export function createExpoPushClient(options: ExpoClientOptions = {}): ExpoPushC
   };
   if (options.accessToken !== undefined) headers.authorization = `Bearer ${options.accessToken}`;
 
+  /**
+   * POST `body` as JSON and return the parsed answer (`null` when empty or not
+   * JSON). A failed request throws an `ExpoRequestError` of the right kind.
+   */
   async function post(url: string, body: unknown): Promise<unknown> {
     let response: Response;
     try {

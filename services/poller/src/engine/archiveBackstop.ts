@@ -75,6 +75,7 @@ export const ARCHIVE_BACKSTOP_SQL = `update public.flights
        ) < now() - ($1::double precision * interval '1 hour')
 returning id`;
 
+/** The flights one run archived. */
 export interface ArchiveBackstopResult {
   archivedFlightIds: string[];
 }
@@ -85,6 +86,7 @@ export interface ArchiveBackstopResult {
  *
  * Idempotent: `archived_at is null` means a second run in the same hour finds
  * nothing, which matters because pg-boss can redeliver a scheduled job (§5).
+ * Run by the `archive-backstop` handler below.
  */
 export async function archiveStaleFlights(pool: Pool): Promise<ArchiveBackstopResult> {
   const result = await pool.query<{ id: string }>({
@@ -96,13 +98,15 @@ export async function archiveStaleFlights(pool: Pool): Promise<ArchiveBackstopRe
   return { archivedFlightIds: result.rows.map((row) => row.id) };
 }
 
+/** What the handler needs; `main()` supplies it. No provider: archiving makes no calls. */
 export interface ArchiveBackstopDeps {
   pool: Pool;
   logger: Logger;
 }
 
 /**
- * The pg-boss handler `queue.ts` registers for `archive-backstop`.
+ * The pg-boss handler `queue.ts` registers for `archive-backstop`. Built by
+ * `main()` at startup; runs daily at 03:40 UTC (`SCHEDULED_JOBS`).
  *
  * Logs the count and the ids — the ids are the only way to answer "why did my
  * flight disappear" later, and a flight id is not personal data.
