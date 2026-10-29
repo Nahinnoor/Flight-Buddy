@@ -32,5 +32,24 @@ export default tseslint.config(
     files: ['apps/api/**', 'services/poller/**', 'packages/flight-provider/**'],
     languageOptions: { globals: { ...globals.node } },
   },
+  {
+    // The worker's `main.ts` starts the worker on import. Imported from a test, that
+    // is a real worker on whatever database `.env` names, inside `npm test`. Static
+    // imports and re-exports only; nothing here uses `import()`.
+    files: ['services/poller/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^\\.{1,2}/(.*/)?main(\\.[jt]s)?$',
+              message: 'main.ts starts the worker on import; move what you need out of it.',
+            },
+          ],
+        },
+      ],
+    },
+  },
   prettier,
 );

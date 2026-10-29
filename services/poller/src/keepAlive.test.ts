@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createLogger } from './logger';
-import { startKeepAlive } from './main';
+import { startKeepAlive } from './keepAlive';
 
 const logger = createLogger({ level: 'silent' });
 const URL_ = 'https://flightbuddy-api.example.invalid/healthz';
