@@ -28,12 +28,16 @@
  *
  * `flightbuddy_worker` has UPDATE on `flights`; nothing here deletes anything.
  */
-import { DEFAULT_MAX_DELIVERY_RETRIES, type FlightDataProvider } from '@flightbuddy/flight-provider';
+import {
+  DEFAULT_MAX_DELIVERY_RETRIES,
+  type FlightDataProvider,
+} from '@flightbuddy/flight-provider';
 import type { FlightCandidate } from '@flightbuddy/shared';
 
 import type { Pool } from '../db';
+import { errorName } from '../errors';
 import type { Logger } from '../logger';
-import { LADDER_BOUNDARIES, departureAnchor } from './ladder';
+import { LADDER_BOUNDARIES, anchor, toMs } from './ladder';
 import { ENGINE_TYPES, type FlightRow } from './types';
 
 /**
@@ -86,12 +90,6 @@ export interface SubscriptionDeps {
 /** 30 minutes after the previous day's occurrence is scheduled to land (ADR 0005). */
 export const WINDOW_OPENS_AFTER_PREVIOUS_LANDING_MS = 30 * 60_000;
 
-function toMs(iso: string | null): number | null {
-  if (iso === null) return null;
-  const ms = new Date(iso).getTime();
-  return Number.isNaN(ms) ? null : ms;
-}
-
 /**
  * The instant the webhook window opens (ADR 0005): **30 minutes after yesterday's
  * occurrence of this number is scheduled to land**, i.e.
@@ -118,17 +116,12 @@ function toMs(iso: string | null): number | null {
  * the previous occurrence's real arrival is not something we track.
  */
 export function webhookWindowOpensAt(fresh: FlightCandidate): number | null {
-  const departure = departureAnchor({
-    tracking_tier: fresh.trackingTier,
-    status: fresh.status,
-    scheduled_departure_utc: fresh.scheduledDepartureUtc,
-    estimated_departure_utc: fresh.estimatedDepartureUtc,
-    actual_departure_utc: fresh.actualDepartureUtc,
-    scheduled_arrival_utc: fresh.scheduledArrivalUtc,
-    estimated_arrival_utc: fresh.estimatedArrivalUtc,
-    actual_arrival_utc: fresh.actualArrivalUtc,
-    alert_subscription_id: null,
-  });
+  // The ladder's departure anchor.
+  const departure = anchor(
+    fresh.scheduledDepartureUtc,
+    fresh.estimatedDepartureUtc,
+    fresh.actualDepartureUtc,
+  );
   if (departure === null) return null;
 
   const fallback = departure - LADDER_BOUNDARIES.TWENTY_FOUR_HOURS;
@@ -182,10 +175,6 @@ export function clampToWindowOpening(next: Date, fresh: FlightCandidate, now: Da
   const opensAt = webhookWindowOpensAt(fresh);
   if (opensAt === null || opensAt <= now.getTime()) return next;
   return opensAt < next.getTime() ? new Date(opensAt) : next;
-}
-
-function nameOf(error: unknown): string {
-  return error instanceof Error ? error.name : 'UnknownError';
 }
 
 /**
@@ -247,7 +236,7 @@ export async function openSubscription(
     return subscriptionId;
   } catch (error) {
     deps.logger.warn(
-      { flightId: flight.id, errorName: nameOf(error) },
+      { flightId: flight.id, errorName: errorName(error) },
       'alert subscription failed; flight stays on the failover ladder',
     );
     return null;
@@ -281,7 +270,7 @@ export async function closeSubscription(
       deps.logger.info({ flightId, subscriptionId }, 'alert subscription closed (§7.6)');
     } catch (error) {
       deps.logger.warn(
-        { flightId, subscriptionId, errorName: nameOf(error) },
+        { flightId, subscriptionId, errorName: errorName(error) },
         'unsubscribe failed; archiving anyway, reconcile will delete it',
       );
     }

@@ -17,8 +17,9 @@ import {
   type FlightsWriter,
 } from '@flightbuddy/flight-provider';
 
-import { ConfigError, loadConfig, type Config } from './config';
+import { ConfigError, loadConfig, webhookBackupIntervalMs, type Config } from './config';
 import { createPool, ping, type Pool } from './db';
+import { errorName } from './errors';
 import { createRateLimiter, type RateLimiter } from './engine/rateLimiter';
 import { runPollPass } from './engine/tick';
 import { createLogger, type Logger } from './logger';
@@ -87,8 +88,7 @@ export async function tick(context: WorkerContext): Promise<void> {
     feedHealthCache: context.feedHealthCache,
     ...pollWebhookSettings(context.config.WEBHOOK_URL, context.creditState),
     // 0 disables the backup poll and restores §7.6's "no polling at all".
-    webhookBackupIntervalMs:
-      context.config.WEBHOOK_BACKUP_POLL_MS > 0 ? context.config.WEBHOOK_BACKUP_POLL_MS : undefined,
+    webhookBackupIntervalMs: webhookBackupIntervalMs(context.config),
     batchSize: context.config.POLL_BATCH_SIZE,
     ...(context.onDeliveriesCreated === undefined
       ? {}
@@ -154,10 +154,7 @@ export function startKeepAlive(options: {
       options.logger.debug({ status: response.status }, 'keep-alive ping');
     } catch (error: unknown) {
       // The URL is not secret, but keep logs uniform: class name only.
-      options.logger.warn(
-        { errorName: error instanceof Error ? error.name : 'unknown' },
-        'keep-alive ping failed',
-      );
+      options.logger.warn({ errorName: errorName(error, 'unknown') }, 'keep-alive ping failed');
     }
   };
 
@@ -203,6 +200,7 @@ async function main(): Promise<void> {
   // reconcile is a no-op, every flight stays on the ladder. The inbox is drained
   // either way, so deliveries for subscriptions opened earlier are still applied.
   const webhooksEnabled = config.WEBHOOK_URL !== undefined;
+  const drillZero = config.CREDIT_DRILL_ZERO === '1';
 
   // Seeded from the log so a deploy during a credit outage keeps failing over
   // (§7.7). If the read fails, start healthy and say so: the hourly check sets the
@@ -212,7 +210,7 @@ async function main(): Promise<void> {
     lastBalance = await readLatestCreditBalance(pool);
   } catch (error: unknown) {
     logger.warn(
-      { errorName: error instanceof Error ? error.name : 'UnknownError' },
+      { errorName: errorName(error) },
       'could not read the last credit balance; assuming credits are available until credit-check runs',
     );
   }
@@ -239,7 +237,7 @@ async function main(): Promise<void> {
   const onDeliveriesCreated = (count: number): void => {
     boss.send(QUEUE_NAMES.PUSH_SEND, { reason: 'deliveries_created' }).catch((error: unknown) => {
       logger.warn(
-        { count, errorName: error instanceof Error ? error.name : 'UnknownError' },
+        { count, errorName: errorName(error) },
         'could not wake push-send; the minute sweep will send these',
       );
     });
@@ -258,8 +256,7 @@ async function main(): Promise<void> {
     webhooksEnabled,
     // The same backup cadence the poll pass uses (ADR 0004). Omitting it here
     // silently took a flight off the ladder as soon as one delivery landed.
-    webhookBackupIntervalMs:
-      config.WEBHOOK_BACKUP_POLL_MS > 0 ? config.WEBHOOK_BACKUP_POLL_MS : undefined,
+    webhookBackupIntervalMs: webhookBackupIntervalMs(config),
     onDeliveriesCreated,
   });
 
@@ -287,7 +284,7 @@ async function main(): Promise<void> {
         webhooksEnabled,
         creditState,
         operatorUserId: config.OPERATOR_USER_ID,
-        drillZero: config.CREDIT_DRILL_ZERO === '1',
+        drillZero,
         onOperatorAlert: (alert) =>
           operatorAlerts.raise({
             kind: alert.kind,
@@ -361,11 +358,11 @@ async function main(): Promise<void> {
       // Booleans, never the values.
       operatorConfigured: config.OPERATOR_USER_ID !== undefined,
       expoAccessTokenConfigured: config.EXPO_ACCESS_TOKEN !== undefined,
-      creditDrill: config.CREDIT_DRILL_ZERO === '1',
+      creditDrill: drillZero,
     },
     'poller started',
   );
-  if (config.CREDIT_DRILL_ZERO === '1') {
+  if (drillZero) {
     logger.error(
       { creditDrill: true },
       'CREDIT DRILL MODE ON: the hourly credit check reads 0 and fails every subscribed flight over to polling; unset CREDIT_DRILL_ZERO when the drill is done',

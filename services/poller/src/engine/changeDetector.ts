@@ -23,8 +23,14 @@
  * stored as JSON. Nothing here interpolates them into SQL, a shell, a log line or
  * a prompt (§5, §12.7).
  */
-import { delayMinutes, type FlightCandidate, type FlightStatus } from '@flightbuddy/shared';
+import {
+  delayMinutes,
+  durationMinutes,
+  type FlightCandidate,
+  type FlightStatus,
+} from '@flightbuddy/shared';
 
+import { toMs } from './ladder';
 import type { FlightRow } from './types';
 
 /** The `flight_events.event_type` values §9 notifies on. */
@@ -81,18 +87,14 @@ const DEPARTED_STATUSES: ReadonlySet<FlightStatus> = new Set<FlightStatus>([
   'landed',
 ]);
 
-/** Statuses that mean the aircraft is down. */
-const ARRIVED_STATUSES: ReadonlySet<FlightStatus> = new Set<FlightStatus>(['landed']);
-
-/** Order events are emitted in, so a batch is deterministic and diffable. */
-const EMIT_ORDER: readonly FlightEventType[] = FLIGHT_EVENT_TYPES;
-
-function hasDeparted(status: FlightStatus, actualDeparture: string | null): boolean {
+/** Off the origin gate: an actual departure time, or a status that says so. */
+export function hasDeparted(status: FlightStatus, actualDeparture: string | null): boolean {
   return actualDeparture !== null || DEPARTED_STATUSES.has(status);
 }
 
+/** Down: an actual arrival time, or `landed`. */
 function hasArrived(status: FlightStatus, actualArrival: string | null): boolean {
-  return actualArrival !== null || ARRIVED_STATUSES.has(status);
+  return actualArrival !== null || status === 'landed';
 }
 
 /**
@@ -111,12 +113,6 @@ function believedDeparture(
   return actual ?? estimated ?? scheduled;
 }
 
-function millis(iso: string | null): number | null {
-  if (iso === null) return null;
-  const ms = new Date(iso).getTime();
-  return Number.isNaN(ms) ? null : ms;
-}
-
 /**
  * Diff a stored flight against a freshly looked-up leg.
  *
@@ -132,14 +128,16 @@ export function detectChanges(
 ): DetectedEvent[] {
   const source = options.source ?? 'poll';
   const threshold = options.delayThresholdMinutes ?? DEFAULT_DELAY_THRESHOLD_MINUTES;
-  const found = new Map<FlightEventType, DetectedEvent>();
+  // Each branch below runs once, in `FLIGHT_EVENT_TYPES` order, so the batch is
+  // deterministic and diffable and never holds two events of one type.
+  const found: DetectedEvent[] = [];
 
   const add = (
     type: FlightEventType,
     previousValue: Record<string, unknown> | null,
     newValue: Record<string, unknown>,
   ): void => {
-    found.set(type, { type, previousValue, newValue, source });
+    found.push({ type, previousValue, newValue, source });
   };
 
   // --- cancellation ---------------------------------------------------------
@@ -147,7 +145,7 @@ export function detectChanges(
     add('cancelled', { status: previous.status }, { status: fresh.status });
     // A cancelled flight's gate vanishing and its times going stale are not
     // separate news. One event, so one notification.
-    return [found.get('cancelled') as DetectedEvent];
+    return found;
   }
 
   // --- diversion ------------------------------------------------------------
@@ -172,11 +170,11 @@ export function detectChanges(
     fresh.estimatedDepartureUtc,
     fresh.actualDepartureUtc,
   );
-  const previousMs = millis(previousDeparture);
-  const freshMs = millis(freshDeparture);
+  const previousMs = toMs(previousDeparture);
+  const freshMs = toMs(freshDeparture);
 
   if (previousMs !== null && freshMs !== null) {
-    const movedMinutes = Math.round((freshMs - previousMs) / 60_000);
+    const movedMinutes = durationMinutes(previousMs, freshMs);
     if (movedMinutes > threshold) {
       add(
         'delay',
@@ -228,8 +226,5 @@ export function detectChanges(
     );
   }
 
-  return EMIT_ORDER.flatMap((type) => {
-    const event = found.get(type);
-    return event === undefined ? [] : [event];
-  });
+  return found;
 }

@@ -25,30 +25,28 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 /** Pino levels, so `LOG_LEVEL` cannot be a string the logger rejects at boot. */
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 
-const POSTGRES_PROTOCOLS = new Set(['postgres:', 'postgresql:']);
-
 /**
- * True for a parseable `postgres://` / `postgresql://` URL.
+ * A predicate: true for a parseable URL with one of `protocols`.
  *
  * Kept as a predicate rather than a `z.url()` so that zod's issue carries our own
  * static message instead of anything derived from the input.
  */
-function isPostgresUrl(value: string): boolean {
-  try {
-    return POSTGRES_PROTOCOLS.has(new URL(value).protocol);
-  } catch {
-    return false;
-  }
+function hasProtocol(...protocols: string[]): (value: string) => boolean {
+  const accepted = new Set(protocols);
+  return (value) => {
+    try {
+      return accepted.has(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  };
 }
 
-/** True for a parseable `https://` URL. A predicate for the same reason as above. */
-function isHttpsUrl(value: string): boolean {
-  try {
-    return new URL(value).protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
+/** A parseable `postgres://` / `postgresql://` URL. */
+const isPostgresUrl = hasProtocol('postgres:', 'postgresql:');
+
+/** A parseable `https://` URL. */
+const isHttpsUrl = hasProtocol('https:');
 
 export const configSchema = z.object({
   /**
@@ -200,6 +198,16 @@ export function parseConfig(source: NodeJS.ProcessEnv = process.env): Config {
   }
   const problems = [...seen].map(([name, code]) => `${name} (${code})`).join(', ');
   throw new ConfigError([...seen.keys()], `Invalid environment: ${problems}`);
+}
+
+/**
+ * The ADR 0004 backup cadence as the ladder takes it: `undefined` when
+ * `WEBHOOK_BACKUP_POLL_MS` is 0, which restores §7.6's "no polling at all".
+ */
+export function webhookBackupIntervalMs(
+  config: Pick<Config, 'WEBHOOK_BACKUP_POLL_MS'>,
+): number | undefined {
+  return config.WEBHOOK_BACKUP_POLL_MS > 0 ? config.WEBHOOK_BACKUP_POLL_MS : undefined;
 }
 
 /** `loadEnvFile()` then `parseConfig()`. What `main.ts` calls. */

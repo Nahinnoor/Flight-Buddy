@@ -70,10 +70,11 @@ import {
 import type { FlightCandidate } from '@flightbuddy/shared';
 
 import { withClient, type Pool, type PoolClient } from '../db';
+import { errorName } from '../errors';
 import type { Logger } from '../logger';
 import { detectChanges, type FlightEventType } from './changeDetector';
 import { nextPollAt } from './ladder';
-import { DEFAULT_LEASE_MS, releaseLease } from './lease';
+import { DEFAULT_LEASE_MS, LEASE_FREE_SQL, LEASE_UNTIL_SQL, releaseLease } from './lease';
 import { ladderViewOf, operatingDesignator } from './poll';
 import { notifyingEventTypes } from './notificationPolicy';
 import {
@@ -140,10 +141,10 @@ export const FIND_SUBSCRIBED_FLIGHTS_SQL = `select id, operating_carrier_iata, o
  * (lease.ts), so the two paths never process one flight concurrently.
  */
 export const LEASE_FLIGHT_FOR_WEBHOOK_SQL = `update public.flights
-   set poll_lease_until = now() + ($2::double precision * interval '1 millisecond')
+   set poll_lease_until = ${LEASE_UNTIL_SQL}
  where id = $1
    and archived_at is null
-   and (poll_lease_until is null or poll_lease_until < now())
+   and ${LEASE_FREE_SQL}
 returning *`;
 
 /** After a delivery was applied: the ladder's answer, and the lease handed back. */
@@ -151,15 +152,6 @@ export const WEBHOOK_APPLIED_SQL = `update public.flights
    set next_poll_at = $2,
        poll_lease_until = null
  where id = $1`;
-
-/**
- * §7.6: the balance every delivery carries is free monitoring. The statement and
- * its int4 guard live in `repository.ts`, shared with the hourly `credit-check`;
- * re-exported here so existing imports keep working.
- */
-export { INSERT_CREDIT_LOG_SQL } from './repository';
-
-export const CREDIT_LOG_SOURCE = CREDIT_LOG_SOURCES.WEBHOOK_PAYLOAD;
 
 /** Fixed reason codes written to `last_error` for rows that are done but not applied. */
 export const INBOX_REASONS = {
@@ -279,10 +271,6 @@ type SubscribedFlight = Pick<
   | 'origin_iata'
 >;
 
-function nameOf(error: unknown): string {
-  return error instanceof Error ? error.name : 'UnknownError';
-}
-
 /**
  * Pair each delivered leg with the row it describes.
  *
@@ -381,14 +369,13 @@ async function applyLeg(
     await ingestFlight(fresh, deps.writer, { now: () => now });
     // The events and their deliveries in one statement. Verified gate and
     // cancellation events notify from the POLLED leg, never the webhook's.
-    const recorded = await recordFlightEvents(
+    const { eventIds, deliveries } = await recordFlightEvents(
       deps.pool,
       current.id,
       events,
       notifyingEventTypes(events, fresh),
     );
-    const eventIds = recorded.eventIds;
-    if (recorded.deliveries > 0) deps.onDeliveriesCreated?.(recorded.deliveries);
+    if (deliveries > 0) deps.onDeliveriesCreated?.(deliveries);
 
     // A subscribed `live` flight keeps the ADR 0004 backup cadence (null only when
     // that is disabled); a landed one gets its landed + 30 min poll, which
@@ -417,14 +404,18 @@ async function applyLeg(
   }
 }
 
-/** §7.6: log a delivery's balance to `provider_credit_log`, when it carries one. */
+/**
+ * §7.6: log a delivery's balance to `provider_credit_log`, when it carries one —
+ * free monitoring. The statement and its int4 guard live in `repository.ts`,
+ * shared with the hourly `credit-check`.
+ */
 async function logDeliveryBalance(
   deps: WebhookIngestDeps,
   inboxId: string,
   credits: number | null,
 ): Promise<void> {
   if (credits !== null && isLoggableBalance(credits)) {
-    await insertCreditLog(deps.pool, credits, CREDIT_LOG_SOURCE);
+    await insertCreditLog(deps.pool, credits, CREDIT_LOG_SOURCES.WEBHOOK_PAYLOAD);
   } else if (credits !== null) {
     // The delivery schema already requires an integer, so only an int4 overflow
     // reaches here. Say so, as `credit-check` does; the value itself is not logged.
@@ -437,6 +428,18 @@ async function logDeliveryBalance(
 
 async function markDone(client: PoolClient, inboxId: string, reason: string | null): Promise<void> {
   await client.query({ text: MARK_INBOX_DONE_SQL, values: [inboxId, reason], types: ENGINE_TYPES });
+}
+
+/** The per-leg results of a delivery, aggregated onto its outcome. */
+function fromApplied(
+  applied: readonly AppliedLeg[],
+): Pick<InboxOutcome, 'flightIds' | 'events' | 'eventIds' | 'verifications'> {
+  return {
+    flightIds: applied.map((leg) => leg.flightId),
+    events: applied.flatMap((leg) => leg.events),
+    eventIds: applied.flatMap((leg) => leg.eventIds),
+    verifications: applied.filter((leg) => leg.verified).length,
+  };
 }
 
 function outcome(
@@ -541,12 +544,7 @@ async function handleRow(
         // No inbox write: the row stays unprocessed and uncounted. Legs already
         // applied are idempotent on the retry — they diff to nothing.
         logger.debug({ inboxId: row.id, flightId }, 'flight leased by a poll; delivery deferred');
-        return outcome(row.id, 'deferred', {
-          flightIds: applied.map((leg) => leg.flightId),
-          events: applied.flatMap((leg) => leg.events),
-          eventIds: applied.flatMap((leg) => leg.eventIds),
-          verifications: applied.filter((leg) => leg.verified).length,
-        });
+        return outcome(row.id, 'deferred', fromApplied(applied));
       }
       applied.push(result);
     }
@@ -556,12 +554,7 @@ async function handleRow(
 
     await markDone(client, row.id, null);
 
-    const result = outcome(row.id, 'processed', {
-      flightIds: applied.map((leg) => leg.flightId),
-      events: applied.flatMap((leg) => leg.events),
-      eventIds: applied.flatMap((leg) => leg.eventIds),
-      verifications: applied.filter((leg) => leg.verified).length,
-    });
+    const result = outcome(row.id, 'processed', fromApplied(applied));
     logger.info(
       {
         inboxId: row.id,
@@ -577,10 +570,10 @@ async function handleRow(
     return result;
   } catch (error) {
     // 5. Count it; give up at the cap. Class name only — never a message.
-    const errorName = nameOf(error);
+    const name = errorName(error);
     const marked = await client.query<{ attempts: number; processed_at: string | null }>({
       text: MARK_INBOX_FAILED_SQL,
-      values: [row.id, errorName, INBOX_MAX_ATTEMPTS],
+      values: [row.id, name, INBOX_MAX_ATTEMPTS],
       types: ENGINE_TYPES,
     });
     const state = marked.rows[0];
@@ -588,16 +581,16 @@ async function handleRow(
 
     if (abandoned) {
       logger.error(
-        { inboxId: row.id, attempts: state.attempts, errorName },
+        { inboxId: row.id, attempts: state.attempts, errorName: name },
         `webhook delivery abandoned after ${INBOX_MAX_ATTEMPTS} attempts`,
       );
     } else {
       logger.warn(
-        { inboxId: row.id, attempts: state?.attempts, errorName },
+        { inboxId: row.id, attempts: state?.attempts, errorName: name },
         'webhook delivery failed; will retry',
       );
     }
-    return outcome(row.id, abandoned ? 'abandoned' : 'failed', { errorName });
+    return outcome(row.id, abandoned ? 'abandoned' : 'failed', { errorName: name });
   }
 }
 
@@ -636,6 +629,17 @@ async function claimAndHandle(
   }
 }
 
+/** The `DrainSummary` counter each outcome kind adds one to. */
+const COUNTER = {
+  processed: 'processed',
+  unknown_subscription: 'unknownSubscription',
+  no_tracked_leg: 'noTrackedLeg',
+  invalid: 'invalid',
+  deferred: 'deferred',
+  failed: 'failed',
+  abandoned: 'abandoned',
+} as const satisfies Record<InboxOutcomeKind, keyof DrainSummary>;
+
 /**
  * Drain up to `batchSize` inbox rows, one transaction per row.
  *
@@ -666,29 +670,7 @@ export async function drainWebhookInbox(deps: WebhookIngestDeps): Promise<DrainS
     summary.claimed += 1;
     summary.events += result.events.length;
     summary.outcomes.push(result);
-    switch (result.kind) {
-      case 'processed':
-        summary.processed += 1;
-        break;
-      case 'unknown_subscription':
-        summary.unknownSubscription += 1;
-        break;
-      case 'no_tracked_leg':
-        summary.noTrackedLeg += 1;
-        break;
-      case 'invalid':
-        summary.invalid += 1;
-        break;
-      case 'deferred':
-        summary.deferred += 1;
-        break;
-      case 'failed':
-        summary.failed += 1;
-        break;
-      case 'abandoned':
-        summary.abandoned += 1;
-        break;
-    }
+    summary[COUNTER[result.kind]] += 1;
   }
 
   if (summary.claimed > 0) {
@@ -750,9 +732,9 @@ export function createInboxDrainer(deps: WebhookIngestDeps): InboxDrainer {
         return summary;
       } catch (error) {
         const code = sqlStateOf(error);
-        const key = code ?? nameOf(error);
+        const key = code ?? errorName(error);
         const unavailable = code !== null && INBOX_UNAVAILABLE_CODES.has(code);
-        const fields = { errorName: nameOf(error), code };
+        const fields = { errorName: errorName(error), code };
 
         if (key === lastFailure) {
           deps.logger.debug(fields, 'webhook inbox drain still failing');

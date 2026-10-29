@@ -31,6 +31,9 @@
  * open the right flight, no personal data (PHASE2_PLAN §5).
  */
 import {
+  airportIataSchema,
+  carrierIataSchema,
+  flightNumberSchema,
   formatAirportLocal,
   isValidTimeZone,
   localDateAtAirport,
@@ -69,9 +72,6 @@ export interface PushCopy {
   data: { flightId: string; eventType: FlightEventType };
 }
 
-const CARRIER = /^[A-Z0-9]{2}$/;
-const FLIGHT_NUMBER = /^[0-9]{1,4}[A-Z]?$/;
-const IATA = /^[A-Z]{3}$/;
 /** Gates like `B12`, `12A`, `C-5`, `A1`. Short and plain on purpose. */
 const GATE = /^[A-Za-z0-9-]{1,6}$/;
 const TERMINAL = /^[A-Za-z0-9-]{1,4}$/;
@@ -79,10 +79,14 @@ const LOCAL_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function clean(value: unknown, shape: RegExp): string | null {
+/** A shared zod schema (carrier, flight number, airport) or one of the patterns above. */
+type Shape = RegExp | { safeParse(value: string): { success: boolean } };
+
+function clean(value: unknown, shape: Shape): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  return shape.test(trimmed) ? trimmed : null;
+  const ok = shape instanceof RegExp ? shape.test(trimmed) : shape.safeParse(trimmed).success;
+  return ok ? trimmed : null;
 }
 
 function field(record: unknown, key: string): unknown {
@@ -93,19 +97,19 @@ function field(record: unknown, key: string): unknown {
 
 /** "DL 1915": the user's number if the segment has one, else the operating one. */
 export function displayFlightNumber(facts: MessageFacts): string | null {
-  const marketingCarrier = clean(facts.marketingCarrierIata, CARRIER);
-  const marketingNumber = clean(facts.marketingFlightNumber, FLIGHT_NUMBER);
+  const marketingCarrier = clean(facts.marketingCarrierIata, carrierIataSchema);
+  const marketingNumber = clean(facts.marketingFlightNumber, flightNumberSchema);
   if (marketingCarrier !== null && marketingNumber !== null) {
     return `${marketingCarrier} ${marketingNumber}`;
   }
-  const carrier = clean(facts.operatingCarrierIata, CARRIER);
-  const number = clean(facts.operatingFlightNumber, FLIGHT_NUMBER);
+  const carrier = clean(facts.operatingCarrierIata, carrierIataSchema);
+  const number = clean(facts.operatingFlightNumber, flightNumberSchema);
   return carrier !== null && number !== null ? `${carrier} ${number}` : null;
 }
 
 function route(facts: MessageFacts): string | null {
-  const origin = clean(facts.originIata, IATA);
-  const destination = clean(facts.destinationIata, IATA);
+  const origin = clean(facts.originIata, airportIataSchema);
+  const destination = clean(facts.destinationIata, airportIataSchema);
   return origin !== null && destination !== null ? `${origin} → ${destination}` : null;
 }
 
@@ -167,8 +171,8 @@ function positiveMinutes(value: unknown): number | null {
 export function buildPushCopy(facts: MessageFacts): PushCopy {
   const flight = displayFlightNumber(facts) ?? 'Your flight';
   const path = route(facts);
-  const origin = clean(facts.originIata, IATA);
-  const destination = clean(facts.destinationIata, IATA);
+  const origin = clean(facts.originIata, airportIataSchema);
+  const destination = clean(facts.destinationIata, airportIataSchema);
   const date = facts.departureDateLocal;
   const departureTime = (utc: unknown) => airportTime(utc, facts.originTz, date);
   const arrivalTime = (utc: unknown) => airportTime(utc, facts.destinationTz, date);
@@ -244,7 +248,7 @@ export function buildPushCopy(facts: MessageFacts): PushCopy {
     }
 
     case 'diverted': {
-      const newDestination = clean(field(facts.newValue, 'destinationIata'), IATA);
+      const newDestination = clean(field(facts.newValue, 'destinationIata'), airportIataSchema);
       title = `${flight} diverted`;
       // Not `route()`: the stored destination may already be the new one.
       body =

@@ -31,7 +31,9 @@
 import type { FlightDataProvider } from '@flightbuddy/flight-provider';
 
 import type { Pool } from '../db';
+import { errorName } from '../errors';
 import type { Logger } from '../logger';
+import { toMs } from './ladder';
 import { ENGINE_TYPES, type FlightRow } from './types';
 
 /** Long enough to cover one subscribe (create + store) and one reconcile (list + read). */
@@ -76,10 +78,6 @@ export interface ReconcileResult {
 
 type ClaimRow = Pick<FlightRow, 'id' | 'alert_subscription_id' | 'alert_subscribed_at'>;
 
-function nameOf(error: unknown): string {
-  return error instanceof Error ? error.name : 'UnknownError';
-}
-
 /**
  * One reconcile run. A provider failure on the list ends the run quietly (logged);
  * acting on a list we could not read would be acting on nothing. A database
@@ -102,9 +100,8 @@ export async function reconcileSubscriptions(deps: ReconcileDeps): Promise<Recon
   const now = (deps.now ?? (() => new Date()))();
   const cutoff = now.getTime() - (deps.graceMs ?? RECONCILE_GRACE_MS);
   const isYoung = (iso: string | null): boolean => {
-    if (iso === null) return false;
-    const at = Date.parse(iso);
-    return !Number.isNaN(at) && at > cutoff;
+    const at = toMs(iso);
+    return at !== null && at > cutoff;
   };
 
   let subscriptions;
@@ -113,7 +110,7 @@ export async function reconcileSubscriptions(deps: ReconcileDeps): Promise<Recon
     subscriptions = await deps.provider.listSubscriptions();
   } catch (error) {
     deps.logger.warn(
-      { job: 'reconcile-subscriptions', errorName: nameOf(error) },
+      { job: 'reconcile-subscriptions', errorName: errorName(error) },
       'could not list provider subscriptions; reconcile skipped this hour',
     );
     return { ...result, skipped: true };
@@ -150,7 +147,7 @@ export async function reconcileSubscriptions(deps: ReconcileDeps): Promise<Recon
         {
           job: 'reconcile-subscriptions',
           subscriptionId: sub.subscriptionId,
-          errorName: nameOf(error),
+          errorName: errorName(error),
         },
         'could not delete an orphaned subscription; next run retries',
       );

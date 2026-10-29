@@ -128,31 +128,26 @@ const requestErrors = z.looseObject({
   errors: z.array(z.looseObject({ code: z.unknown().optional() })).min(1),
 });
 
+/** An error ticket or receipt, keeping only its sanitised code; `null` if `raw` is not one. */
+function readError(raw: unknown): { status: 'error'; errorCode: string } | null {
+  const error = errorShape.safeParse(raw);
+  if (!error.success) return null;
+  const code = error.data.details?.error;
+  return {
+    status: 'error',
+    errorCode: code === undefined ? 'UnknownExpoError' : sanitizeExpoCode(code),
+  };
+}
+
 function readTicket(raw: unknown): ExpoTicket {
   const ok = okTicket.safeParse(raw);
   if (ok.success) return { status: 'ok', id: ok.data.id };
-  const error = errorShape.safeParse(raw);
-  if (error.success) {
-    const code = error.data.details?.error;
-    return {
-      status: 'error',
-      errorCode: code === undefined ? 'UnknownExpoError' : sanitizeExpoCode(code),
-    };
-  }
-  return { status: 'unreadable' };
+  return readError(raw) ?? { status: 'unreadable' };
 }
 
 function readReceipt(raw: unknown): ExpoReceipt | null {
   if (okReceipt.safeParse(raw).success) return { status: 'ok' };
-  const error = errorShape.safeParse(raw);
-  if (error.success) {
-    const code = error.data.details?.error;
-    return {
-      status: 'error',
-      errorCode: code === undefined ? 'UnknownExpoError' : sanitizeExpoCode(code),
-    };
-  }
-  return null;
+  return readError(raw);
 }
 
 export interface ExpoPushClient {

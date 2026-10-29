@@ -48,11 +48,6 @@ export const SUPABASE_ROOT_CA_PATH = resolve(
   '../certs/supabase-prod-ca-2021.crt',
 );
 
-/**
- * The role is capped at 10 connections and one Render worker is the only thing
- * using it, but pg-boss opens its own pool on the same login — so this half is
- * five, leaving five for the queue.
- */
 // The role allows 10 connections. Two pools (this one and pg-boss's) of 3 leave
 // four spare for a redeploy overlap or a local integration run.
 export const MAX_POOL_CONNECTIONS = 3;

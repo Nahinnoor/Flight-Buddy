@@ -10,9 +10,8 @@
  *   owns (§8.7). That schema is not exposed through Supabase's REST API, so job
  *   payloads are not reachable from a browser (§5, "Keys and privilege").
  *
- * Wave 1 registered the *shape*: the queues exist and the schedules tick, with
- * handlers that log and return. Waves 3–5 replace the bodies; nothing about the
- * wiring below should need to change when they do.
+ * This module owns the wiring — queues, schedules, workers — and none of the
+ * bodies: `main.ts` supplies those, because they need the pool and the provider.
  */
 import { PgBoss, type Job } from 'pg-boss';
 
@@ -24,29 +23,25 @@ import { OPERATOR_ALERT_RETRY } from './push/operatorAlerts';
 /** Owned by `flightbuddy_worker` (migration `20260915021807_worker_role`). */
 export const PGBOSS_SCHEMA = 'pgboss';
 
-/**
- * Work queues. Declared here so the queue rows exist from the first boot; the
- * consumers land in later waves.
- */
+/** Work queues. Declared here so the queue rows exist from the first boot. */
 export const QUEUE_NAMES = {
   /**
-   * Declared in wave 1 for alert ingestion, but wave 3 does not use it: the API's
-   * receiver writes each delivery to `public.webhook_inbox`, a durable queue in its
-   * own right, and the worker loop drains that table directly
-   * (`engine/webhookIngest.ts`). Kept declared so removing it is a deliberate
-   * decision rather than a side effect.
+   * Declared for alert ingestion but unused: the API's receiver writes each
+   * delivery to `public.webhook_inbox`, a durable queue in its own right, and the
+   * worker loop drains that table directly (`engine/webhookIngest.ts`). Kept
+   * declared so removing it is a deliberate decision rather than a side effect.
    */
   WEBHOOK_INGEST: 'webhook-ingest',
   /**
-   * Wave 5: send pending `notification_deliveries` through Expo
-   * (`push/pushSend.ts`). Scheduled every minute as a sweep, and also sent on
-   * demand whenever the poll or webhook path creates deliveries.
+   * Send pending `notification_deliveries` through Expo (`push/pushSend.ts`).
+   * Scheduled every minute as a sweep, and also sent on demand whenever the poll
+   * or webhook path creates deliveries.
    */
   PUSH_SEND: 'push-send',
-  /** Wave 5: Expo receipt reads, which clear dead tokens (§8.10). Scheduled. */
+  /** Expo receipt reads, which clear dead tokens (§8.10). Scheduled. */
   PUSH_RECEIPTS: 'push-receipts',
   /**
-   * Wave 5: a push to the operator's own phone (`push/operatorAlerts.ts`). Not
+   * A push to the operator's own phone (`push/operatorAlerts.ts`). Not
    * scheduled; sent by the credit monitor and the push pipeline, retried by
    * pg-boss per `QUEUE_OPTIONS`.
    */
@@ -73,7 +68,8 @@ export interface ScheduledJob {
 }
 
 /**
- * The three schedules from PHASE2_PLAN §4 and §6 (wave 4 implements their bodies).
+ * The scheduled jobs: the three housekeeping jobs from PHASE2_PLAN §4 and §6,
+ * and the two push sweeps.
  *
  * The plan fixes the cadence — hourly, hourly, daily — and leaves the minute to us.
  * They are spread across the hour on purpose: both hourly jobs call RapidAPI, and
@@ -125,59 +121,30 @@ export type JobBatch = Job<object>[];
 export type ScheduledHandler = (jobs: JobBatch) => Promise<void>;
 
 /**
- * The no-op bodies wave 1 ships. Each logs that it ran and returns, which is enough
- * to prove the scheduler fires on the deployed worker before any of it does work.
+ * Placeholder bodies: each logs that it ran and returns. `main.ts` supplies every
+ * real body through `startQueue`'s `handlers` override, so these are only the
+ * fallback a test or a bare `startQueue` gets.
  *
- * `main.ts` supplies the real `archive-backstop` (wave 2),
- * `reconcile-subscriptions` (wave 3) and `credit-check` (wave 4,
- * `engine/creditMonitor.ts`) through `startQueue`'s `handlers` override, so every
- * body below is now only the fallback a test or a bare `startQueue` gets.
- *
- * Handlers must stay idempotent when they grow bodies (§5, "Engineering basics"):
- * a `missed: 'once'` catch-up or a redelivery can run the same occurrence twice.
+ * Real handlers must be idempotent (§5, "Engineering basics"): a
+ * `missed: 'once'` catch-up or a redelivery can run the same occurrence twice.
  */
 export function createScheduledHandlers(logger: Logger): Record<string, ScheduledHandler> {
-  async function handleCreditCheck(jobs: JobBatch): Promise<void> {
-    logger.info(
-      { job: 'credit-check', count: jobs.length },
-      'scheduled job ran (no-op; the real body is injected by main.ts)',
-    );
-  }
-
-  async function handleReconcileSubscriptions(jobs: JobBatch): Promise<void> {
-    logger.info(
-      { job: 'reconcile-subscriptions', count: jobs.length },
-      'scheduled job ran (no-op; the real body is injected by main.ts)',
-    );
-  }
-
-  async function handleArchiveBackstop(jobs: JobBatch): Promise<void> {
-    logger.info(
-      { job: 'archive-backstop', count: jobs.length },
-      'scheduled job ran (no-op; the real body is injected by main.ts)',
-    );
-  }
-
-  async function handlePushSend(jobs: JobBatch): Promise<void> {
-    logger.debug(
-      { job: 'push-send', count: jobs.length },
-      'scheduled job ran (no-op; the real body is injected by main.ts)',
-    );
-  }
-
-  async function handlePushReceipts(jobs: JobBatch): Promise<void> {
-    logger.debug(
-      { job: 'push-receipts', count: jobs.length },
-      'scheduled job ran (no-op; the real body is injected by main.ts)',
-    );
-  }
+  const noop =
+    (job: string, level: 'info' | 'debug'): ScheduledHandler =>
+    async (jobs) => {
+      logger[level](
+        { job, count: jobs.length },
+        'scheduled job ran (no-op; the real body is injected by main.ts)',
+      );
+    };
 
   return {
-    'credit-check': handleCreditCheck,
-    'reconcile-subscriptions': handleReconcileSubscriptions,
-    'archive-backstop': handleArchiveBackstop,
-    'push-send': handlePushSend,
-    'push-receipts': handlePushReceipts,
+    'credit-check': noop('credit-check', 'info'),
+    'reconcile-subscriptions': noop('reconcile-subscriptions', 'info'),
+    'archive-backstop': noop('archive-backstop', 'info'),
+    // Every minute and every five: debug, so the fallback does not flood the log.
+    'push-send': noop('push-send', 'debug'),
+    'push-receipts': noop('push-receipts', 'debug'),
   };
 }
 

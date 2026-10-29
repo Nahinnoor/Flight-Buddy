@@ -33,6 +33,12 @@ import { ENGINE_TYPES, type FlightRow } from './types';
 /** §7.5. Long enough for a slow provider call, short enough that a killed worker's row comes back quickly. */
 export const DEFAULT_LEASE_MS = 120_000;
 
+/** The lease's new end. `$2` = the lease length in ms, in every statement using it. */
+export const LEASE_UNTIL_SQL = `now() + ($2::double precision * interval '1 millisecond')`;
+
+/** No live lease: never leased, or the lease has expired. */
+export const LEASE_FREE_SQL = `(poll_lease_until is null or poll_lease_until < now())`;
+
 /**
  * §7.5's statement, parameterised.
  *
@@ -43,14 +49,14 @@ export const DEFAULT_LEASE_MS = 120_000;
  * claimable.
  */
 export const CLAIM_DUE_FLIGHTS_SQL = `update public.flights
-   set poll_lease_until = now() + ($2::double precision * interval '1 millisecond')
+   set poll_lease_until = ${LEASE_UNTIL_SQL}
  where id in (
    select id
      from public.flights
     where archived_at is null
       and next_poll_at is not null
       and next_poll_at <= now()
-      and (poll_lease_until is null or poll_lease_until < now())
+      and ${LEASE_FREE_SQL}
     order by next_poll_at
     limit $1
     for update skip locked

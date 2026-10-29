@@ -160,7 +160,6 @@ that both call RapidAPI do not land on the same minute as each other or as a pol
 | `src/db.ts` | The `pg` pool, `withClient`, `ping`. |
 | `src/queue.ts` | pg-boss, the declared queues and the three schedules. |
 | `src/logger.ts` | pino, JSON, with the redaction list. |
-| `src/index.ts` | The workspace's importable surface — importing it does not start a worker. |
 | `certs/` | Supabase's public root CA, the only TLS trust anchor. |
 
 ### `src/engine/` — the polling engine (wave 2)

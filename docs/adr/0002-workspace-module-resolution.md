@@ -19,6 +19,9 @@ parallel during Phase 1.
 uses extensionless relative imports, which is the only specifier style Metro, `tsx` and `tsc` all
 agree on. There is no build step in Phase 1.
 
+Workspaces that nothing imports, such as `services/poller` (2026-10-28), have no `src/index.ts` and
+no `main`/`types`/`exports`; they are started from their entry file (`tsx src/main.ts`).
+
 ## Consequences
 
 - No build ordering: `npm run typecheck` and `npm test` work on a fresh clone after `npm install`.

@@ -34,7 +34,6 @@
  * is never handed to the logger.
  */
 import {
-  FlightIngestError,
   ingestFlight,
   lookupCandidates,
   type FlightsWriter,
@@ -44,6 +43,7 @@ import {
 import type { FlightCandidate } from '@flightbuddy/shared';
 
 import type { Pool } from '../db';
+import { errorName } from '../errors';
 import type { Logger } from '../logger';
 import { detectChanges, type DetectedEvent, type FlightEventType } from './changeDetector';
 import {
@@ -261,14 +261,14 @@ export async function pollAndUpdate(
         // nothing ever subscribed (§7.3). ICAO and error class only.
         onFeedHealthError: (icao, error) => {
           deps.logger.warn(
-            { flightId: flight.id, icao, errorName: nameOf(error) },
+            { flightId: flight.id, icao, errorName: errorName(error) },
             'feed health unavailable: flight stays on the scheduled tier',
           );
         },
       },
     );
   } catch (error) {
-    return fail(flight, deps, now, rng, 'provider_error', nameOf(error));
+    return fail(flight, deps, now, rng, 'provider_error', errorName(error));
   }
 
   // Match the leg, never `[0]`: one number can operate several legs on one date
@@ -372,7 +372,7 @@ export async function pollAndUpdate(
       archivedAt,
     });
   } catch (error) {
-    return fail(flight, deps, now, rng, 'write_failed', nameOf(error));
+    return fail(flight, deps, now, rng, 'write_failed', errorName(error));
   }
 
   deps.logger.info(
@@ -392,16 +392,4 @@ export async function pollAndUpdate(
     nextPollAt: next,
     archived: archivedAt !== null,
   };
-}
-
-/**
- * The error's class name, and nothing else.
- *
- * `ProviderError` carries a truncated response body and `FlightIngestError` carries
- * Postgres detail; neither belongs in a log line, so only the name escapes.
- */
-function nameOf(error: unknown): string {
-  if (error instanceof FlightIngestError) return error.name;
-  if (error instanceof Error) return error.name;
-  return 'UnknownError';
 }

@@ -38,17 +38,15 @@
  */
 import type { FlightStatus } from '@flightbuddy/shared';
 
-import { FLIGHT_EVENT_TYPES, type DetectedEvent, type FlightEventType } from './changeDetector';
+import {
+  FLIGHT_EVENT_TYPES,
+  hasDeparted,
+  type DetectedEvent,
+  type FlightEventType,
+} from './changeDetector';
 
 /** Transitions that physically happen once per flight: notify once per user per flight. */
 export const ONCE_PER_FLIGHT_EVENT_TYPES: readonly FlightEventType[] = ['departed', 'landed'];
-
-const AIRBORNE_STATUSES: ReadonlySet<FlightStatus> = new Set<FlightStatus>([
-  'departed',
-  'en_route',
-  'diverted',
-  'landed',
-]);
 
 /** The fresh state the events were detected against. */
 export interface PolicyState {
@@ -58,7 +56,7 @@ export interface PolicyState {
 
 /**
  * The event types in this batch that should notify, in `FLIGHT_EVENT_TYPES`
- * order. A batch never holds two events of one type (the detector keys by type).
+ * order. A batch never holds two events of one type (each detector branch runs once).
  */
 export function notifyingEventTypes(
   events: readonly Pick<DetectedEvent, 'type'>[],
@@ -70,8 +68,7 @@ export function notifyingEventTypes(
     return present.has('cancelled') ? ['cancelled'] : [];
   }
 
-  const airborne = fresh.actualDepartureUtc !== null || AIRBORNE_STATUSES.has(fresh.status);
-  if (airborne) {
+  if (hasDeparted(fresh.status, fresh.actualDepartureUtc)) {
     present.delete('gate_change');
     present.delete('delay');
   }

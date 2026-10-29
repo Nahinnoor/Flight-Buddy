@@ -66,8 +66,6 @@ import {
 import type { OperatorAlertSink } from './operatorAlerts';
 import { countCodes } from './pushSend';
 
-export { SETTLE_DELIVERIES_SQL } from './deviceSends';
-
 /** Receipt requests per run. */
 export const MAX_RECEIPT_BATCHES_PER_RUN = 5;
 

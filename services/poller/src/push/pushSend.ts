@@ -44,6 +44,7 @@
  * Delivery and event ids, counts, and Expo error **codes**. Never a push token,
  * never a title or body, never an Expo error message (it quotes the token).
  */
+import { flightStatusSchema } from '@flightbuddy/shared';
 import { z } from 'zod';
 
 import type { Pool } from '../db';
@@ -80,8 +81,6 @@ import {
 import { buildPushCopy, type MessageFacts } from './messages';
 import type { OperatorAlertSink } from './operatorAlerts';
 import { isExpoPushToken, pushTokenSha256 } from './tokens';
-
-export { CLOSE_EXHAUSTED_SENDS_SQL, FINALIZE_SENDS_SQL } from './deviceSends';
 
 /** Android channel the app registers (`apps/mobile/src/lib/push.ts`). */
 export const ANDROID_CHANNEL_ID = 'flight-updates';
@@ -160,17 +159,6 @@ export const LOAD_DELIVERY_FACTS_SQL = `select d.id as delivery_id,
 // --- types ------------------------------------------------------------------
 
 const eventTypeSchema = z.enum(FLIGHT_EVENT_TYPES);
-const flightStatusSchema = z.enum([
-  'scheduled',
-  'delayed',
-  'boarding',
-  'departed',
-  'en_route',
-  'diverted',
-  'landed',
-  'cancelled',
-  'unknown',
-]);
 
 interface FactsRow {
   delivery_id: string;
@@ -335,6 +323,11 @@ interface Outgoing {
   message: ExpoPushMessage;
 }
 
+/** A device row closed as `failed` with `error`, and no ticket. */
+function failedSend(deliveryId: string, tokenSha256: string, error: string): DeviceSendRecord {
+  return { deliveryId, tokenSha256, status: 'failed', ticketId: null, error };
+}
+
 /** Per delivery: the retryable failure codes of its devices this attempt. */
 type RetryCodes = Map<string, string[]>;
 
@@ -358,10 +351,14 @@ async function recordChunk(
   sentAt: string,
 ): Promise<void> {
   const written = await recordDeviceSends(deps.pool, records, sentAt);
+  // The first record per device, as `records.find` would return it.
+  const recordOf = new Map<string, DeviceSendRecord>();
+  for (const record of records) {
+    const key = JSON.stringify([record.deliveryId, record.tokenSha256]);
+    if (!recordOf.has(key)) recordOf.set(key, record);
+  }
   for (const row of written) {
-    const record = records.find(
-      (r) => r.deliveryId === row.delivery_id && r.tokenSha256 === row.token_sha256,
-    );
+    const record = recordOf.get(JSON.stringify([row.delivery_id, row.token_sha256]));
     if (record?.error !== EXPO_ERROR_CODES.DEVICE_NOT_REGISTERED) continue;
     const userId = userOf.get(row.delivery_id);
     if (userId === undefined) continue;
@@ -383,13 +380,7 @@ function retryOrCloseDevice(
   summary: PushSendSummary,
 ): void {
   if (item.row.attempts >= MAX_SEND_ATTEMPTS) {
-    records.push({
-      deliveryId: item.row.delivery_id,
-      tokenSha256: item.tokenSha256,
-      status: 'failed',
-      ticketId: null,
-      error: code,
-    });
+    records.push(failedSend(item.row.delivery_id, item.tokenSha256, code));
     summary.failed += 1;
     return;
   }
@@ -491,13 +482,9 @@ async function runBatch(
     for (const device of targets) {
       if (!isExpoPushToken(device.token)) {
         // The table's check constraint makes this unreachable; never sent.
-        unsendable.push({
-          deliveryId: row.delivery_id,
-          tokenSha256: device.token_sha256,
-          status: 'failed',
-          ticketId: null,
-          error: DELIVERY_ERRORS.INVALID_PUSH_TOKEN,
-        });
+        unsendable.push(
+          failedSend(row.delivery_id, device.token_sha256, DELIVERY_ERRORS.INVALID_PUSH_TOKEN),
+        );
         summary.failed += 1;
         continue;
       }
@@ -566,13 +553,13 @@ async function runBatch(
       };
       if (error.kind === 'rejected') {
         for (const item of chunk) {
-          records.push({
-            deliveryId: item.row.delivery_id,
-            tokenSha256: item.tokenSha256,
-            status: 'failed',
-            ticketId: null,
-            error: error.code ?? `Http${error.status ?? 'Error'}`,
-          });
+          records.push(
+            failedSend(
+              item.row.delivery_id,
+              item.tokenSha256,
+              error.code ?? `Http${error.status ?? 'Error'}`,
+            ),
+          );
           summary.failed += 1;
         }
         logger.error(fields, 'Expo rejected the push request; those devices closed as failed');
@@ -620,7 +607,7 @@ async function runBatch(
           retryOrCloseDevice(item, code, retries, records, summary);
           continue;
         }
-        records.push({ ...base, status: 'failed', ticketId: null, error: code });
+        records.push(failedSend(item.row.delivery_id, item.tokenSha256, code));
         summary.failed += 1;
         if (code === EXPO_ERROR_CODES.INVALID_CREDENTIALS) invalidCredentials += 1;
       }

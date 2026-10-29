@@ -29,15 +29,16 @@
  * two it is unsubscribed and so on the failover ladder (hourly more than 6 h out).
  * The T-24 h boundary here does not move.
  *
- * ## The wave-3 seam
+ * ## Webhooks on or off
  *
- * Wave 3 builds subscriptions. Until it does, a `live`-tier flight inside T-24 h
- * has no webhook to fall back on, so **it keeps polling on the failover ladder** —
- * stopping now would mean a silent 24-hour blind spot on exactly the flights that
- * matter most. `webhooksEnabled` (default `false`) is the switch: with it on, a
- * `live` flight that holds an `alert_subscription_id` returns `null`, which is the
- * "set `next_poll_at = NULL`" of §7.6. Subscribing is still wave 3's job; this
- * function only decides what to do once the id is there.
+ * `webhooksEnabled` (default `false`) is the switch. Off — no `WEBHOOK_URL`, or
+ * the alert balance is exhausted (§7.7) — a `live`-tier flight inside T-24 h has
+ * no webhook to fall back on, so **it keeps polling on the failover ladder**:
+ * stopping would be a silent blind spot on exactly the flights that matter most.
+ * On, a `live` flight that holds an `alert_subscription_id` gets the ADR 0004
+ * backup cadence, or `null` (§7.6's "no polling") when that is disabled.
+ * Subscribing happens in `subscriptions.ts`; this function only decides what to
+ * do once the id is there.
  *
  * ## Boundaries
  *
@@ -99,8 +100,8 @@ export interface LadderFlight {
 
 export interface LadderOptions {
   /**
-   * Wave-3 seam. `false` (the default) keeps every `live`-tier flight on the
-   * failover ladder inside T-24 h, because nothing is subscribed yet.
+   * `false` (the default) keeps every `live`-tier flight on the failover ladder
+   * inside T-24 h, as if nothing were subscribed (see the module note).
    */
   webhooksEnabled?: boolean;
   /**
@@ -110,7 +111,8 @@ export interface LadderOptions {
   webhookBackupIntervalMs?: number | undefined;
 }
 
-function toMs(iso: string | null): number | null {
+/** Epoch milliseconds for an ISO instant; `null` for `null` or an unparseable string. */
+export function toMs(iso: string | null): number | null {
   if (iso === null) return null;
   const ms = new Date(iso).getTime();
   return Number.isNaN(ms) ? null : ms;
@@ -124,7 +126,7 @@ function toMs(iso: string | null): number | null {
  * that runs *early* must not pull the cadence forward past the schedule — the
  * aircraft can still leave on time.
  */
-function anchor(
+export function anchor(
   scheduled: string | null,
   estimated: string | null,
   actual: string | null,
@@ -170,7 +172,8 @@ export function applyJitter(intervalMs: number, rng: () => number): number {
 
 /**
  * The bare interval for a flight at `now`, before jitter. `null` means "do not
- * poll": `manual` tier, or a subscribed `live` flight once wave 3 is on.
+ * poll": `manual` tier, or a subscribed `live` flight with webhooks on and the
+ * backup poll disabled.
  *
  * Exported for the tests, which assert the band a boundary instant lands in
  * without having to undo the jitter.
@@ -255,7 +258,7 @@ export function ladderIntervalMs(
  * @param flight The flight as it is *after* the current poll wrote its fresh values.
  * @param now The current instant. Absolute; never derived from a local clock reading.
  * @param rng Injected uniform `[0, 1)` source for the ±10 % jitter.
- * @param options `webhooksEnabled` is wave 3's switch (see the module note).
+ * @param options `webhooksEnabled` and the backup cadence (see the module note).
  */
 export function nextPollAt(
   flight: LadderFlight,

@@ -10,7 +10,7 @@
  * 2. Decide whether the reading crossed a low-water mark (300, 100, 0).
  * 3. At zero or below, put every subscribed flight back on the polling ladder.
  * 4. Record the reading in `provider_credit_log` (`source = 'balance_check'`).
- * 5. Raise an operator alert for a crossing: logged now, pushed from wave 5.
+ * 5. Raise an operator alert for a crossing: logged, then pushed to the owner.
  *
  * ## Alerts fire once per downward crossing, from data already stored
  *
@@ -49,10 +49,7 @@
  *
  * It sets `next_poll_at = now()` on unarchived rows holding an
  * `alert_subscription_id`, and only on those — a `live` flight that has not
- * subscribed yet is untouched, because the ladder already polls it. The deployed
- * stack held both at once on 2026-09-16: a subscribed flight on the two-hour backup
- * cadence (the exact row this sweep exists for), and a `live` flight not yet
- * subscribed.
+ * subscribed yet is untouched, because the ladder already polls it.
  *
  * **The row keeps its `alert_subscription_id`.** Zero credits *pause* the
  * provider's subscriptions; they resume by themselves when the owner refills.
@@ -61,15 +58,12 @@
  * refill, because the drain finds a delivery's flights by that id.
  *
  * Keeping the id means the ladder must not read it as "webhooks have this
- * covered" — `ladderIntervalMs` returns the two-hour backup cadence for a
- * subscribed `live` flight. `pollWebhookSettings` below is how that is avoided:
- * while the balance is exhausted the poll pass runs **exactly as if webhooks were
- * off**. The ladder skips the subscribed branch and a subscribed flight is polled
- * on the failover ladder; and, with no receiver URL, `pollAndUpdate` never reaches
- * `shouldSubscribe`, so an unsubscribed `live` flight reaching its window opening during the
- * outage does not open a subscription that could deliver nothing. Closing a
- * subscription at archive, or when a flight stops being subscribable, is
- * independent of that switch and keeps working.
+ * covered" (the backup cadence). So while the balance is exhausted
+ * `pollWebhookSettings` runs the poll pass **exactly as if webhooks were off**: a
+ * subscribed flight is polled on the failover ladder, and with no receiver URL
+ * `pollAndUpdate` never reaches `shouldSubscribe`, so nothing opens a
+ * subscription that could deliver nothing. Closing a subscription at archive, or
+ * when a flight stops being subscribable, is independent of that switch.
  *
  * ### Idempotency
  *
@@ -110,15 +104,13 @@
  * in the middle of an outage does not quietly put subscribed flights back on the
  * backup cadence.
  *
- * ## Operator alerts: the wave 4 / wave 5 seam
+ * ## Operator alerts
  *
- * §7.7 step 4 and PHASE2_PLAN §8.4 route operator alerts to the owner's phone as
- * an Expo push addressed by `OPERATOR_USER_ID`. That pipeline is wave 5. Wave 4
- * builds the detection: the job returns a typed `OperatorAlert` and hands it to
- * `onOperatorAlert` when one is supplied. **Wave 5 is the consumer** — it supplies
- * `onOperatorAlert` from `main.ts`, and owns the copy and the transport. Until
- * then the log line *is* the alert (ADR 0003 decision 4: Render's logs and failure
- * emails are the interim channel): `warn` for 300 and 100, `error` for zero.
+ * §7.7 step 4: the job returns a typed `OperatorAlert`, logs it (`warn` for 300
+ * and 100, `error` for zero) and hands it to `onOperatorAlert`, which `main.ts`
+ * wires to the push sink (`push/operatorAlerts.ts`) that owns the copy and the
+ * transport. The log line is written first, so with no operator configured, or
+ * a push that fails, it still stands as the alert (ADR 0003 decision 4).
  *
  * ## Webhooks off means hands off
  *
@@ -133,6 +125,7 @@
 import type { FlightDataProvider } from '@flightbuddy/flight-provider';
 
 import type { Pool } from '../db';
+import { errorName } from '../errors';
 import type { Logger } from '../logger';
 import { JITTER_FRACTION, LADDER_INTERVALS } from './ladder';
 import {
@@ -256,10 +249,8 @@ export async function readDisarmedThresholds(pool: Pool): Promise<Set<number>> {
 // --- the job -------------------------------------------------------------------
 
 /**
- * One operator alert, shaped for wave 5 to route without reshaping.
- *
- * Numbers, ids and a kind — no copy. Wave 5 turns it into a push to
- * `recipientUserId` and chooses the words.
+ * One operator alert: numbers, ids and a kind — no copy. The push sink turns it
+ * into a push to the operator and chooses the words.
  */
 export interface OperatorAlert {
   kind: 'credit_low' | 'credit_exhausted';
@@ -287,12 +278,12 @@ export interface CreditCheckDeps {
   webhooksEnabled: boolean;
   /** Shared with the worker loop; this job writes it. */
   creditState: CreditState;
-  /** `OPERATOR_USER_ID`. Carried on the alert for wave 5, never logged. */
+  /** `OPERATOR_USER_ID`. Carried on the alert, never logged. */
   operatorUserId?: string | undefined;
   /**
-   * Wave 5's transport. Absent in wave 4, where the log line is the alert. A
-   * failure is logged and swallowed: the reading is already stored and the log
-   * line already written, and a retry would find the mark disarmed.
+   * The operator push. Absent, the log line is the alert. A failure is logged
+   * and swallowed: the reading is already stored and the log line already
+   * written, and a retry would find the mark disarmed.
    */
   onOperatorAlert?: (alert: OperatorAlert) => Promise<void>;
   /**
@@ -316,10 +307,6 @@ export interface CreditCheckResult {
   /** Flights put back on the polling ladder by this run. */
   failedOverFlightIds: string[];
   alert: OperatorAlert | null;
-}
-
-function nameOf(error: unknown): string {
-  return error instanceof Error ? error.name : 'UnknownError';
 }
 
 /**
@@ -361,7 +348,7 @@ export async function runCreditCheck(deps: CreditCheckDeps): Promise<CreditCheck
     // `error`, not `warn`: an unreadable balance hides exactly the outage this job
     // exists to catch, and it recurring every hour should be loud.
     logger.error(
-      { job: 'credit-check', errorName: nameOf(error) },
+      { job: 'credit-check', errorName: errorName(error) },
       'could not read the alert credit balance; credit check skipped this hour',
     );
     return { ...result, skipped: true };
@@ -448,7 +435,7 @@ export async function runCreditCheck(deps: CreditCheckDeps): Promise<CreditCheck
         await deps.onOperatorAlert(alert);
       } catch (error) {
         logger.error(
-          { job: 'credit-check', operatorAlert: alert.kind, errorName: nameOf(error) },
+          { job: 'credit-check', operatorAlert: alert.kind, errorName: errorName(error) },
           'operator alert could not be delivered; the log line above stands in for it',
         );
       }

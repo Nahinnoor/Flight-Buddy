@@ -40,13 +40,12 @@ import { z } from 'zod';
 
 import type { Pool } from '../db';
 import { ENGINE_TYPES } from '../engine/types';
+import { errorName } from '../errors';
 import type { Logger } from '../logger';
 import { MAX_DEVICES_PER_RECIPIENT, invalidateDeadDevice } from './deviceSends';
 import { EXPO_ERROR_CODES, ExpoRequestError, type ExpoPushClient } from './expoClient';
 import { countCodes, toExpoMessage } from './pushSend';
 import { isExpoPushToken, pushTokenSha256 } from './tokens';
-
-export const OPERATOR_ALERT_QUEUE = 'operator-alert';
 
 /** pg-boss retry policy for the operator push (seconds). */
 export const OPERATOR_ALERT_RETRY = {
@@ -161,7 +160,7 @@ export function createOperatorAlertSink(options: OperatorAlertSinkOptions): Oper
         options.logger.error(
           {
             operatorAlert: notice.kind,
-            errorName: error instanceof Error ? error.name : 'UnknownError',
+            errorName: errorName(error),
           },
           'operator alert could not be queued; the log line stands in for it',
         );
@@ -237,7 +236,7 @@ export async function sendOperatorAlert(
       {
         operatorAlert: notice.kind,
         kind: error instanceof ExpoRequestError ? error.kind : 'unknown',
-        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorName: errorName(error),
       },
       'operator push failed; pg-boss will retry',
     );
