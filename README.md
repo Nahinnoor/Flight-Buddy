@@ -157,6 +157,7 @@ npm run typecheck            # every workspace
 npm test                     # unit tests in every workspace
 npm run lint                 # ESLint (the app also has: npm run lint -w mobile)
 supabase/tests/run-local.sh  # SQL contract tests on a throwaway local Postgres
+npm run test:integration -w @flightbuddy/poller  # worker SQL, same throwaway Postgres only
 ```
 
 ## Deployment

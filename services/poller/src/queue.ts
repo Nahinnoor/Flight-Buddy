@@ -13,7 +13,7 @@
  * This module owns the wiring — queues, schedules, workers — and none of the
  * bodies: `main.ts` supplies those, because they need the pool and the provider.
  */
-import { PgBoss, type Job } from 'pg-boss';
+import { PgBoss, type DatabaseOptions, type Job } from 'pg-boss';
 
 import { APPLICATION_NAME, MAX_POOL_CONNECTIONS, connectionSettings } from './db';
 import { type Config } from './config';
@@ -163,10 +163,18 @@ export function createScheduledHandlers(logger: Logger): Record<string, Schedule
  * right outcome — a missing schema is a missing migration, not a runtime repair.
  */
 export function createBoss(config: Config): PgBoss {
+  return createBossOn(connectionSettings(config));
+}
+
+/**
+ * `createBoss` on explicit connection fields, so the integration test runs these
+ * exact settings on the throwaway cluster.
+ */
+export function createBossOn(connection: DatabaseOptions): PgBoss {
   return new PgBoss({
     // Fields, not a connection string, so the pinned Supabase CA from `db.ts`
     // survives — see the TLS note there for why that matters.
-    ...connectionSettings(config),
+    ...connection,
     schema: PGBOSS_SCHEMA,
     application_name: `${APPLICATION_NAME}-boss`,
     max: MAX_POOL_CONNECTIONS,

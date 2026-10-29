@@ -2,77 +2,54 @@
  * The inbox claim against a real Postgres: two concurrent claimers never get the
  * same row (`for update skip locked`).
  *
- * Skipped unless `INTEGRATION=1` **and** `DATABASE_URL` is set, and skipped at
- * run time when `public.webhook_inbox` does not exist yet (the API's migration).
+ * **Only against the throwaway cluster** (`../throwawayDb.ts`): skipped unless
+ * `INTEGRATION=1`, and it refuses to start without `INTEGRATION_THROWAWAY=1`, on a
+ * host that is not a local socket or loopback, or when `auth.users` is not empty.
+ * A deployed worker draining the same inbox would claim the rows it seeds and
+ * break the two-claimer assertions. Run it with:
  *
  * ```sh
- * INTEGRATION=1 npm test -w @flightbuddy/poller
+ * npm run test:integration -w @flightbuddy/poller
  * ```
  *
  * ## Seeding
  *
  * `flightbuddy_worker` has no INSERT on `webhook_inbox` — only the receiver writes
- * it. So rows are seeded through `INTEGRATION_SEED_DATABASE_URL` (any role that may
- * insert, e.g. a local superuser), or through `DATABASE_URL` itself if that role
- * happens to have INSERT; otherwise the test skips and says why.
+ * it — so rows are seeded as the cluster's superuser and claimed as the worker.
  *
  * ## What it touches
  *
  * Four synthetic rows with random subscription ids and a `{ "synthetic": true }`
- * payload, received ten years ago so they sort ahead of anything real. Every claim
- * runs in a transaction that is **rolled back**, so the claim itself changes
- * nothing. Cleanup marks the rows processed (the worker cannot delete). A
- * deployed worker draining the same database could pick them up meanwhile — it
- * would mark them processed as invalid, which is harmless.
+ * payload, received ten years ago so they sort ahead of any other row. Every
+ * claim runs in a transaction that is **rolled back**, so the claim itself
+ * changes nothing. Cleanup marks the rows processed (the worker cannot delete).
  */
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { loadEnvFile, parseConfig } from '../config';
-import { createPool, type Pool, type PoolClient } from '../db';
+import type { Pool, PoolClient } from '../db';
+import {
+  connectThrowawayDb,
+  integrationRequested as enabled,
+  type ThrowawayDb,
+} from '../throwawayDb';
 import { ENGINE_TYPES } from './types';
 import { claimInboxRow } from './webhookIngest';
 
-loadEnvFile();
-
-const enabled = process.env.INTEGRATION === '1' && Boolean(process.env.DATABASE_URL);
 const ROWS = 4;
 
 describe.skipIf(!enabled)('webhook inbox claim against a real database', () => {
+  let db: ThrowawayDb | undefined;
   let poolA: Pool;
   let poolB: Pool;
-  let seedPool: Pool | null = null;
   let ids: string[] = [];
-  let skipReason: string | null = null;
 
   beforeAll(async () => {
-    const config = parseConfig();
-    poolA = createPool(config);
-    poolB = createPool(config);
+    db = await connectThrowawayDb();
+    poolA = db.worker;
+    poolB = new pg.Pool(db.workerConnection) as Pool;
 
-    const table = await poolA.query<{ exists: boolean }>(
-      `select to_regclass('public.webhook_inbox') is not null as exists`,
-    );
-    if (!table.rows[0]?.exists) {
-      skipReason = 'public.webhook_inbox does not exist yet (the API migration is not applied)';
-      return;
-    }
-
-    const seedUrl = process.env.INTEGRATION_SEED_DATABASE_URL;
-    if (seedUrl) {
-      seedPool = createPool(parseConfig({ ...process.env, DATABASE_URL: seedUrl }));
-    } else {
-      const grant = await poolA.query<{ can: boolean }>(
-        `select has_table_privilege(current_user, 'public.webhook_inbox', 'INSERT') as can`,
-      );
-      if (grant.rows[0]?.can) seedPool = poolA;
-    }
-    if (seedPool === null) {
-      skipReason =
-        'DATABASE_URL cannot INSERT into webhook_inbox; set INTEGRATION_SEED_DATABASE_URL to seed';
-      return;
-    }
-
-    const seeded = await seedPool.query<{ id: string }>({
+    const seeded = await db.admin.query<{ id: string }>({
       text: `insert into public.webhook_inbox (subscription_id, payload, received_at)
              select gen_random_uuid(), '{"synthetic": true}'::jsonb,
                     now() - interval '10 years' + (n * interval '1 second')
@@ -95,9 +72,8 @@ describe.skipIf(!enabled)('webhook inbox claim against a real database', () => {
         types: ENGINE_TYPES,
       });
     }
-    if (seedPool !== null && seedPool !== poolA) await seedPool.end();
-    await poolA?.end();
     await poolB?.end();
+    await db?.end();
   });
 
   /** Claim up to `max` rows inside one transaction, then roll it back. */
@@ -119,9 +95,7 @@ describe.skipIf(!enabled)('webhook inbox claim against a real database', () => {
     }
   }
 
-  it('gives each row to exactly one of two concurrent claimers', async (ctx) => {
-    if (skipReason !== null) ctx.skip(skipReason);
-
+  it('gives each row to exactly one of two concurrent claimers', async () => {
     let release!: () => void;
     const hold = new Promise<void>((resolve) => {
       release = resolve;
@@ -140,9 +114,7 @@ describe.skipIf(!enabled)('webhook inbox claim against a real database', () => {
     expect(new Set([...ownA, ...ownB])).toEqual(mine);
   });
 
-  it('leaves every row untouched after a rolled-back claim', async (ctx) => {
-    if (skipReason !== null) ctx.skip(skipReason);
-
+  it('leaves every row untouched after a rolled-back claim', async () => {
     const rows = await poolA.query<{ processed_at: string | null; attempts: number }>({
       text: `select processed_at, attempts from public.webhook_inbox where id = any($1::uuid[])`,
       values: [ids],
@@ -152,9 +124,7 @@ describe.skipIf(!enabled)('webhook inbox claim against a real database', () => {
     for (const row of rows.rows) expect(row).toEqual({ processed_at: null, attempts: 0 });
   });
 
-  it('never hands a locked row to a second claimer', async (ctx) => {
-    if (skipReason !== null) ctx.skip(skipReason);
-
+  it('never hands a locked row to a second claimer', async () => {
     const holder = await poolA.connect();
     const other = await poolB.connect();
     try {

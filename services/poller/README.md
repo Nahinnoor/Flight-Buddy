@@ -39,8 +39,8 @@ Expect roughly this, then a heartbeat every `POLL_INTERVAL_MS`, then a clean exi
 
 ```sh
 npm run typecheck -w @flightbuddy/poller
-npm test -w @flightbuddy/poller                  # offline: config parsing and log redaction
-INTEGRATION=1 npm test -w @flightbuddy/poller    # + one real connection (see Tests)
+npm test -w @flightbuddy/poller                   # offline: config parsing and log redaction
+npm run test:integration -w @flightbuddy/poller   # real SQL, throwaway local cluster only (see Tests)
 ```
 
 ## Environment
@@ -206,30 +206,45 @@ fake clock, every change-detector event and its no-op, the poll paths and the ba
 of every statement. Provider responses come from `docs/api-samples/` through a real provider instance
 with an injected `fetch`; **nothing in this workspace calls AeroDataBox** (§12.2).
 
-Two files skip unless **both** `INTEGRATION=1` and a `DATABASE_URL` are set:
+The four `*.integration.test.ts` files run the worker's real SQL as `flightbuddy_worker`, and run
+**only on a throwaway cluster**:
 
-- `src/engine/lease.integration.test.ts` inserts synthetic `ZZ`-carrier flights due in the past, then
-  claims from **two pools at once** and asserts each row went to exactly one claimer — which is the
-  only way to test `for update skip locked` at all. It also asserts the type parsers against real
-  wire values, and that archived and `next_poll_at is null` rows are never claimed. Cleanup
-  **archives** the synthetic rows rather than deleting them, because the role has no DELETE grant;
-  they stay in the table, invisible to every later claim.
-- `src/queue.integration.test.ts` skips unless **both** `INTEGRATION=1` and a `DATABASE_URL` are set.
-It opens a real pool and starts pg-boss, then asserts the connection is the `flightbuddy_worker`
-role, that pg-boss's tables are in `pgboss` and not `public`, and that the three schedules and three
-queues are registered. Its side effects are intended and idempotent — pg-boss creates its own tables
-inside its own schema, and `createQueue`/`schedule` upsert. It writes to no application table and
-makes no provider call.
+```sh
+npm run test:integration -w @flightbuddy/poller
+```
 
-`src/push/pushDevices.integration.test.ts` (ADR 0006) runs the per-device send, receipt and
-invalidation SQL as `flightbuddy_worker` on a **throwaway cluster only**: it seeds users, devices
-and pending deliveries, the worker functions it calls claim every due delivery, and a deployed worker
-sharing the database would send what it seeds. It skips unless `INTEGRATION=1` and `PUSH_IT_PGHOST`
-are set, and refuses to start without `PUSH_IT_THROWAWAY=1` (set only by `run-local.sh --exec`), on
-a host that is not a local socket or loopback, or when `auth.users` is not empty before it seeds.
-Its own cleanup touches only the users it seeded. `supabase/tests/run-local.sh --exec env INTEGRATION=1 npx vitest run --root
-services/poller src/push/pushDevices.integration.test.ts` replays every migration into a temporary
-cluster, runs it, and deletes the cluster.
+That is `supabase/tests/run-local.sh --exec env INTEGRATION=1 vitest run integration.test`: it
+replays every migration (which also create the `flightbuddy_worker` role and the `pgboss` schema)
+into a temporary Postgres listening on a Unix socket, runs the files one at a time, and deletes
+the cluster. Homebrew `postgresql@14` or newer; no Docker, no network, no keys.
+
+**Never against `.env`'s database.** The deployed worker reads the same dev project, so every
+claimable row a test writes there is one it claims too: on 2026-10-29 it claimed six synthetic
+`ZZ` flights from the lease test within seconds, spent provider units polling each, and broke the
+test's two-claimer assertion as a third claimer. So no integration file reads `DATABASE_URL` or
+`.env`. They skip without `INTEGRATION=1`; with it, [`src/throwawayDb.ts`](src/throwawayDb.ts)
+refuses to connect unless `INTEGRATION_THROWAWAY=1` is set (only `run-local.sh --exec` sets it),
+`INTEGRATION_PGHOST` is a local socket or loopback, and `auth.users` is empty. A bare
+`INTEGRATION=1 npm test` therefore fails loudly in all four files instead of reaching a database.
+
+- `src/engine/lease.integration.test.ts` inserts synthetic `ZZ`-carrier flights due in the past,
+  then claims from **two pools at once** and asserts each row went to exactly one claimer, which is
+  the only way to test `for update skip locked` at all. It also asserts the type parsers against
+  real wire values, and that archived and `next_poll_at is null` rows are never claimed. Cleanup
+  archives the rows (the role has no DELETE grant).
+- `src/engine/webhookInbox.integration.test.ts` proves the same for the `webhook_inbox` claim. The
+  rows are seeded as the cluster's superuser, because the worker has no INSERT there, and every
+  claim is rolled back.
+- `src/queue.integration.test.ts` starts pg-boss with the worker's own settings (`createBossOn`)
+  and asserts the connection is `flightbuddy_worker`, that pg-boss's tables are in `pgboss` and
+  not `public`, and that every declared queue and schedule is registered. It writes to no
+  application table and makes no provider call.
+- `src/push/pushDevices.integration.test.ts` (ADR 0006) runs the per-device send, receipt and
+  invalidation SQL. It seeds users, devices and pending deliveries, and deletes those users at the
+  end so the next file finds `auth.users` empty.
+
+One file on its own: `supabase/tests/run-local.sh --exec env INTEGRATION=1 npx vitest run --root
+services/poller src/push/pushDevices.integration.test.ts`.
 
 ## Notes for maintainers
 

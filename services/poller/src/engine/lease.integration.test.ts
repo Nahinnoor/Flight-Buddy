@@ -1,24 +1,26 @@
 /**
  * The lease claim against a real Postgres (PHASE2_PLAN §1, criterion 4).
  *
- * Skipped unless `INTEGRATION=1` **and** `DATABASE_URL` is set, so `npm test` stays
- * offline everywhere else (§12.2).
+ * **Only against the throwaway cluster** (`../throwawayDb.ts`): skipped unless
+ * `INTEGRATION=1`, and it refuses to start without `INTEGRATION_THROWAWAY=1`, on a
+ * host that is not a local socket or loopback, or when `auth.users` is not empty.
+ * Its rows are due at once, so on a database a deployed worker also reads, that
+ * worker claims and polls them — spending provider units — and becomes a third
+ * claimer the assertions below do not expect (incident 2026-10-29). Run it with:
  *
  * ```sh
- * INTEGRATION=1 npm test -w @flightbuddy/poller
+ * npm run test:integration -w @flightbuddy/poller
  * ```
  *
  * `for update skip locked` cannot be proved against a fake: the whole question is
  * what two connections racing on the same rows do. So this test opens **two pools**
- * and claims from both at once.
+ * as `flightbuddy_worker` and claims from both at once.
  *
  * ## What it touches
  *
  * Synthetic rows only: carrier `ZZ` (unassigned by IATA) on a far-future date, with
- * `next_poll_at` set well in the past so they sort ahead of anything real and a
- * single small batch takes them. A short lease bounds the blast radius if a real
- * row is swept in: two seconds later it is claimable again, and nothing about it is
- * modified except `poll_lease_until`.
+ * `next_poll_at` set well in the past so they sort ahead of any other due row and a
+ * single small batch takes them.
  *
  * Cleanup archives the synthetic rows rather than deleting them, because the
  * `flightbuddy_worker` role has **no DELETE grant anywhere** — which is the point.
@@ -26,26 +28,27 @@
  */
 import { randomUUID } from 'node:crypto';
 
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { loadEnvFile, parseConfig, type Config } from '../config';
-import { createPool, ping, type Pool } from '../db';
+import type { Pool } from '../db';
+import {
+  connectThrowawayDb,
+  integrationRequested as enabled,
+  type ThrowawayDb,
+} from '../throwawayDb';
 import { claimDueFlights, releaseLease } from './lease';
 import { ENGINE_TYPES, type FlightRow } from './types';
-
-loadEnvFile();
-
-const enabled = process.env.INTEGRATION === '1' && Boolean(process.env.DATABASE_URL);
 
 /** Unassigned IATA prefix, so these can never collide with a real flight. */
 const SYNTHETIC_CARRIER = 'ZZ';
 const SYNTHETIC_DATE = '2099-01-01';
 const FLIGHT_COUNT = 6;
-/** Short, so a real row accidentally swept in is claimable again almost at once. */
+/** Short, so the lease tests do not wait long for a row to come back. */
 const LEASE_MS = 2_000;
 
 describe.skipIf(!enabled)('claimDueFlights against a real database', () => {
-  let config: Config;
+  let db: ThrowawayDb | undefined;
   let poolA: Pool;
   let poolB: Pool;
   /** `ZZ` flight numbers unique to this run, so concurrent runs do not collide. */
@@ -53,11 +56,10 @@ describe.skipIf(!enabled)('claimDueFlights against a real database', () => {
   let insertedIds: string[];
 
   beforeAll(async () => {
-    config = parseConfig();
-    poolA = createPool(config);
-    poolB = createPool(config);
-    await ping(poolA);
-    await ping(poolB);
+    db = await connectThrowawayDb();
+    poolA = db.worker;
+    // A second, independent pool on the same role: two workers overlapping.
+    poolB = new pg.Pool(db.workerConnection) as Pool;
 
     const run = randomUUID().replaceAll('-', '').slice(0, 8);
     numbers = Array.from({ length: FLIGHT_COUNT }, (_, i) => `${run}${i}`);
@@ -96,8 +98,8 @@ describe.skipIf(!enabled)('claimDueFlights against a real database', () => {
         types: ENGINE_TYPES,
       });
     }
-    if (poolA !== undefined) await poolA.end();
-    if (poolB !== undefined) await poolB.end();
+    await poolB?.end();
+    await db?.end();
   });
 
   it('inserted the synthetic batch', () => {

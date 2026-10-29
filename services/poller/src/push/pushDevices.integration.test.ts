@@ -7,15 +7,14 @@
  * **Only against a throwaway cluster.** It seeds users, devices and pending
  * deliveries, and the worker functions it calls claim *every* due delivery; on a
  * shared database the deployed worker would also claim and send what it seeds.
- * So it is skipped unless `INTEGRATION=1` and `PUSH_IT_PGHOST` are set, and it
- * refuses to start unless all of these hold:
+ * So it is skipped unless `INTEGRATION=1`, and `connectThrowawayDb`
+ * (`../throwawayDb.ts`) refuses to start without `INTEGRATION_THROWAWAY=1`, on a
+ * host that is not a local socket or loopback, or when `auth.users` is not empty
+ * before it seeds.
  *
- * - `PUSH_IT_THROWAWAY=1`, which only `run-local.sh --exec` sets;
- * - the host is a local Unix socket or loopback;
- * - `auth.users` is empty before it seeds (a fresh cluster, not a real project
- *   reached through a tunnel or a local dev database).
- *
- * Its own cleanup touches only the users and deliveries it seeded. Run it with:
+ * Its own cleanup touches only the users and deliveries it seeded, and deletes
+ * those users at the end, so the next integration file finds `auth.users` empty.
+ * Run it with:
  *
  * ```sh
  * supabase/tests/run-local.sh --exec env INTEGRATION=1 npx vitest run \
@@ -27,12 +26,17 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import pg from 'pg';
+import type pg from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Pool } from '../db';
 import { captureLogger } from '../engine/testFixtures';
 import { ENGINE_TYPES } from '../engine/types';
+import {
+  connectThrowawayDb,
+  integrationRequested as enabled,
+  type ThrowawayDb,
+} from '../throwawayDb';
 import { DELIVERY_ERRORS, MAX_SEND_ATTEMPTS } from './deliveryStatus';
 import {
   CLOSE_EXHAUSTED_SENDS_SQL,
@@ -45,14 +49,8 @@ import { ADOPT_LEGACY_SENDS_SQL, runPushReceipts } from './pushReceipts';
 import { CLAIM_DELIVERIES_SQL, runPushSend } from './pushSend';
 import { pushTokenSha256 } from './tokens';
 
-const host = process.env.PUSH_IT_PGHOST;
-const throwaway = process.env.PUSH_IT_THROWAWAY === '1';
-const enabled = process.env.INTEGRATION === '1' && Boolean(host);
-
-const isLocal = (value: string) =>
-  value.startsWith('/') || value === 'localhost' || value === '127.0.0.1' || value === '::1';
-
 describe.skipIf(!enabled)('per-device push SQL on a real Postgres, as flightbuddy_worker', () => {
+  let db: ThrowawayDb | undefined;
   let admin: pg.Pool;
   let worker: Pool;
   let flightId: string;
@@ -147,34 +145,8 @@ describe.skipIf(!enabled)('per-device push SQL on a real Postgres, as flightbudd
   const pause = () => new Promise((resolve) => setTimeout(resolve, 20));
 
   beforeAll(async () => {
-    if (!throwaway) {
-      throw new Error(
-        'PUSH_IT_THROWAWAY=1 missing: run this through supabase/tests/run-local.sh --exec',
-      );
-    }
-    if (host === undefined || !isLocal(host)) {
-      throw new Error('PUSH_IT_PGHOST must be a local socket or loopback (throwaway cluster only)');
-    }
-    const base = {
-      host,
-      port: Number(process.env.PUSH_IT_PGPORT ?? 5432),
-      user: 'postgres',
-      database: 'postgres',
-    };
-    admin = new pg.Pool(base);
-    worker = new pg.Pool({ ...base, options: '-c role=flightbuddy_worker' }) as Pool;
-    const [{ who } = { who: '' }] = (
-      await worker.query<{ who: string }>('select current_user as who')
-    ).rows;
-    expect(who).toBe('flightbuddy_worker');
-    const [{ users } = { users: -1 }] = await q<{ users: number }>(
-      'select count(*)::int as users from auth.users',
-    );
-    if (users !== 0) {
-      await admin.end();
-      await worker.end();
-      throw new Error('auth.users is not empty: this is not a fresh throwaway cluster; refusing');
-    }
+    db = await connectThrowawayDb();
+    ({ admin, worker } = db);
     const [flight] = await q<{ id: string }>(
       `insert into public.flights (operating_carrier_iata, operating_flight_number, departure_date_local,
                                    origin_iata, destination_iata, origin_tz, destination_tz, gate)
@@ -204,8 +176,15 @@ describe.skipIf(!enabled)('per-device push SQL on a real Postgres, as flightbudd
   });
 
   afterAll(async () => {
-    await admin?.end();
-    await worker?.end();
+    // Cascades to their profiles, devices, deliveries and device rows, leaving
+    // `auth.users` empty for the next integration file's guard.
+    try {
+      if (db !== undefined && seeded.length > 0) {
+        await q(`delete from auth.users where id = any($1::uuid[])`, [seeded]);
+      }
+    } finally {
+      await db?.end();
+    }
   });
 
   it('a crash re-sends only the device without a ticket', async () => {
