@@ -100,32 +100,15 @@ async function removeItem(key: string): Promise<void> {
 }
 
 /** `expo-secure-store` shaped as the storage gotrue-js expects. */
-export const secureStoreAdapter: SupportedStorage = { getItem, setItem, removeItem };
+const secureStoreAdapter: SupportedStorage = { getItem, setItem, removeItem };
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: secureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    /**
-     * PKCE, set explicitly because the auth-js default is `'implicit'` and the
-     * default is invisible. This is deliberate — do not remove it.
-     *
-     * It only matters for the flows that leave the app and come back through
-     * an email link: sign-up confirmation, password reset, resend. Under
-     * implicit flow those links deliver the access and refresh tokens in the
-     * URL fragment, so the credential itself travels through a link that any
-     * app registered for the scheme could receive, and nothing ties it to the
-     * device that asked for it. Under PKCE the link carries a short-lived,
-     * single-use `code`; exchanging it needs the verifier this client wrote to
-     * the keychain when the flow started (`exchangeCodeForSession`, handled in
-     * `src/app/(auth)/auth/callback.tsx`). A code on its own is worthless.
-     *
-     * Apple and Google are untouched by this: they go through
-     * `signInWithIdToken`, which never consults `flowType` (no redirect, no
-     * verifier). Stored-session restore is untouched too — the session lives
-     * under the same storage key either way.
-     */
+    // Explicit PKCE: auth-js defaults to implicit, which puts tokens in email-link
+    // URLs. Do not remove; see auth-links.ts.
     flowType: 'pkce',
     /**
      * Off on native. This is browser behaviour: it makes gotrue-js read
@@ -136,6 +119,17 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     detectSessionInUrl: false,
   },
 });
+
+/** Supabase types a to-one embed as an object; tolerate an array defensively. */
+export function one<T>(value: T | T[] | null | undefined): T | null {
+  if (value === null || value === undefined) return null;
+  return Array.isArray(value) ? (value[0] ?? null) : value;
+}
+
+/** Rethrows a PostgREST error as a plain `Error` carrying its message. */
+export function throwIfError(error: { message: string } | null): asserts error is null {
+  if (error !== null) throw new Error(error.message);
+}
 
 /**
  * Auto-refresh must not run while the app is backgrounded: iOS suspends timers,

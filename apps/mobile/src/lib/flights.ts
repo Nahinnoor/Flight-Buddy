@@ -17,7 +17,7 @@
 import { sortByScheduledDeparture, sortPastFlights, type SegmentView } from './dashboard-model';
 import { MOCK_API } from './env';
 import { listMockAllSegments, listMockPastSegments, listMockSegments } from './mock/store';
-import { supabase } from './supabase';
+import { supabase, throwIfError } from './supabase';
 
 export type { FlightRow, SegmentView } from './dashboard-model';
 
@@ -96,11 +96,11 @@ export async function fetchMySegments(userId: string): Promise<SegmentView[]> {
       nullsFirst: false,
     });
 
-  if (error !== null) throw new Error(error.message);
+  throwIfError(error);
 
   // Ordering an embedded to-one resource is a PostgREST subtlety that depends
-  // on the `!inner` above. The model assumes the order, so it is made true
-  // here rather than assumed of the server.
+  // on the `!inner` above, so the order callers rely on (the dashboard model
+  // sorts again itself) is made true here rather than assumed of the server.
   return sortByScheduledDeparture((data ?? []).map(toView));
 }
 
@@ -124,7 +124,7 @@ export async function fetchPastSegments(userId: string): Promise<SegmentView[]> 
     })
     .limit(PAST_FLIGHTS_LIMIT);
 
-  if (error !== null) throw new Error(error.message);
+  throwIfError(error);
 
   return sortPastFlights((data ?? []).map(toView));
 }
@@ -149,7 +149,7 @@ export async function fetchAllMySegments(userId: string): Promise<SegmentView[]>
     })
     .limit(ALL_FLIGHTS_LIMIT);
 
-  if (error !== null) throw new Error(error.message);
+  throwIfError(error);
 
   return sortPastFlights((data ?? []).map(toView));
 }

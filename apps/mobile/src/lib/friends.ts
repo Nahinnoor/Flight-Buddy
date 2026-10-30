@@ -24,7 +24,7 @@
 import type { GroupTripInput, GroupTripLeg } from './profile-stats';
 import { MOCK_API } from './env';
 import { listMockGroupTrips } from './mock/store';
-import { supabase } from './supabase';
+import { one, supabase, throwIfError } from './supabase';
 
 const MEMBER_SELECT = `
   group_id,
@@ -39,12 +39,6 @@ const MEMBER_SELECT = `
   )
 ` as const;
 
-/** Supabase types a to-one embed as an object; tolerate an array defensively. */
-function one<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) return null;
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
-
 export async function fetchGroupTrips(userId: string): Promise<GroupTripInput[]> {
   if (MOCK_API) return listMockGroupTrips();
 
@@ -53,7 +47,7 @@ export async function fetchGroupTrips(userId: string): Promise<GroupTripInput[]>
     .select('group_id, travelers!inner ( user_id )')
     .eq('travelers.user_id', userId)
     .eq('status', 'active');
-  if (mine.error !== null) throw new Error(mine.error.message);
+  throwIfError(mine.error);
 
   const groupIds = [...new Set((mine.data ?? []).map((row) => row.group_id))];
   if (groupIds.length === 0) return [];
@@ -63,7 +57,7 @@ export async function fetchGroupTrips(userId: string): Promise<GroupTripInput[]>
     .select(MEMBER_SELECT)
     .in('group_id', groupIds)
     .eq('status', 'active');
-  if (error !== null) throw new Error(error.message);
+  throwIfError(error);
 
   const groups = new Map<string, GroupTripInput>();
   for (const row of data ?? []) {

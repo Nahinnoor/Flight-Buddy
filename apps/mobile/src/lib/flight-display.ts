@@ -18,9 +18,16 @@ const STALENESS_AGE_HOURS = 6;
 /** Staleness only matters close in; a flight three weeks out is meant to be quiet. */
 const STALENESS_WINDOW_HOURS = 24;
 
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
+export const MINUTE_MS = 60_000;
+export const HOUR_MS = 60 * MINUTE_MS;
+export const DAY_MS = 24 * HOUR_MS;
+
+/** An ISO-8601 instant as epoch milliseconds; `null` in, or unparseable, is `null`. */
+export function instant(iso: string | null): number | null {
+  if (iso === null) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
 
 export type StatusTone = 'neutral' | 'positive' | 'warning' | 'critical';
 
@@ -97,7 +104,7 @@ const CARRIER_NAMES: Record<string, string> = {
   WN: 'Southwest Airlines',
 };
 
-export function carrierName(iata: string): string {
+function carrierName(iata: string): string {
   return CARRIER_NAMES[iata.toUpperCase()] ?? iata.toUpperCase();
 }
 
@@ -151,6 +158,9 @@ export function formatDelay(minutes: number | null): string | null {
   return `${Math.abs(minutes)} min early`;
 }
 
+/** Built on first use; every option, the zone included, is constant. */
+let shortDateFormat: Intl.DateTimeFormat | undefined;
+
 /**
  * `2026-03-12` → `Mar 12`, for the disambiguation list (§3.1 step 3).
  *
@@ -161,13 +171,14 @@ export function formatDelay(minutes: number | null): string | null {
 export function formatLocalDateShort(dateLocal: string): string {
   const date = new Date(`${dateLocal}T12:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return dateLocal;
-  return new Intl.DateTimeFormat('en-US', {
+  shortDateFormat ??= new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
     calendar: 'gregory',
     numberingSystem: 'latn',
     month: 'short',
     day: 'numeric',
-  }).format(date);
+  });
+  return shortDateFormat.format(date);
 }
 
 /**
@@ -201,10 +212,8 @@ export interface Countdown {
  * boarding closes in four minutes is worse than useless.
  */
 export function countdownTo(targetUtc: string | null, now: Date = new Date()): Countdown | null {
-  if (targetUtc === null) return null;
-
-  const target = new Date(targetUtc).getTime();
-  if (Number.isNaN(target)) return null;
+  const target = instant(targetUtc);
+  if (target === null) return null;
 
   const remainingMs = target - now.getTime();
   const absolute = Math.abs(remainingMs);
@@ -256,11 +265,9 @@ export function stalenessHint(
   departureUtc: string | null,
   now: Date = new Date(),
 ): string | null {
-  if (updatedAt === null || departureUtc === null) return null;
-
-  const departure = new Date(departureUtc).getTime();
-  const updated = new Date(updatedAt).getTime();
-  if (Number.isNaN(departure) || Number.isNaN(updated)) return null;
+  const departure = instant(departureUtc);
+  const updated = instant(updatedAt);
+  if (departure === null || updated === null) return null;
 
   const untilDeparture = departure - now.getTime();
   if (untilDeparture > STALENESS_WINDOW_HOURS * HOUR_MS) return null;

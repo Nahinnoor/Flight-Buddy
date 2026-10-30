@@ -27,7 +27,10 @@
  *
  * Flight numbers are synthetic-looking on purpose and carry no real itinerary.
  */
+import { localDateAtAirport } from '@flightbuddy/shared';
+
 import type { MembershipView, SegmentView, FlightRow, LegTimes } from '../dashboard-model';
+import { HOUR_MS, MINUTE_MS } from '../flight-display';
 import type { GroupMemberTrip, GroupTripInput } from '../profile-stats';
 
 export type MockScenario = 'full' | 'no-groups' | 'empty';
@@ -59,8 +62,6 @@ export function mockUuid(kind: number, index: number): string {
   return `00000000-0000-4000-8000-${(kind * 0x1000000 + index).toString(16).padStart(12, '0')}`;
 }
 
-const HOUR_MS = 3_600_000;
-
 interface FlightSpec {
   index: number;
   carrier: string;
@@ -86,22 +87,28 @@ interface FlightSpec {
   destinationCountry?: string | null;
 }
 
-function localDate(instant: Date, timeZone: string): string {
-  // en-CA formats as YYYY-MM-DD.
-  return new Intl.DateTimeFormat('en-CA', { timeZone }).format(instant);
-}
+/** The columns only the poller writes, as a fresh row has them. */
+export const POLLER_DEFAULTS = {
+  next_poll_at: null,
+  poll_lease_until: null,
+  last_polled_at: null,
+  poll_failure_count: 0,
+  alert_subscription_id: null,
+  alert_subscribed_at: null,
+  raw_payload: null,
+} as const satisfies Partial<FlightRow>;
 
 function flightRow(spec: FlightSpec, now: Date): FlightRow {
   const departure = new Date(now.getTime() + spec.departsInHours * HOUR_MS);
   const arrival = new Date(departure.getTime() + spec.durationHours * HOUR_MS);
   const iso = (date: Date) => date.toISOString();
-  const late = (date: Date) => new Date(date.getTime() + (spec.lateMin ?? 0) * 60_000);
+  const late = (date: Date) => new Date(date.getTime() + (spec.lateMin ?? 0) * MINUTE_MS);
 
   return {
     id: mockUuid(3, spec.index),
     operating_carrier_iata: spec.carrier,
     operating_flight_number: spec.number,
-    departure_date_local: localDate(departure, spec.originTz),
+    departure_date_local: localDateAtAirport(departure, spec.originTz),
     origin_iata: spec.origin,
     destination_iata: spec.destination,
     origin_tz: spec.originTz,
@@ -118,13 +125,7 @@ function flightRow(spec: FlightSpec, now: Date): FlightRow {
     actual_arrival_utc: spec.landed === true ? iso(late(arrival)) : null,
     aircraft_reg: null,
     aircraft_model: null,
-    next_poll_at: null,
-    poll_lease_until: null,
-    last_polled_at: null,
-    poll_failure_count: 0,
-    alert_subscription_id: null,
-    alert_subscribed_at: null,
-    raw_payload: null,
+    ...POLLER_DEFAULTS,
     distance_km: spec.distanceKm ?? null,
     origin_country_code: spec.originCountry ?? null,
     destination_country_code: spec.destinationCountry ?? null,
@@ -434,12 +435,12 @@ function memberLeg(
   destination: string,
   sequenceNumber = 1,
 ) {
-  const landing = new Date(now.getTime() - landedHoursAgo * HOUR_MS + (offsetMin ?? 0) * 60_000);
+  const landing = new Date(now.getTime() - landedHoursAgo * HOUR_MS + (offsetMin ?? 0) * MINUTE_MS);
   return {
     sequenceNumber,
     destinationIata: destination,
     // A date at an origin somewhere west of the destination, hours earlier.
-    departureDateLocal: localDate(new Date(landing.getTime() - 8 * HOUR_MS), NYC),
+    departureDateLocal: localDateAtAirport(new Date(landing.getTime() - 8 * HOUR_MS), NYC),
     actualArrivalUtc: offsetMin === null ? null : landing.toISOString(),
   };
 }

@@ -23,7 +23,7 @@
 import { checkDisplayName } from './display-name';
 import { MOCK_API } from './env';
 import { getMockProfile, updateMockProfile } from './mock/store';
-import { supabase } from './supabase';
+import { supabase, throwIfError } from './supabase';
 
 export interface ProfileView {
   displayName: string;
@@ -42,7 +42,7 @@ export async function fetchProfile(userId: string): Promise<ProfileView> {
     .eq('id', userId)
     .maybeSingle();
 
-  if (error !== null) throw new Error(error.message);
+  throwIfError(error);
   // The auth trigger creates this row at sign-up, so its absence is a fault.
   if (data === null) throw new Error('Your profile could not be found. Pull to try again.');
 
@@ -55,7 +55,7 @@ export async function fetchProfile(userId: string): Promise<ProfileView> {
 }
 
 /** A save that reached the profile but not the traveller row. */
-export class PartialNameSaveError extends Error {
+class PartialNameSaveError extends Error {
   constructor() {
     super(
       'Your name was saved, but the people in your groups may still see the old one. Try saving again.',
@@ -87,7 +87,7 @@ export async function updateDisplayName(userId: string, input: string): Promise<
     .update({ display_name: name })
     .eq('id', userId)
     .select('id');
-  if (profile.error !== null) throw new Error(profile.error.message);
+  throwIfError(profile.error);
   if ((profile.data ?? []).length !== 1) throw new Error('Your profile could not be updated.');
 
   // Zero rows is fine: no self-traveller yet (it is created on first add),
@@ -112,6 +112,6 @@ export async function setQuietHours(userId: string, enabled: boolean): Promise<v
     .update({ quiet_hours_enabled: enabled })
     .eq('id', userId)
     .select('id');
-  if (error !== null) throw new Error(error.message);
+  throwIfError(error);
   if ((data ?? []).length !== 1) throw new Error('Your settings could not be saved.');
 }

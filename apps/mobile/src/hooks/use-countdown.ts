@@ -24,11 +24,11 @@ export function useCountdown(targetUtc: string | null): Countdown | null {
     // Each tick schedules the next from the value it just read, so the cadence
     // tightens by itself as departure approaches — no interval to swap out.
     const schedule = () => {
-      const remaining = countdownTo(targetUtc)?.remainingMs ?? null;
+      const remaining = Date.parse(targetUtc) - Date.now();
       timer = setTimeout(() => {
         setNowMs(Date.now());
         schedule();
-      }, countdownTickMs(remaining));
+      }, countdownTickMs(Number.isNaN(remaining) ? null : remaining));
     };
 
     schedule();

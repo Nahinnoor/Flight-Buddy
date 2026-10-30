@@ -12,15 +12,13 @@ export function deviceTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }
 
-/** Today's calendar date on this device, `YYYY-MM-DD`. */
-export function todayLocal(now: Date = new Date()): string {
-  return localDateAtAirport(now, deviceTimeZone());
-}
-
-/** `YYYY-MM-DD` for a `Date` picked in the device's zone (the date picker). */
-export function toLocalDateString(date: Date): string {
+/** `YYYY-MM-DD` for a `Date` in the device's zone (the date picker); today by default. */
+export function toLocalDateString(date: Date = new Date()): string {
   return localDateAtAirport(date, deviceTimeZone());
 }
+
+/** Today's calendar date on this device, `YYYY-MM-DD`. */
+export const todayLocal = toLocalDateString;
 
 /** A `Date` at local noon on `dateLocal` — a safe seed for the date picker. */
 export function fromLocalDateString(dateLocal: string): Date {

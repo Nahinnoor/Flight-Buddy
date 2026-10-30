@@ -27,7 +27,7 @@
  */
 
 /** The app scheme from `app.json`. */
-export const APP_SCHEME = 'flightbuddy';
+const APP_SCHEME = 'flightbuddy';
 
 /**
  * The exact URL Supabase must redirect to after a confirmation or reset link,

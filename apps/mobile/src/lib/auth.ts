@@ -32,7 +32,7 @@ export class SignInCancelledError extends Error {
   }
 }
 
-export class SignInError extends Error {
+class SignInError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SignInError';

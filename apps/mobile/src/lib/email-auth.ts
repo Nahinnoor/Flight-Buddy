@@ -56,7 +56,7 @@ export type LinkResult =
 // ------------------------------------------------------------ primitives --
 
 /** Normalise before it is sent: iOS autofill and paste both leave spaces. */
-export function normaliseEmail(email: string): string {
+function normaliseEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
@@ -70,7 +70,7 @@ function codeOf(error: unknown): string | undefined {
  * reach the server", because only here is the outcome independent of the
  * address: the server never saw it.
  */
-export function isTransportFailure(error: unknown): boolean {
+function isTransportFailure(error: unknown): boolean {
   if (isAuthRetryableFetchError(error)) return true;
   // auth-js reports a dropped connection as a retryable fetch error with
   // status 0; a plain `TypeError: Network request failed` can also escape.

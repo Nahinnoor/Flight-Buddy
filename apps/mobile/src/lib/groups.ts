@@ -20,7 +20,7 @@
 import type { LegTimes, MembershipView } from './dashboard-model';
 import { MOCK_API } from './env';
 import { listMockMemberships } from './mock/store';
-import { supabase } from './supabase';
+import { one, supabase, throwIfError } from './supabase';
 
 const MEMBERSHIP_SELECT = `
   id,
@@ -49,12 +49,6 @@ const MEMBERSHIP_SELECT = `
 
 type FlightTimes = Omit<LegTimes, 'sequenceNumber'>;
 
-/** Supabase types a to-one embed as an object; tolerate an array defensively. */
-function one<T>(value: T | T[] | null | undefined): T | null {
-  if (value === null || value === undefined) return null;
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
-
 export async function fetchMyMemberships(userId: string): Promise<MembershipView[]> {
   if (MOCK_API) return listMockMemberships();
 
@@ -64,7 +58,7 @@ export async function fetchMyMemberships(userId: string): Promise<MembershipView
     .eq('travelers.user_id', userId)
     .in('status', ['active', 'pending']);
 
-  if (error !== null) throw new Error(error.message);
+  throwIfError(error);
 
   return (data ?? []).map((row) => {
     const group = one(row.groups);

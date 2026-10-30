@@ -27,12 +27,11 @@ import {
   buildMockData,
   MOCK_PROFILE,
   mockUuid,
+  POLLER_DEFAULTS,
   type MockData,
   type MockProfile,
   type MockScenario,
 } from './fixtures';
-
-export { mockUuid };
 
 let scenario: MockScenario = 'full';
 let seeded: MockData | null = null;
@@ -88,13 +87,7 @@ function flightRowFromCandidate(candidate: FlightCandidate, index: number): Flig
     aircraft_model: candidate.aircraftModel,
 
     // Poller-owned columns. A fresh row would look exactly like this.
-    next_poll_at: null,
-    poll_lease_until: null,
-    last_polled_at: null,
-    poll_failure_count: 0,
-    alert_subscription_id: null,
-    alert_subscribed_at: null,
-    raw_payload: null,
+    ...POLLER_DEFAULTS,
     distance_km: candidate.distanceKm ?? null,
     origin_country_code: candidate.originCountryCode ?? null,
     destination_country_code: candidate.destinationCountryCode ?? null,
@@ -113,9 +106,10 @@ export function addMockSegment(candidate: FlightCandidate): {
 } {
   sequence += 1;
   const flight = flightRowFromCandidate(candidate, sequence);
+  const segmentId = mockUuid(2, 1000 + sequence);
 
   added.push({
-    segmentId: mockUuid(2, 1000 + sequence),
+    segmentId,
     sequenceNumber: sequence,
     tripId: MOCK_TRIP_ID,
     tripLabel: null,
@@ -127,7 +121,7 @@ export function addMockSegment(candidate: FlightCandidate): {
 
   return {
     tripId: MOCK_TRIP_ID,
-    segmentId: mockUuid(2, 1000 + sequence),
+    segmentId,
     flightId: flight.id,
     sequenceNumber: sequence,
   };
@@ -160,7 +154,6 @@ export function getMockProfile(): MockProfile {
   return { ...profile };
 }
 
-export function updateMockProfile(patch: Partial<MockProfile>): MockProfile {
+export function updateMockProfile(patch: Partial<MockProfile>): void {
   profile = { ...profile, ...patch };
-  return { ...profile };
 }

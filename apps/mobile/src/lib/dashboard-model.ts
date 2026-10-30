@@ -13,7 +13,7 @@
  */
 import type { Database } from '@flightbuddy/shared';
 
-import { departureAnchor } from './flight-display';
+import { DAY_MS, departureAnchor, HOUR_MS, MINUTE_MS } from './flight-display';
 
 export type FlightRow = Database['public']['Tables']['flights']['Row'];
 export type MembershipStatus = Database['public']['Enums']['membership_status'];
@@ -67,37 +67,41 @@ export interface MembershipView {
   legs: LegTimes[];
 }
 
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
-const DAY_MS = 24 * HOUR_MS;
-
 /** How many archived flights the dashboard shows before linking to Profile. */
 export const PAST_PREVIEW_LIMIT = 5;
 
 // ------------------------------------------------------------- flights ---
 
-/** Earliest scheduled departure first; unknown departures last. */
-export function sortByScheduledDeparture(segments: readonly SegmentView[]): SegmentView[] {
-  return [...segments].sort((a, b) => {
-    const left = a.flight.scheduled_departure_utc;
-    const right = b.flight.scheduled_departure_utc;
-    if (left === right) return a.sequenceNumber - b.sequenceNumber;
+/**
+ * A sorted copy by scheduled departure, `dir` 1 for earliest first and -1 for
+ * latest first; equal departures go by sequence number in the same direction.
+ * Unknown departures always sort last.
+ */
+function byDeparture<T extends { sequenceNumber: number }>(
+  xs: readonly T[],
+  at: (x: T) => string | null,
+  dir: 1 | -1,
+): T[] {
+  return [...xs].sort((a, b) => {
+    const left = at(a);
+    const right = at(b);
+    if (left === right) return dir * (a.sequenceNumber - b.sequenceNumber);
     if (left === null) return 1;
     if (right === null) return -1;
-    return left.localeCompare(right);
+    return dir * left.localeCompare(right);
   });
+}
+
+const segmentDeparture = (segment: SegmentView) => segment.flight.scheduled_departure_utc;
+
+/** Earliest scheduled departure first; unknown departures last. */
+export function sortByScheduledDeparture(segments: readonly SegmentView[]): SegmentView[] {
+  return byDeparture(segments, segmentDeparture, 1);
 }
 
 /** Most recent first, for the archived list. Unknown departures last. */
 export function sortPastFlights(segments: readonly SegmentView[]): SegmentView[] {
-  return [...segments].sort((a, b) => {
-    const left = a.flight.scheduled_departure_utc;
-    const right = b.flight.scheduled_departure_utc;
-    if (left === right) return b.sequenceNumber - a.sequenceNumber;
-    if (left === null) return 1;
-    if (right === null) return -1;
-    return right.localeCompare(left);
-  });
+  return byDeparture(segments, segmentDeparture, -1);
 }
 
 type FlightState = Pick<
@@ -112,7 +116,7 @@ type FlightState = Pick<
 >;
 
 /** Wheels down: the provider said so, or recorded an arrival. */
-export function hasLanded(flight: FlightState): boolean {
+function hasLanded(flight: FlightState): boolean {
   return flight.status === 'landed' || flight.actual_arrival_utc !== null;
 }
 
@@ -131,12 +135,13 @@ export function isAirborne(flight: FlightState): boolean {
   );
 }
 
-function toCamel(flight: FlightState) {
-  return {
+/** `departureAnchor` for a row's snake_case columns. */
+function flightDepartureAnchor(flight: FlightState): string | null {
+  return departureAnchor({
     actualDepartureUtc: flight.actual_departure_utc,
     estimatedDepartureUtc: flight.estimated_departure_utc,
     scheduledDepartureUtc: flight.scheduled_departure_utc,
-  };
+  });
 }
 
 /**
@@ -145,10 +150,10 @@ function toCamel(flight: FlightState) {
  * passed (a flight whose whole window went by with no word from the provider
  * is over, not "next").
  */
-export function isCurrentOrUpcoming(flight: FlightState, now: Date): boolean {
+function isCurrentOrUpcoming(flight: FlightState, now: Date): boolean {
   if (hasLanded(flight)) return false;
   if (isAirborne(flight)) return true;
-  const departure = departureAnchor(toCamel(flight));
+  const departure = flightDepartureAnchor(flight);
   if (departure === null) return false;
   const arrival = flight.estimated_arrival_utc ?? flight.scheduled_arrival_utc ?? departure;
   return new Date(arrival).getTime() >= now.getTime();
@@ -167,9 +172,7 @@ export function pickMainSegment(
   segments: readonly SegmentView[],
   now: Date,
 ): SegmentView | null {
-  const ordered = sortByScheduledDeparture(segments);
-  const current = ordered.find((segment) => isCurrentOrUpcoming(segment.flight, now));
-  return current ?? ordered[ordered.length - 1] ?? null;
+  return mainOf(sortByScheduledDeparture(segments), now);
 }
 
 /** Every other leg still ahead, earliest first. Landed legs drop out. */
@@ -178,7 +181,22 @@ export function laterSegments(
   main: SegmentView | null,
   now: Date,
 ): SegmentView[] {
-  return sortByScheduledDeparture(segments).filter(
+  return laterOf(sortByScheduledDeparture(segments), main, now);
+}
+
+/** `pickMainSegment` over legs already in `sortByScheduledDeparture` order. */
+function mainOf(ordered: readonly SegmentView[], now: Date): SegmentView | null {
+  const current = ordered.find((segment) => isCurrentOrUpcoming(segment.flight, now));
+  return current ?? ordered[ordered.length - 1] ?? null;
+}
+
+/** `laterSegments` over legs already in `sortByScheduledDeparture` order. */
+function laterOf(
+  ordered: readonly SegmentView[],
+  main: SegmentView | null,
+  now: Date,
+): SegmentView[] {
+  return ordered.filter(
     (segment) =>
       segment.segmentId !== main?.segmentId && isCurrentOrUpcoming(segment.flight, now),
   );
@@ -211,17 +229,6 @@ export type GroupCountdown =
   /** A leg exists but nobody knows when it leaves (a manual row, unfilled). */
   | { kind: 'time-unknown' };
 
-function sortLegs(legs: readonly LegTimes[]): LegTimes[] {
-  return [...legs].sort((a, b) => {
-    const left = a.scheduled_departure_utc;
-    const right = b.scheduled_departure_utc;
-    if (left === right) return a.sequenceNumber - b.sequenceNumber;
-    if (left === null) return 1;
-    if (right === null) return -1;
-    return left.localeCompare(right);
-  });
-}
-
 /**
  * The user's own departure in a group: the **first leg** of the trip on their
  * membership, anchored exactly as the flight card anchors its countdown
@@ -237,13 +244,13 @@ export function groupCountdown(legs: readonly LegTimes[], now: Date): GroupCount
   if (live.length === 0) return { kind: 'no-flight' };
   if (live.every((leg) => hasLanded(leg))) return { kind: 'arrived' };
 
-  const first = sortLegs(legs)[0];
+  const first = byDeparture(legs, (leg) => leg.scheduled_departure_utc, 1)[0];
   if (first === undefined) return { kind: 'no-flight' };
   if (first.archived_at !== null || isAirborne(first) || hasLanded(first)) {
     return { kind: 'underway' };
   }
 
-  const target = departureAnchor(toCamel(first));
+  const target = flightDepartureAnchor(first);
   if (target === null) return { kind: 'time-unknown' };
   if (new Date(target).getTime() <= now.getTime()) return { kind: 'underway' };
   return { kind: 'upcoming', targetUtc: target };
@@ -319,7 +326,9 @@ function compareCards(a: GroupCard, b: GroupCard): number {
 }
 
 /** A group the dashboard gives a card: an active membership, group not archived. */
-export function isDashboardGroup(membership: MembershipView): boolean {
+export function isDashboardGroup(
+  membership: MembershipView,
+): membership is MembershipView & { group: NonNullable<MembershipView['group']> } {
   return (
     membership.status === 'active' &&
     membership.group !== null &&
@@ -333,9 +342,8 @@ export function dashboardGroups(memberships: readonly MembershipView[], now: Dat
     .filter(isDashboardGroup)
     .map((membership) => ({
       membershipId: membership.membershipId,
-      // `isDashboardGroup` guarantees the group is there.
-      groupId: membership.group?.id ?? membership.membershipId,
-      label: membership.group === null ? 'Untitled group' : groupLabel(membership.group),
+      groupId: membership.group.id,
+      label: groupLabel(membership.group),
       countdown: groupCountdown(membership.legs, now),
     }))
     .sort(compareCards);
@@ -418,9 +426,9 @@ export interface DashboardModel {
 }
 
 export function buildDashboard(input: DashboardInput, now: Date): DashboardModel {
-  const segments = input.segments ?? [];
-  const main = pickMainSegment(segments, now);
-  const later = laterSegments(segments, main, now);
+  const ordered = sortByScheduledDeparture(input.segments ?? []);
+  const main = mainOf(ordered, now);
+  const later = laterOf(ordered, main, now);
 
   const groups = input.memberships === null ? [] : dashboardGroups(input.memberships, now);
   const space = input.memberships === null ? 'unknown' : groups.length > 0 ? 'groups' : 'past';

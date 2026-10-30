@@ -50,19 +50,23 @@
  *
  * Relative imports only: vitest runs this file without the app's `@/` alias.
  */
-import { localDateAtAirport, type FlightStatus } from '@flightbuddy/shared';
+import { durationMinutes, localDateAtAirport, type FlightStatus } from '@flightbuddy/shared';
 
-import { flightNumbers, formatDuration, formatLocalDateShort } from './flight-display';
+import {
+  flightNumbers,
+  formatDuration,
+  formatLocalDateShort,
+  HOUR_MS,
+  instant,
+  MINUTE_MS,
+} from './flight-display';
 
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
-
-export const KM_TO_MILES = 0.621371;
+const KM_TO_MILES = 0.621371;
 /** Landing this close together (either order) is "in sync". */
-export const SYNC_WINDOW_MS = 20 * MINUTE_MS;
+const SYNC_WINDOW_MS = 20 * MINUTE_MS;
 /** A shorter wait is noise; a longer one is a different day, not a wait. */
-export const WAIT_MIN_MS = 5 * MINUTE_MS;
-export const WAIT_MAX_MS = 12 * HOUR_MS;
+const WAIT_MIN_MS = 5 * MINUTE_MS;
+const WAIT_MAX_MS = 12 * HOUR_MS;
 /** Flight-log pill: this early or more reads as "early". */
 const EARLY_MS = 5 * MINUTE_MS;
 /** Flight-log pill: up to this late still reads as "On time". */
@@ -104,18 +108,20 @@ export interface OwnSegment {
 
 // ---------------------------------------------------------- own flights ---
 
-function instant(iso: string | null): number | null {
-  if (iso === null) return null;
-  const ms = new Date(iso).getTime();
-  return Number.isNaN(ms) ? null : ms;
+/** Departure: actual, else estimated, else scheduled. */
+function departureOf(flight: StatsFlight): string | null {
+  return flight.actual_departure_utc ?? flight.estimated_departure_utc ?? flight.scheduled_departure_utc;
+}
+
+/** Arrival: actual, else estimated, else scheduled. */
+function arrivalOf(flight: StatsFlight): string | null {
+  return flight.actual_arrival_utc ?? flight.estimated_arrival_utc ?? flight.scheduled_arrival_utc;
 }
 
 export function isFlightTaken(flight: StatsFlight, now: Date): boolean {
   if (flight.status === 'cancelled') return false;
   if (flight.status === 'landed') return true;
-  const arrival = instant(
-    flight.actual_arrival_utc ?? flight.estimated_arrival_utc ?? flight.scheduled_arrival_utc,
-  );
+  const arrival = instant(arrivalOf(flight));
   return arrival !== null && arrival < now.getTime();
 }
 
@@ -124,13 +130,9 @@ export function isFlightTaken(flight: StatsFlight, now: Date): boolean {
  * estimated, scheduled), else its arrival, else noon on its local date.
  */
 function whenFlown(flight: StatsFlight): number {
-  const departure = instant(
-    flight.actual_departure_utc ?? flight.estimated_departure_utc ?? flight.scheduled_departure_utc,
-  );
+  const departure = instant(departureOf(flight));
   if (departure !== null) return departure;
-  const arrival = instant(
-    flight.actual_arrival_utc ?? flight.estimated_arrival_utc ?? flight.scheduled_arrival_utc,
-  );
+  const arrival = instant(arrivalOf(flight));
   if (arrival !== null) return arrival;
   return instant(`${flight.departure_date_local}T12:00:00.000Z`) ?? 0;
 }
@@ -138,16 +140,18 @@ function whenFlown(flight: StatsFlight): number {
 /** Every flight taken, once each, most recent first. */
 export function flightsTaken<T extends OwnSegment>(segments: readonly T[], now: Date): T[] {
   const seen = new Set<string>();
-  const taken: T[] = [];
+  const taken: { segment: T; at: number }[] = [];
   for (const segment of segments) {
     if (seen.has(segment.flight.id) || !isFlightTaken(segment.flight, now)) continue;
     seen.add(segment.flight.id);
-    taken.push(segment);
+    taken.push({ segment, at: whenFlown(segment.flight) });
   }
-  return taken.sort((a, b) => {
-    const byTime = whenFlown(b.flight) - whenFlown(a.flight);
-    return byTime !== 0 ? byTime : b.sequenceNumber - a.sequenceNumber;
-  });
+  return taken
+    .sort((a, b) => {
+      const byTime = b.at - a.at;
+      return byTime !== 0 ? byTime : b.segment.sequenceNumber - a.segment.sequenceNumber;
+    })
+    .map(({ segment }) => segment);
 }
 
 /** Most frequent origin; a tie goes to the one flown from most recently. */
@@ -279,21 +283,31 @@ export function formatCompact(value: number): string {
 }
 
 /** `1h 40m`, `45m`, `2h`. */
-export function formatGap(minutes: number): string {
+function formatGap(minutes: number): string {
   return formatDuration(Math.max(0, Math.round(minutes))) ?? '0m';
 }
+
+/** One `Mar 2025` formatter per zone, rebuilt from empty if it ever grows large. */
+const MEMBER_SINCE_CACHE_LIMIT = 50;
+const memberSinceFormats = new Map<string, Intl.DateTimeFormat>();
 
 /** `Mar 2025`, in the device's zone. */
 export function formatMemberSince(iso: string, timeZone: string): string | null {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    calendar: 'gregory',
-    numberingSystem: 'latn',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
+  let format = memberSinceFormats.get(timeZone);
+  if (format === undefined) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      calendar: 'gregory',
+      numberingSystem: 'latn',
+      month: 'short',
+      year: 'numeric',
+    });
+    if (memberSinceFormats.size >= MEMBER_SINCE_CACHE_LIMIT) memberSinceFormats.clear();
+    memberSinceFormats.set(timeZone, format);
+  }
+  return format.format(date);
 }
 
 function words(displayName: string): string[] {
@@ -379,7 +393,7 @@ export function flightDurationMinutes(flight: StatsFlight): number | null {
   for (const [from, to] of pairs) {
     const start = instant(from);
     const end = instant(to);
-    if (start !== null && end !== null && end > start) return Math.round((end - start) / MINUTE_MS);
+    if (start !== null && end !== null && end > start) return durationMinutes(start, end);
   }
   return null;
 }
@@ -400,8 +414,7 @@ export interface FlightLogEntry {
  */
 export function flightLogEntry(segment: OwnSegment): FlightLogEntry {
   const { flight } = segment;
-  const departure =
-    flight.actual_departure_utc ?? flight.estimated_departure_utc ?? flight.scheduled_departure_utc;
+  const departure = departureOf(flight);
   let dateLocal = flight.departure_date_local;
   if (departure !== null) {
     try {
@@ -476,7 +489,7 @@ export function arrivalLeg(
 }
 
 /** This member's landing on this group's trip, if it happened this year. */
-export function landingThisYear(
+function landingThisYear(
   member: GroupMemberTrip,
   destinationIata: string | null,
   year: string,

@@ -1,14 +1,8 @@
-/**
- * The active passport-cover palette, resolved exactly the way `useTheme` and
- * `useIllustration` resolve theirs: `'unspecified'` means light.
- */
+/** The active passport-cover palette, resolved the way `useTheme` resolves its own. */
 
 import { Passport, type PassportPalette } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScheme } from '@/hooks/use-scheme';
 
 export function usePassport(): PassportPalette {
-  const scheme = useColorScheme();
-  const theme = scheme === 'unspecified' ? 'light' : scheme;
-
-  return Passport[theme];
+  return Passport[useScheme()];
 }

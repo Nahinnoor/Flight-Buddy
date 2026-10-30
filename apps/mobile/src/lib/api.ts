@@ -33,7 +33,7 @@ import { addMockSegment } from './mock/store';
 import { supabase } from './supabase';
 
 /** Every failure the caller can see, including transport and validation ones. */
-export class ApiError extends Error {
+class ApiError extends Error {
   readonly code: string;
   readonly status: number | null;
 
@@ -42,11 +42,6 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.code = code;
     this.status = status;
-  }
-
-  /** True when signing in again is what would fix this. */
-  get isAuthError(): boolean {
-    return this.status === 401 || this.code === 'not_authenticated';
   }
 }
 
