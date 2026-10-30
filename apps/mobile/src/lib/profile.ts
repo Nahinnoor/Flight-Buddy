@@ -33,6 +33,7 @@ export interface ProfileView {
   createdAt: string;
 }
 
+/** The user's profile row, for the Profile tab, Settings and the Account screen. */
 export async function fetchProfile(userId: string): Promise<ProfileView> {
   if (MOCK_API) return getMockProfile();
 
@@ -101,6 +102,7 @@ export async function updateDisplayName(userId: string, input: string): Promise<
   return name;
 }
 
+/** The Settings quiet-hours switch. An update RLS matched to zero rows is an error. */
 export async function setQuietHours(userId: string, enabled: boolean): Promise<void> {
   if (MOCK_API) {
     updateMockProfile({ quietHoursEnabled: enabled });

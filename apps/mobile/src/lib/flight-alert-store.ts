@@ -23,11 +23,13 @@ let state: FlightAlertState = INITIAL;
 let seq = 0;
 const listeners = new Set<() => void>();
 
+/** Swaps in the new state and tells every subscriber. */
 function publish(next: FlightAlertState): void {
   state = next;
   for (const listener of listeners) listener();
 }
 
+/** `useSyncExternalStore`'s subscribe, for the Dashboard tab. */
 export function subscribeFlightAlerts(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
@@ -35,6 +37,7 @@ export function subscribeFlightAlerts(listener: () => void): () => void {
   };
 }
 
+/** `useSyncExternalStore`'s snapshot, for the Dashboard tab. */
 export function getFlightAlertState(): FlightAlertState {
   return state;
 }

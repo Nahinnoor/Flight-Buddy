@@ -118,6 +118,7 @@ function arrivalOf(flight: StatsFlight): string | null {
   return flight.actual_arrival_utc ?? flight.estimated_arrival_utc ?? flight.scheduled_arrival_utc;
 }
 
+/** See "Flight taken" in the file comment. `flightsTaken` filters with it. */
 export function isFlightTaken(flight: StatsFlight, now: Date): boolean {
   if (flight.status === 'cancelled') return false;
   if (flight.status === 'landed') return true;
@@ -184,6 +185,7 @@ export interface Level {
   minMiles: number;
 }
 
+/** The ladder from the file comment, lowest first; the Profile level card draws it. */
 export const LEVELS: readonly Level[] = [
   { index: 1, name: 'Boarding', minMiles: 0 },
   { index: 2, name: 'Taxi', minMiles: 1_000 },
@@ -205,6 +207,7 @@ export interface LevelProgress {
   progress: number;
 }
 
+/** The level for a lifetime mileage and the way to the next. `buildProfileStats` calls it. */
 export function levelFor(miles: number): LevelProgress {
   const safe = Number.isFinite(miles) && miles > 0 ? miles : 0;
   let current = LEVELS[0] as Level;
@@ -224,6 +227,7 @@ export function levelFor(miles: number): LevelProgress {
 
 // ----------------------------------------------------------- the totals ---
 
+/** What `buildProfileStats` hands the Profile tab. */
 export interface ProfileStats<T extends OwnSegment = OwnSegment> {
   /** Every flight taken, once each, most recent first. */
   taken: T[];
@@ -235,6 +239,7 @@ export interface ProfileStats<T extends OwnSegment = OwnSegment> {
   level: LevelProgress;
 }
 
+/** The lifetime totals from the file comment. The Profile tab feeds it `fetchAllMySegments`. */
 export function buildProfileStats<T extends OwnSegment>(
   segments: readonly T[],
   now: Date,
@@ -310,6 +315,7 @@ export function formatMemberSince(iso: string, timeZone: string): string | null 
   return format.format(date);
 }
 
+/** A display name split on whitespace, for `firstName`, `initialsOf` and `mrzLines`. */
 function words(displayName: string): string[] {
   return displayName.trim().split(/\s+/u).filter((word) => word !== '');
 }
@@ -342,6 +348,7 @@ function mrzText(text: string): string {
   return plain.toUpperCase().replace(/[^A-Z]/g, '<');
 }
 
+/** Cuts or pads a line to exactly `MRZ_LENGTH` with the `<` filler. */
 function mrzLine(text: string): string {
   return text.slice(0, MRZ_LENGTH).padEnd(MRZ_LENGTH, '<');
 }
@@ -445,6 +452,7 @@ export function flightLogEntry(segment: OwnSegment): FlightLogEntry {
 
 // ------------------------------------------------------- flying with friends ---
 
+/** One leg of a member's trip: just what the arrival-leg rule reads. */
 export interface GroupTripLeg {
   sequenceNumber: number;
   destinationIata: string;
@@ -453,6 +461,7 @@ export interface GroupTripLeg {
   actualArrivalUtc: string | null;
 }
 
+/** One active member of a group, with the trip linked to their membership. */
 export interface GroupMemberTrip {
   travelerId: string;
   /** This traveller is the signed-in user. */
@@ -469,6 +478,7 @@ export interface GroupTripInput {
   members: GroupMemberTrip[];
 }
 
+/** Where a member landed and when (epoch ms), from `landingThisYear`. */
 export interface Landing {
   airport: string;
   atMs: number;
@@ -501,6 +511,7 @@ function landingThisYear(
   return { airport: leg.destinationIata.toUpperCase(), atMs };
 }
 
+/** Someone who landed on a group trip with you this year. */
 export interface Buddy {
   travelerId: string;
   displayName: string;
@@ -510,6 +521,7 @@ export interface Buddy {
   sharedTrips: number;
 }
 
+/** The numbers behind the friends card; `friendsInsights` puts them into words. */
 export interface FriendsStats {
   groupTrips: number;
   /** Most shared trips first, then by name. */
@@ -524,6 +536,7 @@ export function currentYear(now: Date, timeZone: string): string {
   return localDateAtAirport(now, timeZone).slice(0, 4);
 }
 
+/** The "flying with friends" numbers from the file comment, fed by `fetchGroupTrips`. */
 export function buildFriendsStats(
   groups: readonly GroupTripInput[],
   now: Date,

@@ -55,10 +55,12 @@ const STATUS_TONES: Record<FlightStatus, StatusTone> = {
   unknown: 'neutral',
 };
 
+/** The word for a status, on the flight card's pill and the compact cards. */
 export function statusLabel(status: FlightStatus): string {
   return STATUS_LABELS[status];
 }
 
+/** The colour of the flight card's status pill. */
 export function statusTone(status: FlightStatus): StatusTone {
   return STATUS_TONES[status];
 }
@@ -104,6 +106,7 @@ const CARRIER_NAMES: Record<string, string> = {
   WN: 'Southwest Airlines',
 };
 
+/** A carrier's name for the "Operated by" line in `flightNumbers`. */
 function carrierName(iata: string): string {
   return CARRIER_NAMES[iata.toUpperCase()] ?? iata.toUpperCase();
 }

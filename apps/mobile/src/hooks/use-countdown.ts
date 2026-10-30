@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 
 import { countdownTickMs, countdownTo, type Countdown } from '@/lib/flight-display';
 
+/** The live countdown, or `null` for no target. The flight card passes one only when pinned. */
 export function useCountdown(targetUtc: string | null): Countdown | null {
   const [nowMs, setNowMs] = useState(() => Date.now());
 

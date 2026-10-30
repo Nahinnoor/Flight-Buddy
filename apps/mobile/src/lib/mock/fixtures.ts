@@ -33,8 +33,10 @@ import type { MembershipView, SegmentView, FlightRow, LegTimes } from '../dashbo
 import { HOUR_MS, MINUTE_MS } from '../flight-display';
 import type { GroupMemberTrip, GroupTripInput } from '../profile-stats';
 
+/** The seed-data sets described in the file comment. */
 export type MockScenario = 'full' | 'no-groups' | 'empty';
 
+/** The Settings scenario picker's options, in display order. */
 export const MOCK_SCENARIOS: readonly MockScenario[] = ['full', 'no-groups', 'empty'];
 
 export const MOCK_SCENARIO_LABELS: Record<MockScenario, string> = {
@@ -50,6 +52,7 @@ export interface MockProfile {
   createdAt: string;
 }
 
+/** The seeded rows `store.ts` serves. */
 export interface MockData {
   segments: SegmentView[];
   past: SegmentView[];
@@ -98,6 +101,7 @@ export const POLLER_DEFAULTS = {
   raw_payload: null,
 } as const satisfies Partial<FlightRow>;
 
+/** A full `flights` row from a spec, with its times relative to `now`. */
 function flightRow(spec: FlightSpec, now: Date): FlightRow {
   const departure = new Date(now.getTime() + spec.departsInHours * HOUR_MS);
   const arrival = new Date(departure.getTime() + spec.durationHours * HOUR_MS);
@@ -135,6 +139,7 @@ function flightRow(spec: FlightSpec, now: Date): FlightRow {
   };
 }
 
+/** A spec as a `SegmentView` on the given trip. */
 function segment(
   spec: FlightSpec,
   trip: { id: string; label: string | null },
@@ -153,6 +158,7 @@ function segment(
   };
 }
 
+/** One trip's segments as `LegTimes`, for a membership's `legs`. */
 function legsOf(segments: readonly SegmentView[], tripId: string): LegTimes[] {
   return segments
     .filter((s) => s.tripId === tripId)
@@ -178,11 +184,13 @@ const CHICAGO = 'America/Chicago';
 const LOS_ANGELES = 'America/Los_Angeles';
 const MEXICO_CITY = 'America/Mexico_City';
 
+/** Country code of each airport on the past-flight routes. */
 const COUNTRY: Record<string, string> = {
   JFK: 'US', ORD: 'US', LAX: 'US', SFO: 'US', BOS: 'US', MIA: 'US',
   LHR: 'GB', CDG: 'FR', LIS: 'PT', OPO: 'PT', HND: 'JP', NRT: 'JP', MEX: 'MX',
 };
 
+/** The first `count` of a fixed route list as landed, archived legs, for `no-groups`. */
 function pastFlights(count: number, now: Date): SegmentView[] {
   const routes: [string, string, string, string, string, string, number][] = [
     ['ZB', '410', 'JFK', 'ORD', NYC, CHICAGO, 1188],
@@ -220,6 +228,7 @@ function pastFlights(count: number, now: Date): SegmentView[] {
   );
 }
 
+/** One scenario's rows, relative to `now`. `store.ts` calls it on the first read. */
 export function buildMockData(scenario: MockScenario, now: Date): MockData {
   if (scenario === 'empty') return { segments: [], past: [], memberships: [], groupTrips: [] };
 
@@ -445,6 +454,7 @@ function memberLeg(
   };
 }
 
+/** The Profile history `full` carries (see the file comment): landed flights and group trips. */
 function history(now: Date): { flights: SegmentView[]; groupTrips: GroupTripInput[] } {
   const flights = HISTORY.map((spec, i) => {
     const late = spec.lateMin ?? 0;
@@ -541,6 +551,7 @@ function history(now: Date): { flights: SegmentView[]; groupTrips: GroupTripInpu
   return { flights, groupTrips };
 }
 
+/** The mock signed-in user; `store.ts` keeps an editable copy. */
 export const MOCK_PROFILE: MockProfile = {
   displayName: 'Sam Rivera',
   email: 'sam@example.com',

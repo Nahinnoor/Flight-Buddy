@@ -110,6 +110,10 @@ function safeErrorCode(value: string | undefined): string | null {
   return PLAUSIBLE_ERROR_CODE.test(value) ? value : 'unrecognized';
 }
 
+/**
+ * Reduces a link to one `AuthLink`, refusing every form but a PKCE code. The
+ * `auth/callback` route calls it before anything is exchanged.
+ */
 export function parseAuthLink(url: string): AuthLink {
   const params = readLinkParams(url);
 

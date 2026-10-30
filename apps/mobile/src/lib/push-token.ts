@@ -18,6 +18,7 @@
  */
 const EXPO_PUSH_TOKEN = /^(?:ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]{1,200}\]$/;
 
+/** Whether a value has the shape above. `push.ts` checks before registering or clearing. */
 export function isExpoPushToken(value: unknown): value is string {
   return typeof value === 'string' && EXPO_PUSH_TOKEN.test(value);
 }

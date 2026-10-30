@@ -1,6 +1,6 @@
 /**
- * The Supabase client for the app, plus the storage adapter its session lives
- * in.
+ * The Supabase client for the app, the storage adapter its session lives in,
+ * and the two helpers the read modules share (`one`, `throwIfError`).
  *
  * Mobile reads `trips → trip_segments → flights` straight from Postgres under
  * RLS with this client (ADR 0001); it only calls the Fastify API for lookup and
@@ -37,10 +37,12 @@ function safeKey(key: string): string {
   return key.replace(/[^A-Za-z0-9._-]/g, '_');
 }
 
+/** The keychain key of one chunk of a split value. */
 function chunkKey(key: string, index: number): string {
   return `${safeKey(key)}.${index}`;
 }
 
+/** Storage read: an inline value, or a chunked one put back together. */
 async function getItem(key: string): Promise<string | null> {
   const head = await SecureStore.getItemAsync(safeKey(key));
   if (head === null) return null;
@@ -72,6 +74,7 @@ async function deleteChunksFrom(key: string, from: number): Promise<void> {
   }
 }
 
+/** Storage write: inline when small, otherwise chunks plus a manifest. */
 async function setItem(key: string, value: string): Promise<void> {
   if (value.length <= CHUNK_SIZE) {
     await SecureStore.setItemAsync(safeKey(key), value);
@@ -94,6 +97,7 @@ async function setItem(key: string, value: string): Promise<void> {
   await deleteChunksFrom(key, chunks.length);
 }
 
+/** Storage delete: the value or manifest, and any chunks behind it. */
 async function removeItem(key: string): Promise<void> {
   await SecureStore.deleteItemAsync(safeKey(key));
   await deleteChunksFrom(key, 0);
@@ -102,6 +106,7 @@ async function removeItem(key: string): Promise<void> {
 /** `expo-secure-store` shaped as the storage gotrue-js expects. */
 const secureStoreAdapter: SupportedStorage = { getItem, setItem, removeItem };
 
+/** The app's one client: every read under RLS and every auth call go through it. */
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: secureStoreAdapter,
@@ -136,7 +141,7 @@ export function throwIfError(error: { message: string } | null): asserts error i
  * and a refresh that fires as the process is frozen can burn the refresh token
  * without storing the replacement, signing the user out on next launch.
  *
- * Called once from the root layout. Returns an unsubscribe for symmetry; in
+ * Called once from `SessionProvider`. Returns an unsubscribe for symmetry; in
  * practice the app owns this for its whole lifetime.
  */
 export function startSupabaseAutoRefresh(): () => void {

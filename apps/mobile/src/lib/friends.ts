@@ -39,6 +39,7 @@ const MEMBER_SELECT = `
   )
 ` as const;
 
+/** The two queries above, as one entry per group, for the Profile tab's friends card. */
 export async function fetchGroupTrips(userId: string): Promise<GroupTripInput[]> {
   if (MOCK_API) return listMockGroupTrips();
 

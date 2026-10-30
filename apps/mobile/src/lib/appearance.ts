@@ -8,6 +8,7 @@
 
 export type AppearancePreference = 'system' | 'light' | 'dark';
 
+/** The Settings picker's options, in display order. */
 export const APPEARANCE_PREFERENCES: readonly AppearancePreference[] = ['system', 'light', 'dark'];
 
 /** Device-only storage key. The value is one of the three words; no secret. */

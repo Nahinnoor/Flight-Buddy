@@ -28,6 +28,7 @@ interface Options {
   signingOut: RefObject<boolean>;
 }
 
+/** The gate's `register`: runs `registerPushToken` and reduces the result to an outcome. */
 async function registerFor(
   request: RefreshRequest<Notifications.DevicePushToken>,
 ): Promise<RefreshOutcome> {
@@ -43,6 +44,7 @@ async function registerFor(
   return result.status;
 }
 
+/** See the file comment. Called once, by `SessionProvider`. */
 export function usePushTokenRefresh({ userId, isRecovering, signingOut }: Options): void {
   const live = useRef({ userId, isRecovering });
   useEffect(() => {

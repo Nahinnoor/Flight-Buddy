@@ -14,6 +14,10 @@ export interface Remote<T> {
   reload: () => Promise<void>;
 }
 
+/**
+ * Used by every signed-in screen that loads data, once per section. `fetcher` is
+ * `null` until there is a user; nothing loads until the screen calls `reload`.
+ */
 export function useRemote<T>(
   fetcher: (() => Promise<T>) | null,
   fallbackMessage: string,

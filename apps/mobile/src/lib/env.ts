@@ -14,8 +14,8 @@
  * key and RLS is what actually guards the data (supabase/migrations/*_rls.sql);
  * the Google client IDs are compiled into the binary regardless.
  *
- * Missing values fail loudly at first use rather than producing a client that
- * 401s in a way nobody can read.
+ * Missing required values fail loudly at start-up rather than producing a
+ * client that 401s in a way nobody can read.
  */
 import Constants from 'expo-constants';
 
@@ -42,11 +42,13 @@ const inlinedEnv: Partial<Record<PublicEnvKey, string | undefined>> = {
   EXPO_PUBLIC_MOCK_API: process.env.EXPO_PUBLIC_MOCK_API,
 };
 
+/** A value from either route above; an empty string counts as missing. */
 function read(key: PublicEnvKey): string | undefined {
   const value = extraEnv[key] ?? inlinedEnv[key];
   return value === undefined || value === '' ? undefined : value;
 }
 
+/** `read` for a value the app cannot start without: throws, naming the fix. */
 function requireEnv(key: PublicEnvKey): string {
   const value = read(key);
   if (value === undefined) {
@@ -84,8 +86,8 @@ export const API_URL =
   (__DEV__ ? 'http://localhost:3001' : requireEnv('EXPO_PUBLIC_API_URL'));
 
 /**
- * When set, `src/lib/api.ts` answers lookups from `src/lib/mock/candidates.ts`
- * instead of the network, so the add-flight flow is exercisable before
- * `apps/api` exists.
+ * When set, `src/lib/mock/` answers instead of the network: lookups and adds in
+ * `api.ts`, and the flight, group and profile reads, so every signed-in screen
+ * renders without a backend.
  */
 export const MOCK_API = read('EXPO_PUBLIC_MOCK_API') === '1';

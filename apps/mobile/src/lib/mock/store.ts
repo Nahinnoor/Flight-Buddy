@@ -39,11 +39,13 @@ const added: SegmentView[] = [];
 let sequence = 0;
 let profile: MockProfile = { ...MOCK_PROFILE };
 
+/** The current scenario's rows, built on first read so their times start from then. */
 function data(): MockData {
   seeded ??= buildMockData(scenario, new Date());
   return seeded;
 }
 
+/** The Settings scenario picker's starting selection. */
 export function getMockScenario(): MockScenario {
   return scenario;
 }
@@ -58,6 +60,7 @@ export function setMockScenario(next: MockScenario): void {
 /** The single trip every added flight is appended to. */
 const MOCK_TRIP_ID = mockUuid(1, 1000);
 
+/** The `flights` row a picked candidate would become. */
 function flightRowFromCandidate(candidate: FlightCandidate, index: number): FlightRow {
   const now = new Date().toISOString();
 
@@ -142,18 +145,22 @@ export function listMockAllSegments(): SegmentView[] {
   return [...data().segments, ...added, ...data().past];
 }
 
+/** Stands in for `fetchGroupTrips`. */
 export function listMockGroupTrips(): GroupTripInput[] {
   return data().groupTrips;
 }
 
+/** Stands in for `fetchMyMemberships`, which never returns removed rows. */
 export function listMockMemberships(): MembershipView[] {
   return data().memberships.filter((m) => m.status !== 'removed');
 }
 
+/** Stands in for `fetchProfile`. A copy, so callers cannot edit the store. */
 export function getMockProfile(): MockProfile {
   return { ...profile };
 }
 
+/** Stands in for the rename and quiet-hours writes in `profile.ts`. */
 export function updateMockProfile(patch: Partial<MockProfile>): void {
   profile = { ...profile, ...patch };
 }

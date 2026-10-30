@@ -2,8 +2,8 @@
  * Fixtures for `EXPO_PUBLIC_MOCK_API=1`.
  *
  * The add-flight flow has three distinct shapes and every one of them has to be
- * exercisable before `apps/api` exists, because two of them are exactly the
- * cases that get skipped:
+ * exercisable without `apps/api`, because two of them are exactly the cases that
+ * get skipped:
  *
  * - `DL1234` — one candidate. The happy path.
  * - `DL8517` — one candidate, a codeshare: Delta sells it, Air France flies it
@@ -29,6 +29,7 @@ function at(dateLocal: string, minutesPastUtcMidnight: number): string {
   return new Date(base.getTime() + minutesPastUtcMidnight * 60_000).toISOString();
 }
 
+/** In minutes, unlike the `_MS` constants in `flight-display.ts`. */
 const HOUR = 60;
 const DAY = 24 * HOUR;
 

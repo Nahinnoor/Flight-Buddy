@@ -32,6 +32,7 @@ export class SignInCancelledError extends Error {
   }
 }
 
+/** A sign-in or sign-out that failed, as opposed to the user backing out. */
 class SignInError extends Error {
   constructor(message: string) {
     super(message);
@@ -85,6 +86,7 @@ function joinAppleName(fullName: AppleAuthentication.AppleAuthenticationFullName
   return joined === '' ? null : joined;
 }
 
+/** Stores the name from `joinAppleName`, in the two places its comment gives. */
 async function persistDisplayName(userId: string, displayName: string): Promise<void> {
   // Best effort on both. A name is cosmetic; failing to store it must never
   // turn a successful sign-in into a failed one.
@@ -104,6 +106,7 @@ async function persistDisplayName(userId: string, displayName: string): Promise<
   }
 }
 
+/** Apple's native sheet, then a Supabase session from its token. Called by `SessionProvider`. */
 export async function signInWithApple(): Promise<Session> {
   let credential: AppleAuthentication.AppleAuthenticationCredential;
   try {
@@ -167,10 +170,12 @@ export function configureGoogleSignIn(): void {
   googleConfigured = true;
 }
 
+/** Whether this build has a Google client ID; the social buttons hide Google without one. */
 export function isGoogleSignInAvailable(): boolean {
   return GOOGLE_WEB_CLIENT_ID !== undefined;
 }
 
+/** Google's native sign-in, then a Supabase session from its token. Called by `SessionProvider`. */
 export async function signInWithGoogle(): Promise<Session> {
   configureGoogleSignIn();
   if (!isGoogleSignInAvailable()) {
@@ -217,6 +222,7 @@ export async function signInWithGoogle(): Promise<Session> {
 
 // ----------------------------------------------------------------- sign out --
 
+/** Ends the Google and Supabase sessions. `SessionProvider`'s sign-out calls it. */
 export async function signOut(): Promise<void> {
   // Google first, and never fatally: if the native session is not cleared the
   // next sign-in silently reuses the old account, which reads as a bug.
@@ -238,26 +244,32 @@ export async function signOut(): Promise<void> {
 // failure: each returns a result whose failure branch carries only neutral
 // copy from `components/auth/copy.ts`.
 
+/** The sign-up screen's submit. */
 export function signUpWithEmail(input: { name: string; email: string; password: string }) {
   return emailAuth.signUpWithEmail(supabase.auth, input);
 }
 
+/** The sign-in screen's submit. */
 export function signInWithEmail(input: { email: string; password: string }) {
   return emailAuth.signInWithEmail(supabase.auth, input);
 }
 
+/** The forgot-password screen's submit. */
 export function requestPasswordReset(email: string) {
   return emailAuth.requestPasswordReset(supabase.auth, email);
 }
 
+/** The set-password screen's submit. */
 export function updatePassword(password: string) {
   return emailAuth.updatePassword(supabase.auth, password);
 }
 
+/** The check-inbox screen's resend. */
 export function resendConfirmation(email: string) {
   return emailAuth.resendConfirmation(supabase.auth, email);
 }
 
+/** The `auth/callback` route's exchange of a parsed link. */
 export function completeAuthLink(link: AuthLink) {
   return emailAuth.completeAuthLink(supabase.auth, link);
 }

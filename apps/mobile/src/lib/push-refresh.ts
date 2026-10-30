@@ -40,6 +40,7 @@ export interface RefreshRequest<T> {
   token?: T;
 }
 
+/** What the gate needs from the app. `usePushTokenRefresh` supplies the real ones. */
 export interface PushRefreshDeps<T> {
   now: () => number;
   /** Read at the moment of each foreground / token-change attempt. */
@@ -50,6 +51,10 @@ export interface PushRefreshDeps<T> {
   register: (request: RefreshRequest<T>) => Promise<RefreshOutcome>;
 }
 
+/**
+ * Decides whether each trigger above registers now, waits or is dropped. One
+ * instance per mounted `usePushTokenRefresh`.
+ */
 export class PushRefreshGate<T> {
   private nextAllowedAt = Number.NEGATIVE_INFINITY;
   /** What the last attempt of this session returned, or null before the first. */
@@ -102,6 +107,7 @@ export class PushRefreshGate<T> {
     this.inflight = null;
   }
 
+  /** Runs one attempt as the in-flight one, then handles any token queued meanwhile. */
   private start(request: RefreshRequest<T>): Promise<void> {
     const generation = this.generation;
     const attempt = this.attempt(request, generation);
@@ -113,6 +119,7 @@ export class PushRefreshGate<T> {
     });
   }
 
+  /** Calls `register` and sets the next wait from its outcome, unless the session moved on. */
   private async attempt(request: RefreshRequest<T>, generation: number): Promise<void> {
     let outcome: RefreshOutcome;
     try {

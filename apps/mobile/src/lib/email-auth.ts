@@ -42,6 +42,7 @@ export type EmailAuthClient = Pick<
   | 'exchangeCodeForSession'
 >;
 
+/** The one failure shape: `message` is always a string from `AuthCopy`. */
 export type Failure = { status: 'failed'; message: string };
 
 export type SignUpResult = { status: 'check-inbox' } | { status: 'signed-in' } | Failure;
@@ -91,7 +92,7 @@ function logFailure(operation: string, error: unknown): void {
  *
  * Scoped to users whose *only* provider is email so that Apple and Google
  * accounts can never trip it: their address is vouched for by the provider,
- * and a false positive here would sign out the only auth that works today.
+ * and a false positive here would sign out someone whose sign-in is valid.
  */
 export function isUnconfirmedEmailUser(user: User | null | undefined): boolean {
   if (user === null || user === undefined) return false;
@@ -104,6 +105,7 @@ export function isUnconfirmedEmailUser(user: User | null | undefined): boolean {
   return confirmedAt === undefined || confirmedAt === null || confirmedAt === '';
 }
 
+/** A session the app may treat as signed in. `SessionProvider` checks each one it accepts. */
 export function isUsableSession(session: Session | null): session is Session {
   return session !== null && !isUnconfirmedEmailUser(session.user);
 }
@@ -191,6 +193,10 @@ export function mapSignUpError(error: unknown): string | null {
 
 // ---------------------------------------------------------------- sign in --
 
+/**
+ * The sign-in screen's submit (through `auth.ts`). An unconfirmed address ends
+ * at check-inbox, and any session it got is discarded.
+ */
 export async function signInWithEmail(
   client: EmailAuthClient,
   input: { email: string; password: string },
@@ -293,6 +299,7 @@ export function mapUpdatePasswordError(error: unknown): string {
 
 // ----------------------------------------------------------------- resend --
 
+/** The check-inbox screen's resend (through `auth.ts`). */
 export async function resendConfirmation(
   client: EmailAuthClient,
   email: string,
@@ -371,6 +378,7 @@ function redirectTypeOf(data: object): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+/** The copy for a failed exchange in `completeAuthLink`: wrong device, offline or expired. */
 export function mapLinkError(error: unknown): string {
   if (isAuthPKCECodeVerifierMissingError(error)) return AuthCopy.linkOtherDevice;
   const code = codeOf(error);

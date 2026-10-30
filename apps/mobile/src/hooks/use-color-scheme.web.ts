@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { useColorScheme as useRNColorScheme } from 'react-native';
 
+// `useSyncExternalStore` plumbing: nothing ever changes, and the two snapshots
+// differ only so the hook below can tell the server pass from the client.
 const subscribe = () => () => {};
 const getSnapshot = () => true;
 const getServerSnapshot = () => false;

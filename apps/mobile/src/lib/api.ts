@@ -49,6 +49,7 @@ class ApiError extends Error {
 const CONTRACT_VIOLATION =
   'The server sent something this version of the app does not understand. Try updating the app.';
 
+/** The signed-in user's Supabase JWT for `post`; throws an `ApiError` when signed out. */
 async function accessToken(): Promise<string> {
   const { data, error } = await supabase.auth.getSession();
   if (error !== null) {
@@ -63,7 +64,7 @@ async function accessToken(): Promise<string> {
 
 /**
  * POSTs `body` to `/v1<path>` with the caller's Supabase access token and
- * validates the reply against `schema`.
+ * validates the reply with `parse`.
  *
  * The error envelope is `{ error: { code, message } }` for every endpoint, so a
  * non-2xx response is decoded once here and rethrown as an `ApiError` carrying
@@ -129,7 +130,7 @@ async function post<T>(
 
 /**
  * Stands in for the server's parse-then-look-up. It reuses the *same* parser
- * the API will (`@flightbuddy/shared`), so mock mode cannot accept an input
+ * the API uses (`@flightbuddy/shared`), so mock mode cannot accept an input
  * production would reject, and the result goes back through
  * `flightLookupResponseSchema` so it cannot produce a shape production would.
  *

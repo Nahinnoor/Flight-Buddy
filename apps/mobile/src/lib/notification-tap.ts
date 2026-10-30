@@ -46,12 +46,14 @@ export type NotificationPayload =
 /** Canonical 8-4-4-4-12 hex. Postgres prints uuids in lower case. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** `record[key]` if it is an own string property, so nothing inherited is ever read. */
 function ownString(record: object, key: string): string | null {
   if (!Object.prototype.hasOwnProperty.call(record, key)) return null;
   const value = (record as Record<string, unknown>)[key];
   return typeof value === 'string' ? value : null;
 }
 
+/** Narrows an untrusted string to an allowlist. */
 function isOneOf<T extends string>(value: string | null, allowed: readonly T[]): value is T {
   return value !== null && (allowed as readonly string[]).includes(value);
 }
@@ -119,6 +121,7 @@ export function refreshesDashboard(payload: NotificationPayload): boolean {
   return payload.kind === 'flight';
 }
 
+/** Which Dashboard slot holds the notified flight; `null` when it is not shown. */
 export type HighlightTarget =
   | { where: 'main'; segmentId: string }
   | { where: 'later'; segmentId: string }

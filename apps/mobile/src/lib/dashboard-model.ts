@@ -67,14 +67,15 @@ export interface MembershipView {
   legs: LegTimes[];
 }
 
-/** How many archived flights the dashboard shows before linking to Profile. */
+/** How many archived flights the dashboard shows before its "See all" link to the flight log. */
 export const PAST_PREVIEW_LIMIT = 5;
 
 // ------------------------------------------------------------- flights ---
 
 /**
- * A sorted copy by scheduled departure, `dir` 1 for earliest first and -1 for
- * latest first; equal departures go by sequence number in the same direction.
+ * A sorted copy by the departure `at` reads (scheduled, at every call), `dir` 1
+ * for earliest first and -1 for latest first; equal departures go by sequence
+ * number in the same direction.
  * Unknown departures always sort last.
  */
 function byDeparture<T extends { sequenceNumber: number }>(
@@ -92,6 +93,7 @@ function byDeparture<T extends { sequenceNumber: number }>(
   });
 }
 
+/** The sort key `sortByScheduledDeparture` and `sortPastFlights` pass to `byDeparture`. */
 const segmentDeparture = (segment: SegmentView) => segment.flight.scheduled_departure_utc;
 
 /** Earliest scheduled departure first; unknown departures last. */
@@ -315,6 +317,7 @@ const COUNTDOWN_RANK: Record<GroupCountdown['kind'], number> = {
   'no-flight': 4,
 };
 
+/** `dashboardGroups`' sort: `COUNTDOWN_RANK`, then departure, then label. */
 function compareCards(a: GroupCard, b: GroupCard): number {
   const rank = COUNTDOWN_RANK[a.countdown.kind] - COUNTDOWN_RANK[b.countdown.kind];
   if (rank !== 0) return rank;
@@ -425,6 +428,10 @@ export interface DashboardModel {
   isEmpty: boolean;
 }
 
+/**
+ * The Dashboard tab's whole model: the pinned flight, the later legs and what
+ * fills the space below. The tab calls it with its three lists and `useNow`'s clock.
+ */
 export function buildDashboard(input: DashboardInput, now: Date): DashboardModel {
   const ordered = sortByScheduledDeparture(input.segments ?? []);
   const main = mainOf(ordered, now);

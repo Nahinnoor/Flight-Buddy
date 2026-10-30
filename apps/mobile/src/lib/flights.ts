@@ -63,6 +63,7 @@ type SegmentRow = {
   flights: SegmentView['flight'];
 };
 
+/** A joined `trip_segments` row as the `SegmentView` the screens use. */
 function toView(row: SegmentRow): SegmentView {
   return {
     segmentId: row.id,

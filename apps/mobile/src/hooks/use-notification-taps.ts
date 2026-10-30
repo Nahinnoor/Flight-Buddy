@@ -40,11 +40,13 @@ interface SessionGate {
   isRecovering: boolean;
 }
 
+/** Identifies one notification response, so it is handled only once. */
 function responseKey(response: Notifications.NotificationResponse): string {
   const { notification } = response;
   return `${notification.request.identifier}:${notification.date}`;
 }
 
+/** See the file comment. Called once, by the root navigator in `app/_layout.tsx`. */
 export function useNotificationTaps({ isLoading, signedIn, isRecovering }: SessionGate): void {
   const router = useRouter();
   const lastResponse = Notifications.useLastNotificationResponse();

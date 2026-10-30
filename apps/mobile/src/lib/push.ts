@@ -8,9 +8,9 @@
  * database functions (migration `20260926130000_push_token_single_owner`)
  * keep that true:
  *
- * - `register_push_token` sets this device's token on the signed-in profile
- *   and removes it from every other profile, atomically. It is the only way
- *   the app writes the column.
+ * - `register_push_token` puts this device's token on the signed-in account
+ *   and takes it off every other account, atomically. It is the only way the
+ *   app adds a token.
  * - `unregister_push_token` runs on sign-out, while the session still exists
  *   (it acts for `auth.uid()`), and removes only this device's row; the
  *   account's other devices stay registered.
@@ -132,6 +132,11 @@ export function isRegisteredDeviceToken(token: Notifications.DevicePushToken): b
   return registeredDeviceKey !== null && devicePushTokenKey(token) === registeredDeviceKey;
 }
 
+/**
+ * One registration attempt, behind `registerPushToken`: checks the platform and
+ * permission, gets the token, calls `register_push_token`, and remembers the
+ * token for sign-out. Never throws.
+ */
 async function register({
   prompt = true,
   devicePushToken,
@@ -200,6 +205,10 @@ async function thisDevicesToken(): Promise<string | null> {
   return isExpoPushToken(token) ? token : null;
 }
 
+/**
+ * The untimed body of `unregisterPushToken`: waits for any registration still
+ * running, calls `unregister_push_token`, then forgets the token.
+ */
 async function unregister(): Promise<PushUnregisterResult> {
   try {
     if (inflightRegistration !== null) await inflightRegistration;

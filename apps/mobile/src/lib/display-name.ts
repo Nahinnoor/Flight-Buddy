@@ -31,6 +31,7 @@ const CONTROL_CHARACTERS = new RegExp(
   '[\\u0000-\\u001F\\u007F-\\u009F\\u200B\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069\\uFEFF]',
 );
 
+/** Validates and tidies a typed name, for the Account screen's form and `updateDisplayName`. */
 export function checkDisplayName(input: string): DisplayNameCheck {
   const value = input.trim().replace(/\s+/g, ' ');
   if (value === '') return { ok: false, reason: 'Enter a name.' };

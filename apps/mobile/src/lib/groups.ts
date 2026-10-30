@@ -49,6 +49,7 @@ const MEMBERSHIP_SELECT = `
 
 type FlightTimes = Omit<LegTimes, 'sequenceNumber'>;
 
+/** The user's active and pending memberships with their legs, for the Dashboard and Groups tabs. */
 export async function fetchMyMemberships(userId: string): Promise<MembershipView[]> {
   if (MOCK_API) return listMockMemberships();
 
