@@ -9,6 +9,7 @@ import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import type { Remote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 
 export function Section({
@@ -102,6 +103,25 @@ export function sectionState<T>(value: T | null, error: string | null): 'loading
   if (error !== null) return 'error';
   if (value === null) return 'loading';
   return 'ready';
+}
+
+/**
+ * One section's loading row or error notice with a retry. Renders nothing once
+ * the data is ready; the screen draws its content.
+ */
+export function SectionStatus<T>({
+  remote,
+  loadingLabel,
+}: {
+  remote: Remote<T>;
+  loadingLabel: string;
+}) {
+  const state = sectionState(remote.data, remote.error);
+  if (state === 'loading') return <SectionLoading label={loadingLabel} />;
+  if (state === 'error') {
+    return <SectionError message={remote.error ?? ''} onRetry={() => void remote.reload()} />;
+  }
+  return null;
 }
 
 const styles = StyleSheet.create({

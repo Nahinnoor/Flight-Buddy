@@ -6,7 +6,7 @@
  * A response that arrives after a newer request was started is dropped, so a
  * slow first load cannot overwrite a fast pull-to-refresh.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 export interface Remote<T> {
   data: T | null;
@@ -42,4 +42,20 @@ export function useRemote<T>(
   }, [fetcher, fallbackMessage]);
 
   return { data, error, reload };
+}
+
+/**
+ * `useRemote` for a query about the signed-in user: nothing loads while `userId`
+ * is `null`. `fetch` must be a stable function, such as a module-level import.
+ */
+export function useUserRemote<T>(
+  userId: string | null,
+  fetch: (userId: string) => Promise<T>,
+  fallbackMessage: string,
+): Remote<T> {
+  const fetcher = useMemo(
+    () => (userId === null ? null : () => fetch(userId)),
+    [userId, fetch],
+  );
+  return useRemote(fetcher, fallbackMessage);
 }

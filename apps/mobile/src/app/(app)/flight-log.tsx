@@ -8,16 +8,17 @@
  * One query (`fetchAllMySegments`), pull to refresh, and the shared section
  * states for loading, error and empty.
  */
-import { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useMemo } from 'react';
+import { FlatList, StyleSheet, View } from 'react-native';
 
 import { FlightLogRow } from '@/components/profile/flight-log-row';
-import { SectionEmpty, SectionError, SectionLoading, sectionState } from '@/components/section';
+import { SectionEmpty, SectionStatus, sectionState } from '@/components/section';
 import { ThemedView } from '@/components/themed-view';
 import { ContentColumn, Spacing } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
-import { useRemote } from '@/hooks/use-remote';
+import { useRefreshControl } from '@/hooks/use-refresh-control';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
+import { useUserRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchAllMySegments } from '@/lib/flights';
 import { flightLogEntry, flightsTaken } from '@/lib/profile-stats';
@@ -28,24 +29,11 @@ export default function FlightLogScreen() {
   const { userId } = useSession();
   const now = useNow(60_000);
 
-  const segments = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchAllMySegments(userId)), [userId]),
-    'Could not load your flights.',
-  );
+  const segments = useUserRemote(userId, fetchAllMySegments, 'Could not load your flights.');
   const { reload } = segments;
 
-  useFocusEffect(
-    useCallback(() => {
-      void reload();
-    }, [reload]),
-  );
-
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await reload();
-    setIsRefreshing(false);
-  }, [reload]);
+  useReloadOnFocus(reload);
+  const refreshControl = useRefreshControl(reload);
 
   const entries = useMemo(
     () => (segments.data === null ? [] : flightsTaken(segments.data, now).map(flightLogEntry)),
@@ -61,19 +49,10 @@ export default function FlightLogScreen() {
         keyExtractor={(entry) => entry.key}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => void onRefresh()}
-            tintColor={theme.textSecondary}
-          />
-        }
+        refreshControl={refreshControl}
         ListEmptyComponent={
           <View style={styles.notice}>
-            {state === 'loading' ? <SectionLoading label="Loading your flights" /> : null}
-            {state === 'error' ? (
-              <SectionError message={segments.error ?? ''} onRetry={() => void reload()} />
-            ) : null}
+            <SectionStatus remote={segments} loadingLabel="Loading your flights" />
             {state === 'ready' ? <SectionEmpty>Flights move here after they land.</SectionEmpty> : null}
           </View>
         }

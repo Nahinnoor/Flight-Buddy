@@ -12,25 +12,25 @@
  *   key, which ADR 0001 reserves for `ingestFlight`, so it gets its own ADR in
  *   Phase 3. A destructive button that does not work is worse than none.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
 
 import { PrimaryButton } from '@/components/auth/auth-kit';
-import { Section, SectionError, SectionLoading, sectionState } from '@/components/section';
+import { Section, SectionStatus, sectionState } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ContentColumn, Spacing } from '@/constants/theme';
-import { useRemote } from '@/hooks/use-remote';
+import { useRefreshControl } from '@/hooks/use-refresh-control';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
+import { useUserRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import { checkDisplayName, DISPLAY_NAME_MAX_LENGTH } from '@/lib/display-name';
 import { fetchProfile, updateDisplayName, type ProfileView } from '@/lib/profile';
@@ -40,24 +40,11 @@ export default function AccountScreen() {
   const theme = useTheme();
   const { userId, session, signOut } = useSession();
 
-  const profile = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchProfile(userId)), [userId]),
-    'Could not load your profile.',
-  );
+  const profile = useUserRemote(userId, fetchProfile, 'Could not load your profile.');
   const { reload: reloadProfile } = profile;
 
-  useFocusEffect(
-    useCallback(() => {
-      void reloadProfile();
-    }, [reloadProfile]),
-  );
-
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await reloadProfile();
-    setIsRefreshing(false);
-  }, [reloadProfile]);
+  useReloadOnFocus(reloadProfile);
+  const refreshControl = useRefreshControl(reloadProfile);
 
   const [isSigningOut, setIsSigningOut] = useState(false);
   // A failed sign-out leaves the session in place (supabase-js only clears it
@@ -87,19 +74,10 @@ export default function AccountScreen() {
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => void onRefresh()}
-            tintColor={theme.textSecondary}
-          />
-        }>
+        refreshControl={refreshControl}>
         <View style={styles.inner}>
           <Section title="Your name">
-            {profileState === 'loading' ? <SectionLoading label="Loading your profile" /> : null}
-            {profileState === 'error' ? (
-              <SectionError message={profile.error ?? ''} onRetry={() => void reloadProfile()} />
-            ) : null}
+            <SectionStatus remote={profile} loadingLabel="Loading your profile" />
             {profileState === 'ready' && profile.data !== null && userId !== null ? (
               // Keyed on the user, not the name: a save reloads the profile,
               // and remounting then would swallow the "Saved." confirmation.

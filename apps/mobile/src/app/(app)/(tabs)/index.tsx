@@ -27,13 +27,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import {
   AccessibilityInfo,
   AppState,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
   type LayoutChangeEvent,
 } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { TAB_SCREEN_BOTTOM_INSET } from '@/components/app-tab-bar';
@@ -42,8 +41,7 @@ import { cardDataFromSegment, FlightCard } from '@/components/flight-card';
 import {
   Section,
   SectionEmpty,
-  SectionError,
-  SectionLoading,
+  SectionStatus,
   sectionState,
   TextButton,
 } from '@/components/section';
@@ -51,7 +49,9 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ContentColumn, Spacing } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
-import { useRemote } from '@/hooks/use-remote';
+import { useRefreshControl } from '@/hooks/use-refresh-control';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
+import { useUserRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import { buildDashboard, groupCountdownText, isAirborne } from '@/lib/dashboard-model';
 import {
@@ -68,26 +68,15 @@ import { useSession } from '@/providers/session-provider';
 const HIGHLIGHT_MS = 3_000;
 
 export default function DashboardScreen() {
-  const theme = useTheme();
   const router = useRouter();
   const { userId } = useSession();
   // Group countdowns are minute-grained; the pinned card keeps its own clock.
   const now = useNow(30_000);
 
-  const segments = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchMySegments(userId)), [userId]),
-    'Could not load your flights.',
-  );
-  const memberships = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchMyMemberships(userId)), [userId]),
-    'Could not load your groups.',
-  );
-  const past = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchPastSegments(userId)), [userId]),
-    'Could not load your past flights.',
-  );
+  const segments = useUserRemote(userId, fetchMySegments, 'Could not load your flights.');
+  const memberships = useUserRemote(userId, fetchMyMemberships, 'Could not load your groups.');
+  const past = useUserRemote(userId, fetchPastSegments, 'Could not load your past flights.');
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const { reload: reloadSegments } = segments;
   const { reload: reloadMemberships } = memberships;
   const { reload: reloadPast } = past;
@@ -99,17 +88,9 @@ export default function DashboardScreen() {
 
   // Refetch on focus, so closing the add-flight sheet shows the new flight
   // without a manual pull.
-  useFocusEffect(
-    useCallback(() => {
-      void reloadAll();
-    }, [reloadAll]),
-  );
+  useReloadOnFocus(reloadAll);
 
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await reloadAll();
-    setIsRefreshing(false);
-  }, [reloadAll]);
+  const refreshControl = useRefreshControl(reloadAll);
 
   // ---- notifications ----
 
@@ -213,13 +194,7 @@ export default function DashboardScreen() {
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => void onRefresh()}
-            tintColor={theme.textSecondary}
-          />
-        }>
+        refreshControl={refreshControl}>
         <View style={styles.inner}>
           {model.isEmpty ? (
             <EmptyDashboard />
@@ -228,13 +203,7 @@ export default function DashboardScreen() {
               {/* 1. The main flight. */}
               <Section
                 title={model.main !== null && isAirborne(model.main.flight) ? 'In the air' : 'Next flight'}>
-                {segmentsState === 'loading' ? <SectionLoading label="Loading your flights" /> : null}
-                {segmentsState === 'error' ? (
-                  <SectionError
-                    message={segments.error ?? ''}
-                    onRetry={() => void segments.reload()}
-                  />
-                ) : null}
+                <SectionStatus remote={segments} loadingLabel="Loading your flights" />
                 {segmentsState === 'ready' && model.main !== null ? (
                   <HighlightFrame active={target?.where === 'main'}>
                     <FlightCard
@@ -252,14 +221,7 @@ export default function DashboardScreen() {
               {/* 2. Groups, or — with none — past flights. */}
               {membershipsState !== 'ready' ? (
                 <Section title="Your groups">
-                  {membershipsState === 'loading' ? (
-                    <SectionLoading label="Loading your groups" />
-                  ) : (
-                    <SectionError
-                      message={memberships.error ?? ''}
-                      onRetry={() => void memberships.reload()}
-                    />
-                  )}
+                  <SectionStatus remote={memberships} loadingLabel="Loading your groups" />
                 </Section>
               ) : null}
 
@@ -288,10 +250,7 @@ export default function DashboardScreen() {
                       />
                     ) : null
                   }>
-                  {pastState === 'loading' ? <SectionLoading label="Loading past flights" /> : null}
-                  {pastState === 'error' ? (
-                    <SectionError message={past.error ?? ''} onRetry={() => void past.reload()} />
-                  ) : null}
+                  <SectionStatus remote={past} loadingLabel="Loading past flights" />
                   {pastState === 'ready'
                     ? model.pastPreview.map((segment) => (
                         <PastFlightRow key={segment.segmentId} segment={segment} />

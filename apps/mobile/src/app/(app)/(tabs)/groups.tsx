@@ -8,9 +8,7 @@
  * disabled and labelled "Coming soon". Cards are not tappable: the group page
  * (§3.6) is Phase 3 too.
  */
-import { useCallback, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 
 import { TAB_SCREEN_BOTTOM_INSET } from '@/components/app-tab-bar';
@@ -19,43 +17,30 @@ import { Pill } from '@/components/pill';
 import {
   Section,
   SectionEmpty,
-  SectionError,
-  SectionLoading,
+  SectionStatus,
   sectionState,
 } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ContentColumn, Spacing } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
-import { useRemote } from '@/hooks/use-remote';
+import { useRefreshControl } from '@/hooks/use-refresh-control';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
+import { useUserRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import { groupsTabEntries } from '@/lib/dashboard-model';
 import { fetchMyMemberships } from '@/lib/groups';
 import { useSession } from '@/providers/session-provider';
 
 export default function GroupsScreen() {
-  const theme = useTheme();
   const { userId } = useSession();
   const now = useNow(30_000);
 
-  const memberships = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchMyMemberships(userId)), [userId]),
-    'Could not load your groups.',
-  );
+  const memberships = useUserRemote(userId, fetchMyMemberships, 'Could not load your groups.');
   const { reload } = memberships;
 
-  useFocusEffect(
-    useCallback(() => {
-      void reload();
-    }, [reload]),
-  );
-
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await reload();
-    setIsRefreshing(false);
-  }, [reload]);
+  useReloadOnFocus(reload);
+  const refreshControl = useRefreshControl(reload);
 
   const state = sectionState(memberships.data, memberships.error);
   const entries = memberships.data === null ? [] : groupsTabEntries(memberships.data, now);
@@ -64,13 +49,7 @@ export default function GroupsScreen() {
     <ThemedView style={styles.screen}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => void onRefresh()}
-            tintColor={theme.textSecondary}
-          />
-        }>
+        refreshControl={refreshControl}>
         <View style={styles.inner}>
           <View style={styles.actions}>
             <ComingSoonAction icon="plus.circle" label="Create a group" />
@@ -78,10 +57,7 @@ export default function GroupsScreen() {
           </View>
 
           <Section title="Your groups">
-            {state === 'loading' ? <SectionLoading label="Loading your groups" /> : null}
-            {state === 'error' ? (
-              <SectionError message={memberships.error ?? ''} onRetry={() => void reload()} />
-            ) : null}
+            <SectionStatus remote={memberships} loadingLabel="Loading your groups" />
             {state === 'ready' && entries.length === 0 ? (
               <SectionEmpty>
                 You are not in any groups yet. A group follows everyone flying to the same place

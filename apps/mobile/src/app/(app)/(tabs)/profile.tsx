@@ -20,9 +20,9 @@
  *
  * Nothing here writes. Names shown are plain text only.
  */
-import { useCallback, useMemo, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,12 +31,20 @@ import { FriendsCard, FriendsEmpty, FriendsHeading } from '@/components/profile/
 import { FlightLogGroup, FlightLogRow } from '@/components/profile/flight-log-row';
 import { LevelCard } from '@/components/profile/level-card';
 import { PassportCard } from '@/components/profile/passport-card';
-import { SectionEmpty, SectionError, SectionLoading, sectionState } from '@/components/section';
+import {
+  SectionEmpty,
+  SectionError,
+  SectionLoading,
+  SectionStatus,
+  sectionState,
+} from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ContentColumn, Spacing } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
-import { useRemote } from '@/hooks/use-remote';
+import { useRefreshControl } from '@/hooks/use-refresh-control';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
+import { useUserRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import { deviceTimeZone } from '@/lib/device-time';
 import { fetchAllMySegments } from '@/lib/flights';
@@ -60,18 +68,9 @@ export default function ProfileScreen() {
   const { userId } = useSession();
   const now = useNow(60_000);
 
-  const profile = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchProfile(userId)), [userId]),
-    'Could not load your profile.',
-  );
-  const segments = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchAllMySegments(userId)), [userId]),
-    'Could not load your flights.',
-  );
-  const friends = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchGroupTrips(userId)), [userId]),
-    'Could not load your group trips.',
-  );
+  const profile = useUserRemote(userId, fetchProfile, 'Could not load your profile.');
+  const segments = useUserRemote(userId, fetchAllMySegments, 'Could not load your flights.');
+  const friends = useUserRemote(userId, fetchGroupTrips, 'Could not load your group trips.');
   const { reload: reloadProfile } = profile;
   const { reload: reloadSegments } = segments;
   const { reload: reloadFriends } = friends;
@@ -82,18 +81,8 @@ export default function ProfileScreen() {
   );
 
   // On focus, so a rename on Account or a flight that just landed shows up.
-  useFocusEffect(
-    useCallback(() => {
-      void reloadAll();
-    }, [reloadAll]),
-  );
-
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await reloadAll();
-    setIsRefreshing(false);
-  }, [reloadAll]);
+  useReloadOnFocus(reloadAll);
+  const refreshControl = useRefreshControl(reloadAll);
 
   const timeZone = deviceTimeZone();
   const stats = useMemo(
@@ -123,13 +112,7 @@ export default function ProfileScreen() {
     <ThemedView style={styles.screen}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + Spacing.three }]}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={() => void onRefresh()}
-            tintColor={theme.textSecondary}
-          />
-        }>
+        refreshControl={refreshControl}>
         <View style={styles.inner}>
           {/* 1. Title and Edit. */}
           <View style={styles.header}>
@@ -180,10 +163,7 @@ export default function ProfileScreen() {
           {/* 4. Flying with friends. */}
           <View style={styles.section}>
             <FriendsHeading />
-            {friendsState === 'loading' ? <SectionLoading label="Loading your group trips" /> : null}
-            {friendsState === 'error' ? (
-              <SectionError message={friends.error ?? ''} onRetry={() => void reloadFriends()} />
-            ) : null}
+            <SectionStatus remote={friends} loadingLabel="Loading your group trips" />
             {friendStats !== null && friendsState === 'ready' ? (
               friendStats.groupTrips > 0 ? (
                 <FriendsCard stats={friendStats} />
@@ -212,10 +192,7 @@ export default function ProfileScreen() {
                 </Pressable>
               ) : null}
             </View>
-            {segmentsState === 'loading' ? <SectionLoading label="Loading your flights" /> : null}
-            {segmentsState === 'error' ? (
-              <SectionError message={segments.error ?? ''} onRetry={() => void reloadSegments()} />
-            ) : null}
+            <SectionStatus remote={segments} loadingLabel="Loading your flights" />
             {segmentsState === 'ready' && log.length === 0 ? (
               <SectionEmpty>Flights move here after they land.</SectionEmpty>
             ) : null}

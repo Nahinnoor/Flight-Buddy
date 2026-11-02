@@ -9,17 +9,17 @@
  *   every dashboard state can be seen without rebuilding. It never renders in
  *   a real-data or release build.
  */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import Constants from 'expo-constants';
-import { useFocusEffect } from 'expo-router';
 
 import { TAB_SCREEN_BOTTOM_INSET } from '@/components/app-tab-bar';
-import { Section, SectionError, SectionLoading, sectionState } from '@/components/section';
+import { Section, SectionStatus, sectionState } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { ContentColumn, Spacing } from '@/constants/theme';
-import { useRemote } from '@/hooks/use-remote';
+import { useReloadOnFocus } from '@/hooks/use-reload-on-focus';
+import { useUserRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import {
   APPEARANCE_LABELS,
@@ -38,16 +38,9 @@ export default function SettingsScreen() {
   const { userId } = useSession();
   const { preference, setPreference } = useAppearance();
 
-  const profile = useRemote(
-    useMemo(() => (userId === null ? null : () => fetchProfile(userId)), [userId]),
-    'Could not load your settings.',
-  );
+  const profile = useUserRemote(userId, fetchProfile, 'Could not load your settings.');
   const { reload } = profile;
-  useFocusEffect(
-    useCallback(() => {
-      void reload();
-    }, [reload]),
-  );
+  useReloadOnFocus(reload);
 
   // Optimistic: the switch moves at once, and moves back if the write fails.
   const [quietOverride, setQuietOverride] = useState<boolean | null>(null);
@@ -83,10 +76,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.inner}>
           <Section title="Notifications">
-            {state === 'loading' ? <SectionLoading label="Loading your settings" /> : null}
-            {state === 'error' ? (
-              <SectionError message={profile.error ?? ''} onRetry={() => void reload()} />
-            ) : null}
+            <SectionStatus remote={profile} loadingLabel="Loading your settings" />
             {state === 'ready' ? (
               <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
                 <View style={styles.switchRow}>
