@@ -19,8 +19,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useNotificationTaps } from '@/hooks/use-notification-taps';
+import { useScheme } from '@/hooks/use-scheme';
 import { configureNotificationHandler } from '@/lib/push';
 import { routeFor } from '@/lib/route-guard';
 import { AppearanceProvider, useAppearance } from '@/providers/appearance-provider';
@@ -58,10 +58,10 @@ function RootNavigator() {
  * The navigation theme — headers, the modal sheet's backdrop, the tab screens'
  * background — built from the same tokens as every screen, so a header is
  * never a different white (or black) from the page under it. It follows
- * `useColorScheme`, which the appearance override drives.
+ * `useScheme`, which the appearance override drives.
  */
 function ThemedNavigation({ children }: { children: React.ReactNode }) {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const scheme = useScheme();
   const value = useMemo(() => {
     const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
     const palette = Colors[scheme];

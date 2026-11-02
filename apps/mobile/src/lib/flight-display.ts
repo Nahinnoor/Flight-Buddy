@@ -9,6 +9,8 @@
  */
 import type { FlightStatus, TrackingTier } from '@flightbuddy/shared';
 
+import type { Tone } from '../constants/theme';
+
 /** Past this many minutes a delay is a notifying event (§9), so the UI shouts. */
 export const DELAY_HIGHLIGHT_MINUTES = 30;
 
@@ -29,8 +31,6 @@ export function instant(iso: string | null): number | null {
   return Number.isNaN(ms) ? null : ms;
 }
 
-export type StatusTone = 'neutral' | 'positive' | 'warning' | 'critical';
-
 const STATUS_LABELS: Record<FlightStatus, string> = {
   scheduled: 'Scheduled',
   delayed: 'Delayed',
@@ -43,7 +43,7 @@ const STATUS_LABELS: Record<FlightStatus, string> = {
   unknown: 'Unknown',
 };
 
-const STATUS_TONES: Record<FlightStatus, StatusTone> = {
+const STATUS_TONES: Record<FlightStatus, Tone> = {
   scheduled: 'neutral',
   delayed: 'warning',
   boarding: 'positive',
@@ -61,7 +61,7 @@ export function statusLabel(status: FlightStatus): string {
 }
 
 /** The colour of the flight card's status pill. */
-export function statusTone(status: FlightStatus): StatusTone {
+export function statusTone(status: FlightStatus): Tone {
   return STATUS_TONES[status];
 }
 

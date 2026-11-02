@@ -33,8 +33,6 @@ import { startSupabaseAutoRefresh, supabase } from '@/lib/supabase';
 interface SessionContextValue {
   session: Session | null;
   userId: string | null;
-  /** Display name from the JWT. `null` until the profile row has one. */
-  displayName: string | null;
   /**
    * True only while the stored session is being read back out of the keychain.
    * The route guard must not redirect during this window or a returning user
@@ -103,17 +101,6 @@ async function clearThisDevicesPushToken(): Promise<void> {
   if (result.status === 'failed') {
     console.log(`[push] token not cleared on sign-out: ${result.reason}`);
   }
-}
-
-function nameFromSession(session: Session | null): string | null {
-  if (session === null) return null;
-  const metadata = session.user.user_metadata as Record<string, unknown> | null;
-  for (const key of ['full_name', 'name']) {
-    const value = metadata?.[key];
-    if (typeof value === 'string' && value.trim() !== '') return value.trim();
-  }
-  const email = session.user.email;
-  return typeof email === 'string' && email !== '' ? email : null;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -254,7 +241,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       userId,
-      displayName: nameFromSession(session),
       isLoading,
       isRecovering,
       finishRecovery,

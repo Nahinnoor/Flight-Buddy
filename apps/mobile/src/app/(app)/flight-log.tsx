@@ -15,7 +15,7 @@ import { useFocusEffect } from 'expo-router';
 import { FlightLogRow } from '@/components/profile/flight-log-row';
 import { SectionEmpty, SectionError, SectionLoading, sectionState } from '@/components/section';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
 import { useRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
@@ -101,9 +101,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     padding: Spacing.three,
     paddingBottom: Spacing.five,
   },

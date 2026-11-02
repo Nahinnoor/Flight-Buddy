@@ -28,7 +28,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing, TONE_COLORS, type Tone } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Link-sized targets are ~20pt of text; this is the rest of the 44. */
@@ -80,11 +80,11 @@ export function AuthHero({
 }) {
   return (
     <View style={styles.hero}>
-      <ThemedText type={size === 'large' ? 'title' : 'subtitle'} style={styles.centred}>
+      <ThemedText type={size === 'large' ? 'title' : 'subtitle'} style={AuthLayout.centredText}>
         {title}
       </ThemedText>
       {subtitle !== undefined ? (
-        <ThemedText type="default" themeColor="textSecondary" style={styles.centred}>
+        <ThemedText type="default" themeColor="textSecondary" style={AuthLayout.centredText}>
           {subtitle}
         </ThemedText>
       ) : null}
@@ -188,9 +188,7 @@ export function TextLink({
       accessibilityLabel={label}
       hitSlop={LINK_HIT_SLOP}
       onPress={onPress}
-      style={({ pressed }) => [{ alignSelf: alignmentOf(align), opacity: pressed ? 0.6 : 1 }]}>
-      {/* Not `ThemedText type="linkPrimary"`: that variant hard-codes a blue
-          that does not change with the scheme. `theme.accent` does. */}
+      style={({ pressed }) => [{ alignSelf: ALIGNMENT[align], opacity: pressed ? 0.6 : 1 }]}>
       <ThemedText
         type="smallBold"
         style={{ color: emphasis === 'accent' ? theme.accent : theme.textSecondary }}>
@@ -200,11 +198,8 @@ export function TextLink({
   );
 }
 
-function alignmentOf(align: 'center' | 'left' | 'right') {
-  if (align === 'left') return 'flex-start';
-  if (align === 'right') return 'flex-end';
-  return 'center';
-}
+/** A `TextLink`'s `align`, as the `alignSelf` that puts it there. */
+const ALIGNMENT = { center: 'center', left: 'flex-start', right: 'flex-end' } as const;
 
 /** A hairline with a word in it. `accessibilityElementsHidden` — it is decoration. */
 export function Divider({ label = 'or' }: { label?: string }) {
@@ -221,7 +216,7 @@ export function Divider({ label = 'or' }: { label?: string }) {
   );
 }
 
-export type NoticeTone = 'critical' | 'neutral' | 'positive';
+export type NoticeTone = Exclude<Tone, 'warning'>;
 
 /**
  * The block a submission failure lands in. `accessibilityLiveRegion` and the
@@ -230,25 +225,14 @@ export type NoticeTone = 'critical' | 'neutral' | 'positive';
  */
 export function Notice({ tone, children }: { tone: NoticeTone; children: string }) {
   const theme = useTheme();
-  const surface =
-    tone === 'critical'
-      ? theme.criticalSurface
-      : tone === 'positive'
-        ? theme.positiveSurface
-        : theme.neutralSurface;
-  const text =
-    tone === 'critical'
-      ? theme.criticalText
-      : tone === 'positive'
-        ? theme.positiveText
-        : theme.neutralText;
+  const { surface, text } = TONE_COLORS[tone];
 
   return (
     <View
       accessibilityRole="alert"
       accessibilityLiveRegion="polite"
-      style={[styles.notice, { backgroundColor: surface }]}>
-      <ThemedText type="small" style={{ color: text }}>
+      style={[styles.notice, { backgroundColor: theme[surface] }]}>
+      <ThemedText type="small" style={{ color: theme[text] }}>
         {children}
       </ThemedText>
     </View>
@@ -290,9 +274,7 @@ const styles = StyleSheet.create({
   },
   inner: {
     flex: 1,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
     paddingBottom: Spacing.four,
@@ -300,9 +282,6 @@ const styles = StyleSheet.create({
   },
   hero: {
     gap: Spacing.two,
-  },
-  centred: {
-    textAlign: 'center',
   },
   button: {
     height: 50,

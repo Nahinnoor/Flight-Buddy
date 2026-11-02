@@ -102,28 +102,21 @@ export const ROUTES: readonly Route[] = [
 const LAST_START = 0.2;
 
 /**
- * Per-route progress, eased.
- *
- * The master value runs linearly so the three routes can be offset from each
- * other; the ease-out lives here instead, applied after the offset, so every
- * route decelerates into its own landing rather than inheriting a slice of one
- * shared curve.
+ * `value` held inside `min`…`max`. Declared before the worklets that call it:
+ * the Reanimated plugin turns a worklet declaration into a `const`, so it is
+ * not hoisted, and a caller captures it when the caller is created.
  */
-export function routeProgress(master: number, stagger: number): number {
+export function clamp(value: number, min: number, max: number): number {
   'worklet';
-  const raw = (master - stagger) / (1 - LAST_START);
-  const p = raw < 0 ? 0 : raw > 1 ? 1 : raw;
-  const inverse = 1 - p;
-  return 1 - inverse * inverse * inverse;
+  return value < min ? min : value > max ? max : value;
 }
 
 /**
- * The trail as drawn so far: the exact sub-curve from the origin to `t`, via
- * de Casteljau. Truncating the real curve rather than masking a finished one
- * means the dash pattern is laid from the origin and simply grows — new dashes
- * appear at the head, the ones behind never shift.
+ * One de Casteljau split of `route` at curve parameter `t`. `a`, `d` and `f`
+ * are the control points and end of the sub-curve from the origin to `t`; `d`
+ * to `e` is the tangent there. Declared early for the same reason as `clamp`.
  */
-export function trailPath(route: Route, t: number): string {
+function casteljau(route: Route, t: number) {
   'worklet';
   const ax = route.x0 + (route.x1 - route.x0) * t;
   const ay = route.y0 + (route.y1 - route.y0) * t;
@@ -137,6 +130,34 @@ export function trailPath(route: Route, t: number): string {
   const ey = by + (cy - by) * t;
   const fx = dx + (ex - dx) * t;
   const fy = dy + (ey - dy) * t;
+  return { ax, ay, dx, dy, ex, ey, fx, fy };
+}
+
+/**
+ * Per-route progress, eased.
+ *
+ * The master value runs linearly so the three routes can be offset from each
+ * other; the ease-out lives here instead, applied after the offset, so every
+ * route decelerates into its own landing rather than inheriting a slice of one
+ * shared curve.
+ */
+export function routeProgress(master: number, stagger: number): number {
+  'worklet';
+  const raw = (master - stagger) / (1 - LAST_START);
+  const p = clamp(raw, 0, 1);
+  const inverse = 1 - p;
+  return 1 - inverse * inverse * inverse;
+}
+
+/**
+ * The trail as drawn so far: the exact sub-curve from the origin to `t`, via
+ * de Casteljau. Truncating the real curve rather than masking a finished one
+ * means the dash pattern is laid from the origin and simply grows — new dashes
+ * appear at the head, the ones behind never shift.
+ */
+export function trailPath(route: Route, t: number): string {
+  'worklet';
+  const { ax, ay, dx, dy, fx, fy } = casteljau(route, t);
   return `M ${route.x0} ${route.y0} C ${ax} ${ay} ${dx} ${dy} ${fx} ${fy}`;
 }
 
@@ -165,18 +186,7 @@ export function planeMatrix(
   t: number,
 ): [number, number, number, number, number, number] {
   'worklet';
-  const ax = route.x0 + (route.x1 - route.x0) * t;
-  const ay = route.y0 + (route.y1 - route.y0) * t;
-  const bx = route.x1 + (route.x2 - route.x1) * t;
-  const by = route.y1 + (route.y2 - route.y1) * t;
-  const cx = route.x2 + (route.x3 - route.x2) * t;
-  const cy = route.y2 + (route.y3 - route.y2) * t;
-  const dx = ax + (bx - ax) * t;
-  const dy = ay + (by - ay) * t;
-  const ex = bx + (cx - bx) * t;
-  const ey = by + (cy - by) * t;
-  const fx = dx + (ex - dx) * t;
-  const fy = dy + (ey - dy) * t;
+  const { dx, dy, ex, ey, fx, fy } = casteljau(route, t);
   const radians = Math.atan2(ey - dy, ex - dx);
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
@@ -189,16 +199,7 @@ export function planeMatrix(
 
 /** The tangent angle in degrees. Exported for the geometry test. */
 export function headingAt(route: Route, t: number): number {
-  const bx = route.x1 + (route.x2 - route.x1) * t;
-  const by = route.y1 + (route.y2 - route.y1) * t;
-  const ax = route.x0 + (route.x1 - route.x0) * t;
-  const ay = route.y0 + (route.y1 - route.y0) * t;
-  const cx = route.x2 + (route.x3 - route.x2) * t;
-  const cy = route.y2 + (route.y3 - route.y2) * t;
-  const dx = ax + (bx - ax) * t;
-  const dy = ay + (by - ay) * t;
-  const ex = bx + (cx - bx) * t;
-  const ey = by + (cy - by) * t;
+  const { dx, dy, ex, ey } = casteljau(route, t);
   return (Math.atan2(ey - dy, ex - dx) * 180) / Math.PI;
 }
 

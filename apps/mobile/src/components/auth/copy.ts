@@ -96,8 +96,6 @@ export const AuthCopy = {
   linkOtherDevice:
     'Open this link on the phone where you asked for it. If you were confirming your email, it is confirmed — you can sign in now.',
   linkUnrecognised: 'That link is not one FlightBuddy can use.',
-
-  privacyNote: 'We only use your name and email to show who is on which flight.',
 } as const;
 
 export const FieldCopy = {

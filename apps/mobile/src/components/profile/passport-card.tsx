@@ -18,6 +18,7 @@ import {
   formatNumber,
   initialsOf,
   mrzLines,
+  plural,
   type LevelProgress,
 } from '@/lib/profile-stats';
 
@@ -59,9 +60,9 @@ export function PassportCard({ data }: { data: PassportData }) {
     `Level ${data.level.index}, ${data.level.name}. ` +
     `Home base ${data.homeBase ?? 'not set yet'}. ` +
     (data.memberSince === null ? '' : `Member since ${data.memberSince}. `) +
-    `${formatNumber(data.flights)} ${data.flights === 1 ? 'flight' : 'flights'}, ` +
-    `${formatNumber(data.airports)} ${data.airports === 1 ? 'airport' : 'airports'}, ` +
-    `${formatNumber(data.countries)} ${data.countries === 1 ? 'country' : 'countries'}, ` +
+    `${plural(data.flights, 'flight', 'flights')}, ` +
+    `${plural(data.airports, 'airport', 'airports')}, ` +
+    `${plural(data.countries, 'country', 'countries')}, ` +
     `${formatNumber(data.miles)} miles.`;
 
   const totals: [string, string][] = [
@@ -183,7 +184,6 @@ export function PassportCard({ data }: { data: PassportData }) {
 
 const styles = StyleSheet.create({
   cover: {
-    position: 'relative',
     overflow: 'hidden',
     gap: Spacing.three,
     padding: COVER_PADDING,
@@ -195,7 +195,6 @@ const styles = StyleSheet.create({
     top: -36,
   },
   brand: {
-    position: 'relative',
     flexDirection: 'row',
     justifyContent: 'space-between',
   },

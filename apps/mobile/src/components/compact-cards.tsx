@@ -13,13 +13,8 @@ import { formatAirportLocal, localDateAtAirport } from '@flightbuddy/shared';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { SegmentView } from '@/lib/dashboard-model';
-import {
-  departureAnchor,
-  flightNumbers,
-  formatLocalDateShort,
-  statusLabel,
-} from '@/lib/flight-display';
+import { flightDepartureAnchor, type SegmentView } from '@/lib/dashboard-model';
+import { flightNumbers, formatLocalDateShort, statusLabel } from '@/lib/flight-display';
 
 function Card({ label, children }: { label: string; children: React.ReactNode }) {
   const theme = useTheme();
@@ -74,11 +69,7 @@ function numberOf(segment: SegmentView): string {
  */
 export function UpcomingFlightRow({ segment }: { segment: SegmentView }) {
   const { flight } = segment;
-  const anchor = departureAnchor({
-    actualDepartureUtc: flight.actual_departure_utc,
-    estimatedDepartureUtc: flight.estimated_departure_utc,
-    scheduledDepartureUtc: flight.scheduled_departure_utc,
-  });
+  const anchor = flightDepartureAnchor(flight);
   const when =
     anchor === null
       ? 'Time unknown'

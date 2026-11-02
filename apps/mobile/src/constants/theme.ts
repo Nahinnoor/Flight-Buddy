@@ -105,6 +105,17 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/** The four status tones: what a pill or a notice says about a flight or a result. */
+export type Tone = 'neutral' | 'positive' | 'warning' | 'critical';
+
+/** Each tone's muted background and the saturated text drawn on it. */
+export const TONE_COLORS: Record<Tone, { surface: ThemeColor; text: ThemeColor }> = {
+  neutral: { surface: 'neutralSurface', text: 'neutralText' },
+  positive: { surface: 'positiveSurface', text: 'positiveText' },
+  warning: { surface: 'warningSurface', text: 'warningText' },
+  critical: { surface: 'criticalSurface', text: 'criticalText' },
+};
+
 /**
  * Colours that exist only inside drawn artwork.
  *
@@ -222,24 +233,16 @@ export type PassportPalette = Record<PassportColor, string>;
 
 export const Fonts = Platform.select({
   ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
     /** iOS `UIFontDescriptorSystemDesignRounded` */
     rounded: 'ui-rounded',
     /** iOS `UIFontDescriptorSystemDesignMonospaced` */
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
-    serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',
   },
   web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
     rounded: 'var(--font-rounded)',
     mono: 'var(--font-mono)',
   },
@@ -256,4 +259,11 @@ export const Spacing = {
 } as const;
 
 /** Keeps text measure sane if this ever runs on an iPad or the web build. */
-export const MaxContentWidth = 800;
+const MaxContentWidth = 800;
+
+/** The centred, width-capped column every screen's content sits in. */
+export const ContentColumn = {
+  width: '100%',
+  maxWidth: MaxContentWidth,
+  alignSelf: 'center',
+} as const;

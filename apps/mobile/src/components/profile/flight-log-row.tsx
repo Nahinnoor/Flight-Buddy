@@ -12,16 +12,9 @@ import { StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
-import type { ThemeColor } from '@/constants/theme';
+import { TONE_COLORS } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { FlightLogEntry, PillTone } from '@/lib/profile-stats';
-
-const PILL_COLORS: Record<PillTone, [ThemeColor, ThemeColor]> = {
-  neutral: ['neutralSurface', 'neutralText'],
-  positive: ['positiveSurface', 'positiveText'],
-  warning: ['warningSurface', 'warningText'],
-  critical: ['criticalSurface', 'criticalText'],
-};
+import type { FlightLogEntry } from '@/lib/profile-stats';
 
 /** The rounded card a run of rows sits in. */
 export function FlightLogGroup({ children }: { children: ReactNode }) {
@@ -31,7 +24,7 @@ export function FlightLogGroup({ children }: { children: ReactNode }) {
 
 export function FlightLogRow({ entry, first }: { entry: FlightLogEntry; first: boolean }) {
   const theme = useTheme();
-  const [surface, ink] = PILL_COLORS[entry.pill.tone];
+  const { surface, text } = TONE_COLORS[entry.pill.tone];
   return (
     <View
       accessible
@@ -52,7 +45,7 @@ export function FlightLogRow({ entry, first }: { entry: FlightLogEntry; first: b
         </ThemedText>
       </View>
       <View style={[styles.pill, { backgroundColor: theme[surface] }]}>
-        <Text style={[styles.pillText, { color: theme[ink] }]} maxFontSizeMultiplier={1.5} numberOfLines={1}>
+        <Text style={[styles.pillText, { color: theme[text] }]} maxFontSizeMultiplier={1.5} numberOfLines={1}>
           {entry.pill.label}
         </Text>
       </View>

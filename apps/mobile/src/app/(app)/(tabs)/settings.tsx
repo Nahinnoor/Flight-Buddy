@@ -18,7 +18,7 @@ import { TAB_SCREEN_BOTTOM_INSET } from '@/components/app-tab-bar';
 import { Section, SectionError, SectionLoading, sectionState } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { useRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -229,9 +229,7 @@ const styles = StyleSheet.create({
     paddingBottom: TAB_SCREEN_BOTTOM_INSET,
   },
   inner: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     padding: Spacing.three,
     gap: Spacing.four,
   },

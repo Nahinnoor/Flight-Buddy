@@ -32,6 +32,7 @@ import {
   type TrackingTier,
 } from '@flightbuddy/shared';
 
+import { Pill } from '@/components/pill';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { useCountdown } from '@/hooks/use-countdown';
@@ -46,7 +47,6 @@ import {
   stalenessHint,
   statusLabel,
   statusTone,
-  type StatusTone,
 } from '@/lib/flight-display';
 import type { SegmentView } from '@/lib/dashboard-model';
 
@@ -126,30 +126,6 @@ export function cardDataFromCandidate(candidate: FlightCandidate): FlightCardDat
     actualArrivalUtc: candidate.actualArrivalUtc,
     updatedAt: null,
   };
-}
-
-function Pill({ label, tone }: { label: string; tone: StatusTone }) {
-  const theme = useTheme();
-  const surface = {
-    neutral: theme.neutralSurface,
-    positive: theme.positiveSurface,
-    warning: theme.warningSurface,
-    critical: theme.criticalSurface,
-  }[tone];
-  const color = {
-    neutral: theme.neutralText,
-    positive: theme.positiveText,
-    warning: theme.warningText,
-    critical: theme.criticalText,
-  }[tone];
-
-  return (
-    <View style={[styles.pill, { backgroundColor: surface }]}>
-      <ThemedText type="smallBold" style={[styles.pillText, { color }]}>
-        {label}
-      </ThemedText>
-    </View>
-  );
 }
 
 /**
@@ -386,15 +362,6 @@ const styles = StyleSheet.create({
   },
   struck: {
     textDecorationLine: 'line-through',
-  },
-  pill: {
-    borderRadius: 999,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-  },
-  pillText: {
-    fontSize: 12,
-    lineHeight: 16,
   },
   badges: {
     flexDirection: 'row',

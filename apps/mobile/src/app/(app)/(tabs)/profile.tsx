@@ -34,7 +34,7 @@ import { PassportCard } from '@/components/profile/passport-card';
 import { SectionEmpty, SectionError, SectionLoading, sectionState } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
 import { useRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
@@ -269,9 +269,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   inner: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     paddingHorizontal: Spacing.three,
     gap: Spacing.four,
   },

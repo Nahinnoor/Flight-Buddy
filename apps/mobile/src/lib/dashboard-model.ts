@@ -138,7 +138,7 @@ export function isAirborne(flight: FlightState): boolean {
 }
 
 /** `departureAnchor` for a row's snake_case columns. */
-function flightDepartureAnchor(flight: FlightState): string | null {
+export function flightDepartureAnchor(flight: FlightState): string | null {
   return departureAnchor({
     actualDepartureUtc: flight.actual_departure_utc,
     estimatedDepartureUtc: flight.estimated_departure_utc,

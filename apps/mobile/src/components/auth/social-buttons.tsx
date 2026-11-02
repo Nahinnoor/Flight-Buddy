@@ -30,7 +30,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useScheme } from '@/hooks/use-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { isAppleSignInAvailable, isGoogleSignInAvailable, SignInCancelledError } from '@/lib/auth';
 import { useSession } from '@/providers/session-provider';
@@ -42,7 +42,7 @@ type Provider = 'apple' | 'google';
 const BUTTON_HEIGHT = 50;
 
 function AppleButton({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
-  const isDark = useColorScheme() === 'dark';
+  const isDark = useScheme() === 'dark';
 
   return (
     // The native button has no disabled state, so the wrapper supplies one:

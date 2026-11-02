@@ -42,6 +42,15 @@ export function LevelCard({ level }: { level: LevelProgress }) {
     : `Altitude chart of eight levels. You are at level ${level.index}, ${level.name}, ` +
       `${percent}% of the way to level ${level.index + 1}, ${level.nextName}.`;
 
+  // Reached levels are solid, the current one larger and ringed, the rest hollow.
+  // Spread rather than passed as props, so a solid dot still has no stroke at all.
+  const dotProps = (i: number) =>
+    i < g.index
+      ? { r: 4.5, fill: theme.accent }
+      : i === g.index
+        ? { r: 6, fill: theme.accent, stroke: theme.backgroundElement, strokeWidth: 2.5 }
+        : { r: 4.5, fill: theme.backgroundElement, stroke: theme.textSecondary, strokeWidth: 2 };
+
   const area = [...g.solid, [g.plane[0], BASELINE] as const, [DOTS[0]?.[0] ?? 16, BASELINE] as const];
 
   return (
@@ -86,31 +95,9 @@ export function LevelCard({ level }: { level: LevelProgress }) {
               strokeLinecap="round"
             />
           ) : null}
-          {DOTS.map(([x, y], i) =>
-            i < g.index ? (
-              <Circle key={i} cx={x} cy={y} r={4.5} fill={theme.accent} />
-            ) : i === g.index ? (
-              <Circle
-                key={i}
-                cx={x}
-                cy={y}
-                r={6}
-                fill={theme.accent}
-                stroke={theme.backgroundElement}
-                strokeWidth={2.5}
-              />
-            ) : (
-              <Circle
-                key={i}
-                cx={x}
-                cy={y}
-                r={4.5}
-                fill={theme.backgroundElement}
-                stroke={theme.textSecondary}
-                strokeWidth={2}
-              />
-            ),
-          )}
+          {DOTS.map(([x, y], i) => (
+            <Circle key={i} cx={x} cy={y} {...dotProps(i)} />
+          ))}
           <G
             transform={`translate(${g.plane[0].toFixed(1)} ${(g.plane[1] - 1).toFixed(1)}) rotate(${g.angle.toFixed(1)}) scale(${PLANE_SCALE})`}>
             <Path d={PLANE.fin} fill={art.planeWing} />

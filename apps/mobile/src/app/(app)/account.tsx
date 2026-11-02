@@ -25,10 +25,11 @@ import {
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 
+import { PrimaryButton } from '@/components/auth/auth-kit';
 import { Section, SectionError, SectionLoading, sectionState } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { useRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
 import { checkDisplayName, DISPLAY_NAME_MAX_LENGTH } from '@/lib/display-name';
@@ -234,24 +235,13 @@ function NameEditor({
         </ThemedText>
       ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Save name"
-        accessibilityState={{ disabled: !canSave, busy: isSaving }}
+      {/* `disabled` stays true while saving, which is what keeps the 0.4 opacity behind the spinner. */}
+      <PrimaryButton
+        label="Save name"
+        busy={isSaving}
         disabled={!canSave}
         onPress={() => void save()}
-        style={({ pressed }) => [
-          styles.primaryButton,
-          { backgroundColor: theme.accent, opacity: !canSave ? 0.4 : pressed ? 0.8 : 1 },
-        ]}>
-        {isSaving ? (
-          <ActivityIndicator color={theme.onAccent} />
-        ) : (
-          <ThemedText type="default" style={[styles.buttonLabel, { color: theme.onAccent }]}>
-            Save name
-          </ThemedText>
-        )}
-      </Pressable>
+      />
     </View>
   );
 }
@@ -265,9 +255,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.five,
   },
   inner: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     padding: Spacing.three,
     gap: Spacing.four,
   },
@@ -287,12 +275,6 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
-  },
-  primaryButton: {
-    height: 50,
-    borderRadius: Spacing.three,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   secondaryButton: {
     height: 50,

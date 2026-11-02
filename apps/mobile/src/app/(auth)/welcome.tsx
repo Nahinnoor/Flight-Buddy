@@ -21,7 +21,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
-import { AuthScaffold, Notice, PrimaryButton, TextLink } from '@/components/auth/auth-kit';
+import { AuthLayout, AuthScaffold, Notice, PrimaryButton, TextLink } from '@/components/auth/auth-kit';
 import { AuthCopy } from '@/components/auth/copy';
 import { SocialSignIn } from '@/components/auth/social-buttons';
 import { WelcomeArtwork } from '@/components/auth/welcome-artwork';
@@ -41,10 +41,10 @@ export default function WelcomeScreen() {
 
       <View style={styles.controls}>
         <View style={styles.hero}>
-          <ThemedText type="subtitle" style={styles.centred}>
+          <ThemedText type="subtitle" style={AuthLayout.centredText}>
             {AuthCopy.productName}
           </ThemedText>
-          <ThemedText type="default" themeColor="textSecondary" style={styles.centred}>
+          <ThemedText type="default" themeColor="textSecondary" style={AuthLayout.centredText}>
             {AuthCopy.tagline}
           </ThemedText>
         </View>
@@ -83,9 +83,6 @@ const styles = StyleSheet.create({
   hero: {
     gap: Spacing.one,
     paddingBottom: Spacing.one,
-  },
-  centred: {
-    textAlign: 'center',
   },
   links: {
     flexDirection: 'row',

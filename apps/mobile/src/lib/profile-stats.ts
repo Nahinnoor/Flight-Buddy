@@ -52,6 +52,8 @@
  */
 import { durationMinutes, localDateAtAirport, type FlightStatus } from '@flightbuddy/shared';
 
+import type { Tone } from '../constants/theme';
+
 import {
   flightNumbers,
   formatDuration,
@@ -376,10 +378,8 @@ export function mrzLines(
 
 // ------------------------------------------------------------ flight log ---
 
-export type PillTone = 'neutral' | 'positive' | 'warning' | 'critical';
-
 /** How a landed flight turned out, for the flight-log pill. */
-export function flightOutcome(flight: StatsFlight): { label: string; tone: PillTone } {
+export function flightOutcome(flight: StatsFlight): { label: string; tone: Tone } {
   if (flight.status === 'cancelled') return { label: 'Cancelled', tone: 'critical' };
   if (flight.status === 'diverted') return { label: 'Diverted', tone: 'warning' };
   const actual = instant(flight.actual_arrival_utc);
@@ -410,7 +410,7 @@ export interface FlightLogEntry {
   route: string;
   /** `Sep 7 · XY 123 · 5h 20m`. */
   meta: string;
-  pill: { label: string; tone: PillTone };
+  pill: { label: string; tone: Tone };
   accessibilityLabel: string;
 }
 

@@ -15,6 +15,7 @@ import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 
 import { TAB_SCREEN_BOTTOM_INSET } from '@/components/app-tab-bar';
 import { GroupCard } from '@/components/compact-cards';
+import { Pill } from '@/components/pill';
 import {
   Section,
   SectionEmpty,
@@ -24,7 +25,7 @@ import {
 } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
 import { useRemote } from '@/hooks/use-remote';
 import { useTheme } from '@/hooks/use-theme';
@@ -126,11 +127,7 @@ function ComingSoonAction({
       <ThemedText type="default" themeColor="textSecondary" style={styles.actionLabel}>
         {label}
       </ThemedText>
-      <View style={[styles.badge, { backgroundColor: theme.neutralSurface }]}>
-        <ThemedText type="smallBold" style={[styles.badgeText, { color: theme.neutralText }]}>
-          Coming soon
-        </ThemedText>
-      </View>
+      <Pill label="Coming soon" tone="neutral" />
     </Pressable>
   );
 }
@@ -144,9 +141,7 @@ const styles = StyleSheet.create({
     paddingBottom: TAB_SCREEN_BOTTOM_INSET,
   },
   inner: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     padding: Spacing.three,
     gap: Spacing.four,
   },
@@ -164,14 +159,5 @@ const styles = StyleSheet.create({
   },
   actionLabel: {
     flex: 1,
-  },
-  badge: {
-    borderRadius: 999,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-  },
-  badgeText: {
-    fontSize: 12,
-    lineHeight: 16,
   },
 });

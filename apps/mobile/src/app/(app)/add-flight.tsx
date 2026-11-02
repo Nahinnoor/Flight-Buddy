@@ -30,7 +30,7 @@ import { formatAirportLocal, parseFlightDesignator, type FlightCandidate } from 
 import { cardDataFromCandidate, FlightCard } from '@/components/flight-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addFlight, describeError, lookupFlights } from '@/lib/api';
 import {
@@ -346,9 +346,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   inner: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     padding: Spacing.three,
     gap: Spacing.four,
   },

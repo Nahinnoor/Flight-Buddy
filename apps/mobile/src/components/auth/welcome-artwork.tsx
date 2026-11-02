@@ -45,6 +45,7 @@ import type { IllustrationPalette } from '@/constants/theme';
 import { useIllustration } from '@/hooks/use-illustration';
 
 import {
+  clamp,
   DESTINATION,
   figureAt,
   GLOBE,
@@ -265,11 +266,11 @@ function Aircraft({
     const eased = routeProgress(progress.value, route.stagger);
     // Ride the head of the drawn trail, then hold short of the pin while the
     // rest of the route runs on ahead.
-    const t = eased < route.enter ? route.enter : eased > route.settle ? route.settle : eased;
+    const t = clamp(eased, route.enter, route.settle);
     const fade = (eased - route.enter) / FADE;
     return {
       matrix: planeMatrix(route, t),
-      opacity: fade < 0 ? 0 : fade > 1 ? 1 : fade,
+      opacity: clamp(fade, 0, 1),
     };
   });
 
